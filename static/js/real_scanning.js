@@ -7,18 +7,22 @@ let currentScan = null;
 let scanInterval = null;
 
 // Initialize page
-$(document).ready(function() {
+document.addEventListener('DOMContentLoaded', function() {
     // Check tool status on page load
     checkToolStatus();
-    
+
     // Setup custom port range toggle
-    $('#naabuPorts').change(function() {
-        if ($(this).val() === 'custom') {
-            $('#customPortRange').show();
-        } else {
-            $('#customPortRange').hide();
-        }
-    });
+    const naabuPorts = document.getElementById('naabuPorts');
+    if (naabuPorts) {
+        naabuPorts.addEventListener('change', function() {
+            const customPortRange = document.getElementById('customPortRange');
+            if (this.value === 'custom') {
+                customPortRange.style.display = 'block';
+            } else {
+                customPortRange.style.display = 'none';
+            }
+        });
+    }
 });
 
 /**
@@ -26,23 +30,21 @@ $(document).ready(function() {
  */
 function checkToolStatus() {
     showLoading('Checking security tools status...');
-    
-    $.ajax({
-        url: '/api/scan/status',
-        method: 'GET',
-        success: function(response) {
+
+    fetch('/api/scan/status')
+        .then(response => response.json())
+        .then(data => {
             hideLoading();
-            if (response.success) {
-                displayToolStatus(response.status);
+            if (data.success) {
+                displayToolStatus(data.status);
             } else {
-                showError('Failed to check tool status: ' + response.error);
+                showError('Failed to check tool status: ' + data.error);
             }
-        },
-        error: function(xhr, status, error) {
+        })
+        .catch(error => {
             hideLoading();
-            showError('Error checking tool status: ' + error);
-        }
-    });
+            showError('Error checking tool status: ' + error.message);
+        });
 }
 
 /**
@@ -151,12 +153,12 @@ function displayTestResults(results) {
  * Start quick scan
  */
 function startQuickScan() {
-    const domain = $('#quickScanDomain').val().trim();
+    const domain = document.getElementById('quickScanDomain').value.trim();
     if (!domain) {
         showError('Please enter a domain to scan');
         return;
     }
-    
+
     startScan(domain, 'quick');
 }
 
@@ -164,12 +166,12 @@ function startQuickScan() {
  * Start deep scan
  */
 function startDeepScan() {
-    const domain = $('#deepScanDomain').val().trim();
+    const domain = document.getElementById('deepScanDomain').value.trim();
     if (!domain) {
         showError('Please enter a domain to scan');
         return;
     }
-    
+
     startScan(domain, 'deep');
 }
 
@@ -177,13 +179,14 @@ function startDeepScan() {
  * Show custom scan modal
  */
 function showCustomScanModal() {
-    const domain = $('#customScanDomain').val().trim();
+    const domain = document.getElementById('customScanDomain').value.trim();
     if (!domain) {
         showError('Please enter a domain to scan');
         return;
     }
-    
-    $('#customScanModal').modal('show');
+
+    // For now, just start a custom scan directly since we don't have a modal
+    startScan(domain, 'custom');
 }
 
 /**
@@ -241,36 +244,38 @@ function startCustomScan() {
  */
 function startScan(domain, scanType, config = null) {
     showScanProgress();
-    
+
     const data = {
         domain: domain,
         scan_type: scanType
     };
-    
+
     if (config) {
         data.config = config;
     }
-    
+
     const endpoint = scanType === 'custom' ? '/api/scan/custom' : `/api/scan/${scanType}`;
-    
-    $.ajax({
-        url: endpoint,
+
+    fetch(endpoint, {
         method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(data),
-        success: function(response) {
-            hideScanProgress();
-            if (response.success) {
-                displayScanResults(response.scan_results);
-                showSuccess(`${scanType.charAt(0).toUpperCase() + scanType.slice(1)} scan completed successfully!`);
-            } else {
-                showError('Scan failed: ' + response.error);
-            }
+        headers: {
+            'Content-Type': 'application/json',
         },
-        error: function(xhr, status, error) {
-            hideScanProgress();
-            showError('Scan error: ' + error);
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideScanProgress();
+        if (data.success) {
+            displayScanResults(data.scan_results);
+            showSuccess(`${scanType.charAt(0).toUpperCase() + scanType.slice(1)} scan completed successfully!`);
+        } else {
+            showError('Scan failed: ' + data.error);
         }
+    })
+    .catch(error => {
+        hideScanProgress();
+        showError('Scan error: ' + error.message);
     });
 }
 
@@ -499,23 +504,25 @@ function hideScanProgress() {
  * Utility functions
  */
 function showLoading(message) {
-    // You can implement a loading spinner here
     console.log('Loading:', message);
+    // You could add a loading spinner here
 }
 
 function hideLoading() {
-    // Hide loading spinner
     console.log('Loading complete');
 }
 
 function showError(message) {
+    console.error('Error:', message);
     alert('Error: ' + message);
 }
 
 function showSuccess(message) {
+    console.log('Success:', message);
     alert('Success: ' + message);
 }
 
 function showInfo(message) {
-    alert('Info: ' + message);
+    console.log('Info:', message);
+    // For now, just log to console instead of alert
 }
