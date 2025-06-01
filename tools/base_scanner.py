@@ -58,25 +58,24 @@ class BaseScanner(ABC):
         """Run a command and return the result"""
         try:
             logger.info(f"Running command: {' '.join(cmd)}")
-            
+
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE if input_data else None,
-                text=True,
-                timeout=self.timeout
+                text=True
             )
-            
-            stdout, stderr = process.communicate(input=input_data)
-            
+
+            stdout, stderr = process.communicate(input=input_data, timeout=self.timeout)
+
             return {
                 'returncode': process.returncode,
                 'stdout': stdout,
                 'stderr': stderr,
                 'success': process.returncode == 0
             }
-            
+
         except subprocess.TimeoutExpired:
             process.kill()
             raise ScanTimeoutError(f"{self.tool_name} scan timed out after {self.timeout} seconds")
