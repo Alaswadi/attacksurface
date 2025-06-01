@@ -313,25 +313,26 @@ class ScannerManager:
         config = {
             'subfinder': {
                 'silent': True,
-                'max_time': 60  # 1 minute
+                'max_time': 30  # Reduced to 30 seconds
             },
             'httpx': {
-                'ports': [80, 443, 8080, 8443],  # Common HTTP ports only
-                'timeout': 5,
-                'threads': 50,
+                'ports': [80, 443],  # Only HTTP/HTTPS for speed
+                'timeout': 3,  # Faster timeout
+                'threads': 100,  # More threads
                 'silent': True
             },
             'naabu': {
-                'top_ports': 100,  # Top 100 ports only
-                'rate': 2000,
-                'timeout': 3
+                'top_ports': 50,  # Reduced to top 50 ports for speed
+                'rate': 3000,  # Faster rate
+                'timeout': 2,  # Faster timeout
+                'retries': 1  # Fewer retries
             },
             'nuclei': {
-                'severity': ['critical', 'high'],  # Only critical and high severity
-                'rate_limit': 300,  # Faster rate
-                'concurrency': 50,
-                'timeout': 120,  # 2 minutes for nuclei
-                'max_time': 120  # Overall nuclei timeout
+                'templates': ['http/miscellaneous/'],  # Very limited templates
+                'rate_limit': 500,  # Much faster rate
+                'concurrency': 100,  # More concurrency
+                'timeout': 60,  # Shorter timeout
+                'max_time': 60  # Overall nuclei timeout
             }
         }
 

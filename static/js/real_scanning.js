@@ -312,95 +312,167 @@ function startScan(domain, scanType, config = null) {
  * Start individual tool scans
  */
 function startSubfinderScan() {
-    const domain = $('#subfinderDomain').val().trim();
+    const domain = document.getElementById('subfinderDomain').value.trim();
     if (!domain) {
         showError('Please enter a domain');
         return;
     }
-    
+
     showLoading('Running Subfinder...');
-    
-    $.ajax({
-        url: '/api/scan/subdomain',
+
+    fetch('/api/scan/subdomain', {
         method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ domain: domain }),
-        success: function(response) {
-            hideLoading();
-            if (response.success) {
-                displayIndividualScanResults('Subfinder', response.results);
-            } else {
-                showError('Subfinder scan failed: ' + response.error);
-            }
+        headers: {
+            'Content-Type': 'application/json',
         },
-        error: function(xhr, status, error) {
-            hideLoading();
-            showError('Subfinder error: ' + error);
+        body: JSON.stringify({ domain: domain })
+    })
+    .then(response => {
+        console.log('Subfinder response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Subfinder data:', data);
+        hideLoading();
+        if (data.success) {
+            displayIndividualScanResults('Subfinder', data.results);
+        } else {
+            showError('Subfinder scan failed: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Subfinder error:', error);
+        hideLoading();
+        showError('Subfinder error: ' + error.message);
     });
 }
 
 function startNaabuScan() {
-    const targets = $('#naabuTargets').val().trim();
+    const targets = document.getElementById('naabuTargets').value.trim();
     if (!targets) {
         showError('Please enter target hosts');
         return;
     }
-    
+
     showLoading('Running Naabu...');
-    
-    $.ajax({
-        url: '/api/scan/ports',
+
+    fetch('/api/scan/ports', {
         method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ 
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
             targets: targets.split(',').map(t => t.trim()),
             options: { top_ports: 100 }
-        }),
-        success: function(response) {
-            hideLoading();
-            if (response.success) {
-                displayIndividualScanResults('Naabu', response.results);
-            } else {
-                showError('Naabu scan failed: ' + response.error);
-            }
-        },
-        error: function(xhr, status, error) {
-            hideLoading();
-            showError('Naabu error: ' + error);
+        })
+    })
+    .then(response => {
+        console.log('Naabu response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Naabu data:', data);
+        hideLoading();
+        if (data.success) {
+            displayIndividualScanResults('Naabu', data.results);
+        } else {
+            showError('Naabu scan failed: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Naabu error:', error);
+        hideLoading();
+        showError('Naabu error: ' + error.message);
     });
 }
 
 function startNucleiScan() {
-    const targets = $('#nucleiTargets').val().trim();
+    const targets = document.getElementById('nucleiTargets').value.trim();
     if (!targets) {
         showError('Please enter target URLs');
         return;
     }
-    
+
     showLoading('Running Nuclei...');
-    
-    $.ajax({
-        url: '/api/scan/vulnerabilities',
+
+    fetch('/api/scan/vulnerabilities', {
         method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ 
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
             targets: targets.split(',').map(t => t.trim()),
             options: { severity: ['critical', 'high'] }
-        }),
-        success: function(response) {
-            hideLoading();
-            if (response.success) {
-                displayIndividualScanResults('Nuclei', response.results);
-            } else {
-                showError('Nuclei scan failed: ' + response.error);
-            }
-        },
-        error: function(xhr, status, error) {
-            hideLoading();
-            showError('Nuclei error: ' + error);
+        })
+    })
+    .then(response => {
+        console.log('Nuclei response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Nuclei data:', data);
+        hideLoading();
+        if (data.success) {
+            displayIndividualScanResults('Nuclei', data.results);
+        } else {
+            showError('Nuclei scan failed: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Nuclei error:', error);
+        hideLoading();
+        showError('Nuclei error: ' + error.message);
+    });
+}
+
+function startHttpxScan() {
+    const targets = document.getElementById('httpxTargets').value.trim();
+    if (!targets) {
+        showError('Please enter target hosts');
+        return;
+    }
+
+    showLoading('Running Httpx...');
+
+    fetch('/api/scan/httpx', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            targets: targets.split(',').map(t => t.trim()),
+            options: { timeout: 10, threads: 50 }
+        })
+    })
+    .then(response => {
+        console.log('Httpx response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Httpx data:', data);
+        hideLoading();
+        if (data.success) {
+            displayIndividualScanResults('Httpx', data.results);
+        } else {
+            showError('Httpx scan failed: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Httpx error:', error);
+        hideLoading();
+        showError('Httpx error: ' + error.message);
     });
 }
 

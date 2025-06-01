@@ -204,6 +204,41 @@ def scan_vulnerabilities():
             'error': str(e)
         }), 500
 
+@real_scanning_bp.route('/httpx', methods=['POST'])
+@login_required
+def scan_httpx():
+    """Scan for HTTP services only"""
+    try:
+        data = request.get_json()
+
+        if not data or 'targets' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Targets are required'
+            }), 400
+
+        targets = data['targets']
+        if not isinstance(targets, list):
+            targets = [targets]
+
+        # Get scan options
+        options = data.get('options', {})
+
+        # Perform HTTP probe
+        results = scanning_service.scanner_manager.http_probe_only(targets, **options)
+
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+
+    except Exception as e:
+        logger.error(f"Error performing HTTP probe: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @real_scanning_bp.route('/quick', methods=['POST'])
 @login_required
 def quick_scan():

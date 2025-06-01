@@ -34,9 +34,9 @@ class RealScanningService:
         logger.info(f"Starting {scan_type} scan for domain: {domain}")
 
         try:
-            # For quick scans, do a fast scan without nuclei first
+            # Use the new httpx-enabled scan flow for all scan types
             if scan_type == 'quick':
-                scan_results = self._quick_scan_without_nuclei(domain)
+                scan_results = self.scanner_manager.quick_scan(domain)
             elif scan_type == 'deep':
                 scan_results = self.scanner_manager.deep_scan(domain)
             else:
