@@ -69,10 +69,22 @@ print_status "Ports: HTTP=8090, Direct=8077"
 
 if docker-compose up -d --build; then
     print_success "Deployment successful!"
-    
+
     # Wait for services to start
     print_status "Waiting for services to start..."
-    sleep 15
+    sleep 20
+
+    # Wait for database to be ready
+    print_status "Waiting for database to be ready..."
+    timeout=60
+    while ! docker-compose exec -T db pg_isready -U attacksurface_user -d attacksurface >/dev/null 2>&1; do
+        sleep 2
+        timeout=$((timeout - 2))
+        if [ $timeout -le 0 ]; then
+            print_warning "Database took longer than expected to start"
+            break
+        fi
+    done
     
     # Check service status
     print_status "Service status:"

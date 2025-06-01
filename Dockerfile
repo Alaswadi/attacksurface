@@ -29,6 +29,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Make scripts executable and create entrypoint
+RUN chmod +x init_db.py && \
+    echo '#!/bin/bash\n\
+echo "🚀 Starting Attack Surface Discovery..."\n\
+echo "⏳ Waiting for database..."\n\
+sleep 15\n\
+echo "🔄 Initializing database..."\n\
+python init_db.py\n\
+echo "✅ Database initialized"\n\
+echo "🌐 Starting web server..."\n\
+exec gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 "app:create_app()"\n\
+' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' appuser \
     && chown -R appuser:appuser /app
@@ -41,5 +54,5 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:5000/api/dashboard/stats || exit 1
 
-# Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:create_app()"]
+# Run the application with database initialization
+CMD ["/app/entrypoint.sh"]
