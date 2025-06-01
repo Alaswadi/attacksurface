@@ -20,10 +20,13 @@ RUN apt-get update \
         wget \
         unzip \
         git \
+        build-essential \
+        libpcap-dev \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go (required for security tools)
-RUN wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz \
+RUN wget -q https://go.dev/dl/go1.21.5.linux-amd64.tar.gz \
     && tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz \
     && rm go1.21.5.linux-amd64.tar.gz
 
@@ -31,14 +34,35 @@ RUN wget https://go.dev/dl/go1.21.5.linux-amd64.tar.gz \
 ENV PATH="/usr/local/go/bin:${PATH}"
 ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
-
-# Install security tools
-RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest \
-    && go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest \
-    && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-
-# Add Go bin to PATH
 ENV PATH="/go/bin:${PATH}"
+
+# Create Go workspace
+RUN mkdir -p /go/bin /go/src /go/pkg
+
+# Install security tools with proper error handling
+RUN echo "Installing security tools..." \
+    && export GOPROXY=https://proxy.golang.org,direct \
+    && export GOSUMDB=sum.golang.org \
+    && export CGO_ENABLED=1 \
+    && echo "Installing Subfinder..." \
+    && timeout 300 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest || (echo "Subfinder install failed, retrying..." && go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest) \
+    && echo "Installing Naabu..." \
+    && timeout 300 go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest || (echo "Naabu install failed, retrying..." && go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest) \
+    && echo "Installing Nuclei..." \
+    && timeout 300 go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest || (echo "Nuclei install failed, retrying..." && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest) \
+    && echo "All tools installed successfully"
+
+# Verify installations and create symlinks for easier access
+RUN echo "Verifying tool installations..." \
+    && ls -la /go/bin/ \
+    && /go/bin/subfinder -version || echo "Subfinder version check failed" \
+    && /go/bin/naabu -version || echo "Naabu version check failed" \
+    && /go/bin/nuclei -version || echo "Nuclei version check failed" \
+    && cp /go/bin/subfinder /usr/local/bin/subfinder \
+    && cp /go/bin/naabu /usr/local/bin/naabu \
+    && cp /go/bin/nuclei /usr/local/bin/nuclei \
+    && chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/nuclei \
+    && echo "All tools copied to /usr/local/bin successfully"
 
 # Copy requirements first for better caching
 COPY requirements.txt .
