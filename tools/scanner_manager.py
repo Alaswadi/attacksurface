@@ -223,12 +223,13 @@ class ScannerManager:
             },
             'nuclei': {
                 'severity': ['critical', 'high'],  # Only critical and high severity
-                'rate_limit': 200,
+                'rate_limit': 300,  # Faster rate
                 'concurrency': 50,
-                'timeout': 3
+                'timeout': 120,  # 2 minutes for nuclei
+                'max_time': 120  # Overall nuclei timeout
             }
         }
-        
+
         return self.full_scan(domain, **config)
     
     def deep_scan(self, domain: str) -> Dict[str, Any]:

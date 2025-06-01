@@ -22,32 +22,32 @@ class RealScanningService:
     def scan_domain(self, domain: str, organization_id: int, scan_type: str = 'quick') -> Dict[str, Any]:
         """
         Perform a complete domain scan
-        
+
         Args:
             domain: Target domain to scan
             organization_id: Organization ID for storing results
             scan_type: Type of scan ('quick', 'deep', 'custom')
-        
+
         Returns:
             Scan results summary
         """
         logger.info(f"Starting {scan_type} scan for domain: {domain}")
-        
+
         try:
-            # Perform the scan based on type
+            # For quick scans, do a fast scan without nuclei first
             if scan_type == 'quick':
-                scan_results = self.scanner_manager.quick_scan(domain)
+                scan_results = self._quick_scan_without_nuclei(domain)
             elif scan_type == 'deep':
                 scan_results = self.scanner_manager.deep_scan(domain)
             else:
                 scan_results = self.scanner_manager.full_scan(domain)
-            
+
             # Process and store results
             summary = self._process_scan_results(scan_results, organization_id)
-            
+
             logger.info(f"Scan completed for {domain}: {summary}")
             return summary
-            
+
         except Exception as e:
             logger.error(f"Scan failed for {domain}: {str(e)}")
             return {
@@ -56,6 +56,51 @@ class RealScanningService:
                 'domain': domain,
                 'scan_type': scan_type
             }
+
+    def _quick_scan_without_nuclei(self, domain: str) -> Dict[str, Any]:
+        """Perform a quick scan without nuclei for faster response"""
+        from datetime import datetime
+
+        scan_results = {
+            'domain': domain,
+            'start_time': datetime.utcnow().isoformat(),
+            'subdomains': [],
+            'open_ports': [],
+            'vulnerabilities': [],
+            'errors': [],
+            'scan_summary': {}
+        }
+
+        try:
+            # Subdomain discovery
+            logger.info(f"Starting subdomain discovery for {domain}")
+            subdomains = self.scanner_manager.subdomain_scan_only(domain, silent=True, max_time=60)
+            scan_results['subdomains'] = subdomains.get('subdomains', [])
+
+            # Port scanning on discovered subdomains
+            if scan_results['subdomains']:
+                logger.info("Starting port scanning")
+                hosts = [sub['host'] for sub in scan_results['subdomains']]
+                ports = self.scanner_manager.port_scan_only(hosts, top_ports=100, rate=2000, timeout=3)
+                scan_results['open_ports'] = ports.get('open_ports', [])
+
+            # Skip nuclei for quick response
+            logger.info("Skipping vulnerability scan for quick response")
+
+            # Create summary
+            scan_results['scan_summary'] = {
+                'subdomains_found': len(scan_results['subdomains']),
+                'ports_found': len(scan_results['open_ports']),
+                'vulnerabilities_found': 0  # No nuclei scan
+            }
+
+        except Exception as e:
+            error_msg = f"Quick scan error: {str(e)}"
+            logger.error(error_msg)
+            scan_results['errors'].append(error_msg)
+
+        scan_results['end_time'] = datetime.utcnow().isoformat()
+        return scan_results
     
     def _process_scan_results(self, scan_results: Dict[str, Any], organization_id: int) -> Dict[str, Any]:
         """Process and store scan results in database"""
