@@ -268,7 +268,8 @@ function startScan(domain, scanType, config = null) {
         hideScanProgress();
         if (data.success) {
             displayScanResults(data.scan_results);
-            showSuccess(`${scanType.charAt(0).toUpperCase() + scanType.slice(1)} scan completed successfully!`);
+            const scanTypeName = scanType ? scanType.charAt(0).toUpperCase() + scanType.slice(1) : 'Scan';
+            showSuccess(`${scanTypeName} completed successfully!`);
         } else {
             showError('Scan failed: ' + data.error);
         }
@@ -379,8 +380,15 @@ function startNucleiScan() {
  * Display scan results
  */
 function displayScanResults(results) {
+    console.log('Displaying scan results:', results);
+
     const scanResultsCard = document.getElementById('scanResultsCard');
     const scanResultsContent = document.getElementById('scanResultsContent');
+
+    if (!results) {
+        console.error('No results provided to displayScanResults');
+        return;
+    }
 
     let html = `
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
