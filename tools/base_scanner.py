@@ -38,9 +38,20 @@ class BaseScanner(ABC):
     def _find_tool(self) -> str:
         """Find the tool executable in PATH"""
         import shutil
+        import os
+
+        # Prefer /usr/local/bin/ over other locations for better permissions
+        preferred_path = f"/usr/local/bin/{self.tool_name}"
+        if os.path.isfile(preferred_path) and os.access(preferred_path, os.X_OK):
+            logger.info(f"Found {self.tool_name} at preferred location: {preferred_path}")
+            return preferred_path
+
+        # Fallback to PATH search
         tool_path = shutil.which(self.tool_name)
         if not tool_path:
-            raise ToolNotFoundError(f"{self.tool_name} not found in PATH")
+            raise ToolNotFoundError(f"{self.tool_name} not found in PATH or /usr/local/bin/")
+
+        logger.info(f"Found {self.tool_name} at: {tool_path}")
         return tool_path
     
     def _run_command(self, cmd: List[str], input_data: Optional[str] = None) -> Dict[str, Any]:
@@ -99,8 +110,12 @@ class BaseScanner(ABC):
         """Check if the tool is available"""
         try:
             result = self._run_command([self.tool_path, '-h'])
+            logger.info(f"{self.tool_name} availability check: returncode={result['returncode']}, success={result['success']}")
+            if result['stderr']:
+                logger.info(f"{self.tool_name} stderr: {result['stderr']}")
             return result['success'] or result['returncode'] in [0, 1]  # Some tools return 1 for help
-        except:
+        except Exception as e:
+            logger.error(f"{self.tool_name} availability check failed: {str(e)}")
             return False
     
     def get_version(self) -> str:
