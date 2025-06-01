@@ -12,7 +12,6 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_change_me}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     networks:
       - attacksurface_network
     healthcheck:
@@ -67,20 +66,47 @@ services:
       retries: 3
       start_period: 40s
 
-  # Nginx Reverse Proxy
+  # Simple Nginx Reverse Proxy (without SSL for simplicity)
   nginx:
-    build: ./nginx
+    image: nginx:alpine
     container_name: attacksurface_nginx
     restart: unless-stopped
     ports:
       - "${NGINX_PORT:-8080}:80"
-      - "${NGINX_SSL_PORT:-443}:443"
     volumes:
       - ./logs/nginx:/var/log/nginx
     depends_on:
       - web
     networks:
       - attacksurface_network
+    command: |
+      sh -c "
+      cat > /etc/nginx/nginx.conf << 'EOF'
+      events {
+          worker_connections 1024;
+      }
+      http {
+          upstream backend {
+              server web:5000;
+          }
+          server {
+              listen 80;
+              location / {
+                  proxy_pass http://backend;
+                  proxy_set_header Host \$$host;
+                  proxy_set_header X-Real-IP \$$remote_addr;
+                  proxy_set_header X-Forwarded-For \$$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$$scheme;
+              }
+              location /health {
+                  return 200 'healthy';
+                  add_header Content-Type text/plain;
+              }
+          }
+      }
+      EOF
+      nginx -g 'daemon off;'
+      "
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
