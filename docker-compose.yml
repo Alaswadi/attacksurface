@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: attacksurface_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: attacksurface
+      POSTGRES_USER: attacksurface_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_change_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - attacksurface_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attacksurface_user -d attacksurface"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching and Session Storage
+  redis:
+    image: redis:7-alpine
+    container_name: attacksurface_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password_change_me}
+    volumes:
+      - redis_data:/data
+    networks:
+      - attacksurface_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Flask Web Application
+  web:
+    build: .
+    container_name: attacksurface_web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:5000"
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
+      - DATABASE_URL=postgresql://attacksurface_user:${DB_PASSWORD:-secure_password_change_me}@db:5432/attacksurface
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
+    volumes:
+      - app_data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - attacksurface_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/dashboard/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: attacksurface_nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - web
+    networks:
+      - attacksurface_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker (for background tasks)
+  celery:
+    build: .
+    container_name: attacksurface_celery
+    restart: unless-stopped
+    command: celery -A app.celery worker --loglevel=info
+    environment:
+      - FLASK_CONFIG=production
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
+      - DATABASE_URL=postgresql://attacksurface_user:${DB_PASSWORD:-secure_password_change_me}@db:5432/attacksurface
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
+    volumes:
+      - app_data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - attacksurface_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_data:
+    driver: local
+
+networks:
+  attacksurface_network:
+    driver: bridge

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attack Surface Monitoring</title>
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: { primary: "#3b82f6", secondary: "#64748b" },
+            borderRadius: {
+              none: "0px",
+              sm: "4px",
+              DEFAULT: "8px",
+              md: "12px",
+              lg: "16px",
+              xl: "20px",
+              "2xl": "24px",
+              "3xl": "32px",
+              full: "9999px",
+              button: "8px",
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+    <style>
+      :where([class^="ri-"])::before { content: "\f3c2"; }
+
+      body {
+          font-family: 'Inter', sans-serif;
+          background-color: #f9fafb;
+      }
+
+      .sidebar-icon {
+          transition: all 0.2s ease;
+      }
+
+      .sidebar-icon:hover {
+          background-color: rgba(59, 130, 246, 0.1);
+      }
+
+      .card {
+          transition: all 0.3s ease;
+      }
+
+      .card:hover {
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+
+      input[type="search"]::-webkit-search-decoration,
+      input[type="search"]::-webkit-search-cancel-button,
+      input[type="search"]::-webkit-search-results-button,
+      input[type="search"]::-webkit-search-results-decoration {
+          display: none;
+      }
+
+      input[type="search"] {
+          -webkit-appearance: none;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen">
+    <div class="flex h-screen overflow-hidden">
+      <!-- Sidebar -->
+      <div class="w-16 bg-gray-700 flex flex-col items-center py-4 text-white">
+        <div class="w-10 h-10 flex items-center justify-center mb-8">
+          <i class="ri-shield-keyhole-line ri-lg"></i>
+        </div>
+
+        <div
+          class="sidebar-icon w-10 h-10 flex items-center justify-center mb-4 rounded bg-gray-600"
+        >
+          <i class="ri-dashboard-line ri-lg"></i>
+        </div>
+
+        <div
+          class="sidebar-icon w-10 h-10 flex items-center justify-center mb-4 rounded"
+        >
+          <i class="ri-computer-line ri-lg"></i>
+        </div>
+
+        <div
+          class="sidebar-icon w-10 h-10 flex items-center justify-center mb-4 rounded"
+        >
+          <i class="ri-radar-line ri-lg"></i>
+        </div>
+
+        <div
+          class="sidebar-icon w-10 h-10 flex items-center justify-center mb-4 rounded"
+        >
+          <i class="ri-shield-check-line ri-lg"></i>
+        </div>
+
+        <div
+          class="sidebar-icon w-10 h-10 flex items-center justify-center mb-4 rounded"
+        >
+          <i class="ri-alert-line ri-lg"></i>
+        </div>
+
+        <div
+          class="mt-auto sidebar-icon w-10 h-10 flex items-center justify-center rounded"
+        >
+          <i class="ri-menu-line ri-lg"></i>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header
+          class="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6"
+        >
+          <h1 class="text-xl font-semibold text-gray-800">
+            Attack Surface Monitoring
+          </h1>
+
+          <div class="relative w-72">
+            <div
+              class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+            >
+              <i class="ri-search-line text-gray-400"></i>
+            </div>
+            <input
+              type="search"
+              class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              placeholder="Search"
+            />
+          </div>
+
+          <div class="flex items-center">
+            <button
+              class="flex items-center px-4 py-2 mr-4 border border-gray-300 rounded-button text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+            >
+              <i class="ri-settings-3-line mr-2"></i>
+              Settings
+            </button>
+
+            <div
+              class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100"
+            >
+              <i class="ri-user-line text-gray-600"></i>
+            </div>
+          </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <div class="flex-1 overflow-y-auto p-6">
+          <!-- Key Metrics -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div
+              class="card bg-white rounded shadow-sm border border-gray-100 p-6"
+            >
+              <h3 class="text-gray-500 font-medium mb-2">Active Assets</h3>
+              <p class="text-5xl font-semibold text-gray-800">52</p>
+            </div>
+
+            <div
+              class="card bg-white rounded shadow-sm border border-gray-100 p-6"
+            >
+              <h3 class="text-gray-500 font-medium mb-2">
+                Critical Vulnerabilities
+              </h3>
+              <p class="text-5xl font-semibold text-gray-800">4</p>
+            </div>
+
+            <div
+              class="card bg-white rounded shadow-sm border border-gray-100 p-6"
+            >
+              <h3 class="text-gray-500 font-medium mb-2">Alerts</h3>
+              <p class="text-5xl font-semibold text-gray-800">3</p>
+            </div>
+          </div>
+
+          <!-- Main Dashboard Sections -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Assets Section -->
+            <div
+              class="card bg-white rounded shadow-sm border border-gray-100 overflow-hidden"
+            >
+              <div class="p-5 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800">Assets</h2>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <tbody>
+                    <tr class="border-b border-gray-100">
+                      <td class="py-4 px-5 text-gray-700">Domains</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        15
+                      </td>
+                    </tr>
+                    <tr class="border-b border-gray-100">
+                      <td class="py-4 px-5 text-gray-700">IP Addresses</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        12
+                      </td>
+                    </tr>
+                    <tr class="border-b border-gray-100">
+                      <td class="py-4 px-5 text-gray-700">Subdomains</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        20
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="py-4 px-5 text-gray-700">Cloud Resources</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        5
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Vulnerability Scanner -->
+            <div class="card bg-white rounded shadow-sm border border-gray-100">
+              <div class="p-5 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800">
+                  Vulnerability Scanner
+                </h2>
+              </div>
+              <div class="p-5">
+                <div id="vulnerabilityChart" class="w-full h-64"></div>
+              </div>
+            </div>
+
+            <!-- Recent Discoveries -->
+            <div class="card bg-white rounded shadow-sm border border-gray-100">
+              <div class="p-5 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800">
+                  Recent Discoveries
+                </h2>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full">
+                  <tbody>
+                    <tr class="border-b border-gray-100">
+                      <td class="py-4 px-5 text-gray-700">New Subdomain</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        api-dev.example.com
+                      </td>
+                    </tr>
+                    <tr class="border-b border-gray-100">
+                      <td class="py-4 px-5 text-gray-700">Exposed Service</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        Redis on 192.168.1.24
+                      </td>
+                    </tr>
+                    <tr class="border-b border-gray-100">
+                      <td class="py-4 px-5 text-gray-700">New IP Address</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        34.225.198.57
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="py-4 px-5 text-gray-700">Cloud Instance</td>
+                      <td
+                        class="py-4 px-5 text-right font-medium text-gray-800"
+                      >
+                        EC2 i-08a9f7b3c5d4e2f1a
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Threat Intelligence -->
+            <div class="card bg-white rounded shadow-sm border border-gray-100">
+              <div class="p-5 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-800">
+                  Threat Intelligence
+                </h2>
+              </div>
+              <div class="p-5 space-y-4">
+                <div class="p-4 bg-gray-50 rounded">
+                  <h4 class="font-medium text-gray-800 mb-2">
+                    CVE-2023-45678 Detected
+                  </h4>
+                  <p class="text-gray-600 text-sm">
+                    Critical vulnerability detected in Apache server version
+                    2.4.52 running on web-01.example.com
+                  </p>
+                </div>
+                <div class="p-4 bg-gray-50 rounded">
+                  <h4 class="font-medium text-gray-800 mb-2">
+                    Suspicious Activity
+                  </h4>
+                  <p class="text-gray-600 text-sm">
+                    Multiple failed login attempts detected from IP
+                    185.143.223.45 targeting admin portal
+                  </p>
+                </div>
+                <div class="p-4 bg-gray-50 rounded">
+                  <h4 class="font-medium text-gray-800 mb-2">
+                    Security Advisory
+                  </h4>
+                  <p class="text-gray-600 text-sm">
+                    New ransomware campaign targeting exposed MongoDB instances.
+                    2 of your assets may be vulnerable.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alerts Section -->
+          <div class="mt-6">
+            <div class="card bg-white rounded shadow-sm border border-gray-100">
+              <div
+                class="p-5 border-b border-gray-100 flex justify-between items-center"
+              >
+                <h2 class="text-lg font-semibold text-gray-800">
+                  Active Alerts
+                </h2>
+                <button
+                  class="text-primary hover:text-primary-dark transition-colors whitespace-nowrap"
+                >
+                  View All
+                </button>
+              </div>
+              <div>
+                <div class="border-b border-gray-100">
+                  <div class="p-5 flex items-start">
+                    <div
+                      class="w-8 h-8 flex items-center justify-center rounded-full bg-red-100 text-red-500 mr-4 flex-shrink-0"
+                    >
+                      <i class="ri-error-warning-line"></i>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex justify-between items-start mb-1">
+                        <h4 class="font-medium text-gray-800">
+                          Critical: SSL Certificate Expiring
+                        </h4>
+                        <span class="text-sm text-gray-500">2 hours ago</span>
+                      </div>
+                      <p class="text-gray-600 text-sm">
+                        The SSL certificate for payments.example.com will expire
+                        in 3 days. Immediate action required.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="border-b border-gray-100">
+                  <div class="p-5 flex items-start">
+                    <div
+                      class="w-8 h-8 flex items-center justify-center rounded-full bg-amber-100 text-amber-500 mr-4 flex-shrink-0"
+                    >
+                      <i class="ri-alert-line"></i>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex justify-between items-start mb-1">
+                        <h4 class="font-medium text-gray-800">
+                          High: Open Database Port Detected
+                        </h4>
+                        <span class="text-sm text-gray-500">Yesterday</span>
+                      </div>
+                      <p class="text-gray-600 text-sm">
+                        MongoDB port 27017 is publicly accessible on
+                        database-03.example.com without authentication.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="p-5 flex items-start">
+                    <div
+                      class="w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 text-blue-500 mr-4 flex-shrink-0"
+                    >
+                      <i class="ri-information-line"></i>
+                    </div>
+                    <div class="flex-1">
+                      <div class="flex justify-between items-start mb-1">
+                        <h4 class="font-medium text-gray-800">
+                          Info: New Asset Discovered
+                        </h4>
+                        <span class="text-sm text-gray-500">2 days ago</span>
+                      </div>
+                      <p class="text-gray-600 text-sm">
+                        New subdomain staging-api.example.com discovered
+                        pointing to an unmonitored server.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script id="vulnerability-chart-script">
+      document.addEventListener("DOMContentLoaded", function () {
+        const vulnerabilityChart = echarts.init(
+          document.getElementById("vulnerabilityChart"),
+        );
+
+        const option = {
+          animation: false,
+          grid: {
+            top: 10,
+            right: 10,
+            bottom: 20,
+            left: 40,
+          },
+          tooltip: {
+            trigger: "axis",
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            borderColor: "#e2e8f0",
+            borderWidth: 1,
+            textStyle: {
+              color: "#1f2937",
+            },
+          },
+          xAxis: {
+            type: "category",
+            data: [
+              "May 26",
+              "May 27",
+              "May 28",
+              "May 29",
+              "May 30",
+              "May 31",
+              "Jun 1",
+            ],
+            axisLine: {
+              lineStyle: {
+                color: "#e2e8f0",
+              },
+            },
+            axisLabel: {
+              color: "#64748b",
+            },
+          },
+          yAxis: {
+            type: "value",
+            axisLine: {
+              show: false,
+            },
+            axisLabel: {
+              color: "#64748b",
+            },
+            splitLine: {
+              lineStyle: {
+                color: "#e2e8f0",
+              },
+            },
+          },
+          series: [
+            {
+              name: "Critical",
+              type: "line",
+              smooth: true,
+              symbol: "none",
+              lineStyle: {
+                width: 3,
+                color: "rgba(252, 141, 98, 1)",
+              },
+              areaStyle: {
+                color: {
+                  type: "linear",
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    {
+                      offset: 0,
+                      color: "rgba(252, 141, 98, 0.1)",
+                    },
+                    {
+                      offset: 1,
+                      color: "rgba(252, 141, 98, 0.01)",
+                    },
+                  ],
+                },
+              },
+              data: [2, 3, 5, 4, 6, 5, 4],
+            },
+            {
+              name: "High",
+              type: "line",
+              smooth: true,
+              symbol: "none",
+              lineStyle: {
+                width: 3,
+                color: "rgba(251, 191, 114, 1)",
+              },
+              areaStyle: {
+                color: {
+                  type: "linear",
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    {
+                      offset: 0,
+                      color: "rgba(251, 191, 114, 0.1)",
+                    },
+                    {
+                      offset: 1,
+                      color: "rgba(251, 191, 114, 0.01)",
+                    },
+                  ],
+                },
+              },
+              data: [8, 10, 9, 11, 13, 15, 12],
+            },
+            {
+              name: "Medium",
+              type: "line",
+              smooth: true,
+              symbol: "none",
+              lineStyle: {
+                width: 3,
+                color: "rgba(141, 211, 199, 1)",
+              },
+              areaStyle: {
+                color: {
+                  type: "linear",
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    {
+                      offset: 0,
+                      color: "rgba(141, 211, 199, 0.1)",
+                    },
+                    {
+                      offset: 1,
+                      color: "rgba(141, 211, 199, 0.01)",
+                    },
+                  ],
+                },
+              },
+              data: [18, 16, 19, 15, 17, 14, 16],
+            },
+            {
+              name: "Low",
+              type: "line",
+              smooth: true,
+              symbol: "none",
+              lineStyle: {
+                width: 3,
+                color: "rgba(87, 181, 231, 1)",
+              },
+              areaStyle: {
+                color: {
+                  type: "linear",
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    {
+                      offset: 0,
+                      color: "rgba(87, 181, 231, 0.1)",
+                    },
+                    {
+                      offset: 1,
+                      color: "rgba(87, 181, 231, 0.01)",
+                    },
+                  ],
+                },
+              },
+              data: [25, 22, 20, 18, 21, 23, 25],
+            },
+          ],
+        };
+
+        vulnerabilityChart.setOption(option);
+
+        window.addEventListener("resize", function () {
+          vulnerabilityChart.resize();
+        });
+      });
+    </script>
+  </body>
+</html>

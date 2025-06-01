@@ -1,0 +1,39 @@
+# Docker Compose Override for Development
+# This file is automatically loaded by docker-compose
+# Use for development-specific configurations
+
+version: '3.8'
+
+services:
+  # Development overrides for web service
+  web:
+    environment:
+      - FLASK_CONFIG=development
+      - FLASK_DEBUG=1
+    volumes:
+      # Mount source code for live reloading
+      - .:/app
+      - /app/__pycache__
+    command: ["python", "run.py"]
+    ports:
+      # Expose additional port for direct access
+      - "5000:5000"
+
+  # Development overrides for database
+  db:
+    ports:
+      # Expose database port for external access
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=attacksurface_dev
+
+  # Development overrides for Redis
+  redis:
+    ports:
+      # Expose Redis port for external access
+      - "6379:6379"
+
+  # Disable Celery in development (optional)
+  celery:
+    profiles:
+      - production

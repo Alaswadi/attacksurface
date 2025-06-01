@@ -1,0 +1,1068 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Attack Surface Monitoring{% endblock %}
+
+{% block content %}
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-gray-700 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+        <!-- Logo Section -->
+        <div class="flex items-center justify-center py-4 mb-4">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <i class="ri-shield-keyhole-line ri-lg text-blue-400"></i>
+            </div>
+            <span id="logo-text" class="ml-3 text-lg font-semibold text-blue-400 opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
+        </div>
+
+        <!-- Navigation Items -->
+        <nav class="flex-1 px-2">
+            <!-- Dashboard -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors bg-gray-600 relative" data-section="dashboard" title="Dashboard">
+                <div class="flex items-center">
+                    <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Assets -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="assets" title="Assets">
+                <div class="flex items-center">
+                    <i class="ri-computer-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="vulnerabilities" title="Vulnerabilities">
+                <div class="flex items-center">
+                    <i class="ri-shield-check-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
+                <div class="flex items-center">
+                    <i class="ri-alert-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
+                    <span class="alert-badge ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 nav-text opacity-0 transition-opacity duration-300">{{ active_alerts }}</span>
+                </div>
+            </div>
+
+            <!-- Scans -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="scans" title="Scans">
+                <div class="flex items-center">
+                    <i class="ri-radar-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Scans</span>
+                </div>
+            </div>
+
+            <!-- Reports -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="reports" title="Reports">
+                <div class="flex items-center">
+                    <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="settings" title="Settings">
+                <div class="flex items-center">
+                    <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Toggle Button -->
+        <div class="p-2">
+            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center" title="Toggle Sidebar">
+                <i class="ri-menu-line ri-lg min-w-[24px]"></i>
+                <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+            <h1 class="text-xl font-semibold text-gray-800">Attack Surface Discovery</h1>
+
+            <div class="flex items-center space-x-4">
+                <div class="relative w-80">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="ri-global-line text-gray-400"></i>
+                    </div>
+                    <input
+                        type="text"
+                        id="domain-input"
+                        class="block w-full pl-10 pr-20 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                        placeholder="Enter domain (e.g., example.com)"
+                        value="">
+                    <button
+                        id="scan-button"
+                        class="absolute inset-y-0 right-0 px-4 py-2 bg-primary text-white text-sm font-medium rounded-r-lg hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onclick="startScan()">
+                        <span id="scan-button-text">Scan</span>
+                        <i id="scan-button-icon" class="ri-search-line ml-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-center">
+                <button class="flex items-center px-4 py-2 mr-4 border border-gray-300 rounded-button text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap">
+                    <i class="ri-settings-3-line mr-2"></i>
+                    Settings
+                </button>
+
+                <div class="relative">
+                    <button class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100" onclick="toggleUserMenu()">
+                        <i class="ri-user-line text-gray-600"></i>
+                    </button>
+                    <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
+                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Content -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Key Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Discovered Subdomains</h3>
+                    <p id="subdomains-count" class="text-5xl font-semibold text-gray-800">0</p>
+                    <p class="text-sm text-gray-500 mt-1">Found by Subfinder</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Critical Vulnerabilities</h3>
+                    <p id="vulnerabilities-count" class="text-5xl font-semibold text-gray-800">0</p>
+                    <p class="text-sm text-gray-500 mt-1">Detected by Nuclei</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Open Ports</h3>
+                    <p id="ports-count" class="text-5xl font-semibold text-gray-800">0</p>
+                    <p class="text-sm text-gray-500 mt-1">Scanned by Naabu</p>
+                </div>
+            </div>
+
+            <!-- Main Dashboard Sections -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Interactive Attack Surface Map -->
+                <div class="card bg-white rounded shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-gray-800">Attack Surface Map</h2>
+                        <div class="flex items-center space-x-2">
+                            <div class="flex items-center space-x-1 text-xs">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                <span class="text-gray-600">Domain</span>
+                            </div>
+                            <div class="flex items-center space-x-1 text-xs">
+                                <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <span class="text-gray-600">Subdomain</span>
+                            </div>
+                            <div class="flex items-center space-x-1 text-xs">
+                                <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <span class="text-gray-600">Port</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <div id="attack-surface-map" class="w-full h-80 bg-gray-50"></div>
+                        <div id="map-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-500">
+                            <div class="text-center">
+                                <i class="ri-map-2-line text-4xl mb-2"></i>
+                                <p class="text-lg font-medium">Start a scan to view the attack surface map</p>
+                                <p class="text-sm">Enter a domain above and click "Scan"</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scan Progress Indicator -->
+                <div class="card bg-white rounded shadow-sm border border-gray-100">
+                    <div class="p-5 border-b border-gray-100">
+                        <h2 class="text-lg font-semibold text-gray-800">Scan Progress</h2>
+                    </div>
+                    <div class="p-5">
+                        <div id="scan-progress-container" class="w-full h-64">
+                            <!-- Idle State -->
+                            <div id="scan-idle" class="flex items-center justify-center h-full text-gray-500">
+                                <div class="text-center">
+                                    <i class="ri-radar-line text-4xl mb-2"></i>
+                                    <p class="text-lg font-medium">Ready to scan</p>
+                                    <p class="text-sm">Enter a domain to begin discovery</p>
+                                </div>
+                            </div>
+
+                            <!-- Progress State -->
+                            <div id="scan-progress" class="hidden space-y-4">
+                                <div class="text-center mb-4">
+                                    <h3 id="scan-status" class="text-lg font-medium text-gray-800">Initializing scan...</h3>
+                                    <p id="scan-domain" class="text-sm text-gray-600"></p>
+                                </div>
+
+                                <!-- Subfinder Progress -->
+                                <div class="space-y-2">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Subfinder (Subdomain Discovery)</span>
+                                        <span id="subfinder-status" class="text-sm text-gray-500">Waiting...</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div id="subfinder-progress" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Naabu Progress -->
+                                <div class="space-y-2">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Naabu (Port Scanning)</span>
+                                        <span id="naabu-status" class="text-sm text-gray-500">Waiting...</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div id="naabu-progress" class="bg-green-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Nuclei Progress -->
+                                <div class="space-y-2">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm font-medium text-gray-700">Nuclei (Vulnerability Scanning)</span>
+                                        <span id="nuclei-status" class="text-sm text-gray-500">Waiting...</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div id="nuclei-progress" class="bg-red-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Completion State -->
+                            <div id="scan-complete" class="hidden text-center">
+                                <div class="mb-4">
+                                    <i class="ri-check-circle-line text-4xl text-green-500 mb-2"></i>
+                                    <h3 class="text-lg font-medium text-gray-800">Scan Completed!</h3>
+                                </div>
+                                <div id="scan-summary" class="space-y-2 text-sm text-gray-600">
+                                    <!-- Summary will be populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scan Results -->
+                <div class="card bg-white rounded shadow-sm border border-gray-100">
+                    <div class="p-5 border-b border-gray-100">
+                        <h2 class="text-lg font-semibold text-gray-800">Scan Results</h2>
+                    </div>
+                    <div class="p-5">
+                        <div id="scan-results-container">
+                            <!-- No Results State -->
+                            <div id="no-results" class="text-center text-gray-500 py-8">
+                                <i class="ri-search-line text-3xl mb-2"></i>
+                                <p class="text-lg font-medium">No scan results yet</p>
+                                <p class="text-sm">Start a scan to see discovered assets</p>
+                            </div>
+
+                            <!-- Results Tabs -->
+                            <div id="results-tabs" class="hidden">
+                                <div class="flex border-b border-gray-200 mb-4">
+                                    <button class="tab-button active px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-blue-600" data-tab="subdomains">
+                                        Subdomains
+                                    </button>
+                                    <button class="tab-button px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="ports">
+                                        Ports
+                                    </button>
+                                    <button class="tab-button px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="vulnerabilities">
+                                        Vulnerabilities
+                                    </button>
+                                </div>
+
+                                <!-- Subdomains Tab -->
+                                <div id="subdomains-tab" class="tab-content">
+                                    <div id="subdomains-list" class="space-y-2 max-h-48 overflow-y-auto">
+                                        <!-- Populated by JavaScript -->
+                                    </div>
+                                </div>
+
+                                <!-- Ports Tab -->
+                                <div id="ports-tab" class="tab-content hidden">
+                                    <div id="ports-list" class="space-y-2 max-h-48 overflow-y-auto">
+                                        <!-- Populated by JavaScript -->
+                                    </div>
+                                </div>
+
+                                <!-- Vulnerabilities Tab -->
+                                <div id="vulnerabilities-tab" class="tab-content hidden">
+                                    <div id="vulnerabilities-list" class="space-y-2 max-h-48 overflow-y-auto">
+                                        <!-- Populated by JavaScript -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vulnerability Details -->
+                <div class="card bg-white rounded shadow-sm border border-gray-100">
+                    <div class="p-5 border-b border-gray-100">
+                        <h2 class="text-lg font-semibold text-gray-800">Vulnerability Details</h2>
+                    </div>
+                    <div class="p-5">
+                        <div id="vulnerability-details-container">
+                            <!-- No Vulnerabilities State -->
+                            <div id="no-vulnerabilities" class="text-center text-gray-500 py-8">
+                                <i class="ri-shield-check-line text-3xl mb-2"></i>
+                                <p class="text-lg font-medium">No vulnerabilities found</p>
+                                <p class="text-sm">Start a scan to check for security issues</p>
+                            </div>
+
+                            <!-- Vulnerabilities List -->
+                            <div id="vulnerabilities-details" class="hidden space-y-4 max-h-64 overflow-y-auto">
+                                <!-- Populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scan Notifications & Reports -->
+            <div class="mt-6">
+                <div class="card bg-white rounded shadow-sm border border-gray-100">
+                    <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                        <h2 class="text-lg font-semibold text-gray-800">Scan Notifications</h2>
+                        <div class="flex items-center space-x-2">
+                            <button id="download-report-btn" class="hidden px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2" onclick="downloadReport()">
+                                <i class="ri-download-line mr-2"></i>
+                                Download Report
+                            </button>
+                            <button class="text-primary hover:text-primary-dark transition-colors whitespace-nowrap" onclick="clearNotifications()">
+                                Clear All
+                            </button>
+                        </div>
+                    </div>
+                    <div id="notifications-container">
+                        <div id="no-notifications" class="p-5 text-center text-gray-500">
+                            <i class="ri-notification-line text-3xl mb-2"></i>
+                            <p class="text-lg font-medium">No notifications</p>
+                            <p class="text-sm">Scan notifications will appear here</p>
+                        </div>
+
+                        <div id="notifications-list" class="hidden">
+                            <!-- Notifications will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let sidebarExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+let currentScanId = null;
+let scanResults = null;
+let attackSurfaceMap = null;
+let notifications = [];
+
+// Sidebar functionality
+function initializeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleButton = document.getElementById('sidebar-toggle');
+    const toggleIcon = toggleButton.querySelector('i');
+
+    if (sidebarExpanded) {
+        expandSidebar();
+    } else {
+        collapseSidebar();
+    }
+}
+
+function expandSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleButton = document.getElementById('sidebar-toggle');
+    const toggleIcon = toggleButton.querySelector('i');
+    const toggleText = document.getElementById('toggle-text');
+
+    sidebar.classList.remove('w-16');
+    sidebar.classList.add('w-64');
+
+    // Show text elements with delay for smooth animation
+    setTimeout(() => {
+        logoText.classList.remove('opacity-0');
+        logoText.classList.add('opacity-100');
+        navTexts.forEach(text => {
+            text.classList.remove('opacity-0');
+            text.classList.add('opacity-100');
+        });
+    }, 150);
+
+    // Update toggle button
+    toggleIcon.classList.remove('ri-menu-line');
+    toggleIcon.classList.add('ri-menu-fold-line');
+    toggleText.textContent = 'Collapse';
+
+    sidebarExpanded = true;
+    localStorage.setItem('sidebarExpanded', 'true');
+}
+
+function collapseSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleButton = document.getElementById('sidebar-toggle');
+    const toggleIcon = toggleButton.querySelector('i');
+    const toggleText = document.getElementById('toggle-text');
+
+    // Hide text elements immediately
+    logoText.classList.remove('opacity-100');
+    logoText.classList.add('opacity-0');
+    navTexts.forEach(text => {
+        text.classList.remove('opacity-100');
+        text.classList.add('opacity-0');
+    });
+
+    // Collapse sidebar after text fade
+    setTimeout(() => {
+        sidebar.classList.remove('w-64');
+        sidebar.classList.add('w-16');
+    }, 150);
+
+    // Update toggle button
+    toggleIcon.classList.remove('ri-menu-fold-line');
+    toggleIcon.classList.add('ri-menu-line');
+    toggleText.textContent = 'Expand';
+
+    sidebarExpanded = false;
+    localStorage.setItem('sidebarExpanded', 'false');
+}
+
+function toggleSidebar() {
+    if (sidebarExpanded) {
+        collapseSidebar();
+    } else {
+        expandSidebar();
+    }
+}
+
+// Navigation functionality
+function setActiveNavItem(section) {
+    // Remove active class from all nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('bg-gray-600');
+        item.classList.add('hover:bg-gray-600');
+    });
+
+    // Add active class to selected item
+    const activeItem = document.querySelector(`[data-section="${section}"]`);
+    if (activeItem) {
+        activeItem.classList.add('bg-gray-600');
+        activeItem.classList.remove('hover:bg-gray-600');
+    }
+}
+
+function toggleUserMenu() {
+    const menu = document.getElementById('userMenu');
+    menu.classList.toggle('hidden');
+}
+
+// Close user menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('userMenu');
+    const button = event.target.closest('button');
+    if (!button || !button.onclick) {
+        menu.classList.add('hidden');
+    }
+});
+
+// Scanning functionality
+async function startScan() {
+    const domainInput = document.getElementById('domain-input');
+    const domain = domainInput.value.trim();
+
+    if (!domain) {
+        addNotification('error', 'Please enter a domain to scan');
+        return;
+    }
+
+    // Validate domain format
+    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+    if (!domainRegex.test(domain)) {
+        addNotification('error', 'Please enter a valid domain (e.g., example.com)');
+        return;
+    }
+
+    // Reset UI state
+    resetScanUI();
+    showScanProgress();
+
+    try {
+        // Start scan
+        const response = await fetch('/api/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ domain: domain })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        currentScanId = data.scan_id;
+
+        addNotification('info', `Scan started for ${domain}`);
+
+        // Start polling for progress
+        pollScanProgress();
+
+    } catch (error) {
+        console.error('Error starting scan:', error);
+        addNotification('error', `Failed to start scan: ${error.message}`);
+        resetToIdleState();
+    }
+}
+
+async function pollScanProgress() {
+    if (!currentScanId) return;
+
+    try {
+        const response = await fetch(`/api/scan/${currentScanId}/status`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        updateScanProgress(data);
+
+        if (data.status === 'completed') {
+            await handleScanCompletion(data);
+        } else if (data.status === 'failed') {
+            addNotification('error', `Scan failed: ${data.error || 'Unknown error'}`);
+            resetToIdleState();
+        } else {
+            // Continue polling
+            setTimeout(pollScanProgress, 2000);
+        }
+
+    } catch (error) {
+        console.error('Error polling scan progress:', error);
+        addNotification('error', `Error checking scan progress: ${error.message}`);
+        resetToIdleState();
+    }
+}
+
+function updateScanProgress(data) {
+    const progress = data.progress || {};
+
+    // Update scan status
+    document.getElementById('scan-status').textContent = data.message || 'Scanning...';
+    document.getElementById('scan-domain').textContent = `Domain: ${data.domain}`;
+
+    // Update individual tool progress
+    updateToolProgress('subfinder', progress.subfinder || 0);
+    updateToolProgress('naabu', progress.naabu || 0);
+    updateToolProgress('nuclei', progress.nuclei || 0);
+}
+
+function updateToolProgress(tool, progress) {
+    const progressBar = document.getElementById(`${tool}-progress`);
+    const statusSpan = document.getElementById(`${tool}-status`);
+
+    if (progressBar) {
+        progressBar.style.width = `${progress}%`;
+    }
+
+    if (statusSpan) {
+        if (progress === 0) {
+            statusSpan.textContent = 'Waiting...';
+        } else if (progress === 100) {
+            statusSpan.textContent = 'Completed';
+        } else {
+            statusSpan.textContent = `${progress}%`;
+        }
+    }
+}
+
+async function handleScanCompletion(data) {
+    try {
+        // Fetch detailed results
+        const response = await fetch(`/api/scan/${currentScanId}/results`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        scanResults = await response.json();
+
+        // Update UI with results
+        updateMetrics(scanResults);
+        displayScanResults(scanResults);
+        createAttackSurfaceMap(scanResults);
+        showScanComplete(scanResults);
+
+        addNotification('success', `Scan completed! Found ${scanResults.subdomains?.length || 0} subdomains, ${scanResults.ports?.length || 0} open ports, ${scanResults.vulnerabilities?.length || 0} vulnerabilities`);
+
+        // Show download report button
+        document.getElementById('download-report-btn').classList.remove('hidden');
+
+    } catch (error) {
+        console.error('Error fetching scan results:', error);
+        addNotification('error', `Error fetching scan results: ${error.message}`);
+    }
+}
+
+// Initialize sidebar on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSidebar();
+    initializeTabSwitching();
+
+    // Add click event to toggle button
+    document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+
+    // Add click events to navigation items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const section = this.getAttribute('data-section');
+            setActiveNavItem(section);
+
+            // Here you can add logic to show different content sections
+            console.log(`Navigating to: ${section}`);
+        });
+    });
+
+    // Add Enter key support for domain input
+    document.getElementById('domain-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            startScan();
+        }
+    });
+});
+
+// UI Management Functions
+function resetScanUI() {
+    // Reset metrics
+    document.getElementById('subdomains-count').textContent = '0';
+    document.getElementById('vulnerabilities-count').textContent = '0';
+    document.getElementById('ports-count').textContent = '0';
+
+    // Hide results
+    document.getElementById('no-results').classList.remove('hidden');
+    document.getElementById('results-tabs').classList.add('hidden');
+
+    // Hide vulnerabilities
+    document.getElementById('no-vulnerabilities').classList.remove('hidden');
+    document.getElementById('vulnerabilities-details').classList.add('hidden');
+
+    // Hide map
+    document.getElementById('map-placeholder').classList.remove('hidden');
+
+    // Hide download button
+    document.getElementById('download-report-btn').classList.add('hidden');
+
+    // Reset progress bars
+    ['subfinder', 'naabu', 'nuclei'].forEach(tool => {
+        document.getElementById(`${tool}-progress`).style.width = '0%';
+        document.getElementById(`${tool}-status`).textContent = 'Waiting...';
+    });
+}
+
+function showScanProgress() {
+    document.getElementById('scan-idle').classList.add('hidden');
+    document.getElementById('scan-progress').classList.remove('hidden');
+    document.getElementById('scan-complete').classList.add('hidden');
+
+    // Update button state
+    const scanButton = document.getElementById('scan-button');
+    const scanButtonText = document.getElementById('scan-button-text');
+    const scanButtonIcon = document.getElementById('scan-button-icon');
+
+    scanButton.disabled = true;
+    scanButtonText.textContent = 'Scanning...';
+    scanButtonIcon.className = 'ri-loader-line ml-1 animate-spin';
+}
+
+function resetToIdleState() {
+    document.getElementById('scan-idle').classList.remove('hidden');
+    document.getElementById('scan-progress').classList.add('hidden');
+    document.getElementById('scan-complete').classList.add('hidden');
+
+    // Reset button state
+    const scanButton = document.getElementById('scan-button');
+    const scanButtonText = document.getElementById('scan-button-text');
+    const scanButtonIcon = document.getElementById('scan-button-icon');
+
+    scanButton.disabled = false;
+    scanButtonText.textContent = 'Scan';
+    scanButtonIcon.className = 'ri-search-line ml-1';
+}
+
+function showScanComplete(results) {
+    document.getElementById('scan-idle').classList.add('hidden');
+    document.getElementById('scan-progress').classList.add('hidden');
+    document.getElementById('scan-complete').classList.remove('hidden');
+
+    // Update summary
+    const summary = document.getElementById('scan-summary');
+    summary.innerHTML = `
+        <p><strong>${results.subdomains?.length || 0}</strong> subdomains discovered</p>
+        <p><strong>${results.ports?.length || 0}</strong> open ports found</p>
+        <p><strong>${results.vulnerabilities?.length || 0}</strong> vulnerabilities detected</p>
+    `;
+
+    // Reset button state
+    resetToIdleState();
+}
+
+function updateMetrics(results) {
+    document.getElementById('subdomains-count').textContent = results.subdomains?.length || 0;
+    document.getElementById('vulnerabilities-count').textContent = results.vulnerabilities?.filter(v => v.severity === 'critical').length || 0;
+    document.getElementById('ports-count').textContent = results.ports?.length || 0;
+}
+
+// Tab switching functionality
+function initializeTabSwitching() {
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            switchTab(tabName);
+        });
+    });
+}
+
+function switchTab(tabName) {
+    // Update button states
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active', 'border-blue-500', 'text-blue-600');
+        button.classList.add('border-transparent', 'text-gray-500');
+    });
+
+    const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
+    if (activeButton) {
+        activeButton.classList.add('active', 'border-blue-500', 'text-blue-600');
+        activeButton.classList.remove('border-transparent', 'text-gray-500');
+    }
+
+    // Show/hide tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    const activeContent = document.getElementById(`${tabName}-tab`);
+    if (activeContent) {
+        activeContent.classList.remove('hidden');
+    }
+}
+
+// Notification system
+function addNotification(type, message) {
+    const notification = {
+        id: Date.now(),
+        type: type,
+        message: message,
+        timestamp: new Date()
+    };
+
+    notifications.unshift(notification);
+    updateNotificationsDisplay();
+}
+
+function updateNotificationsDisplay() {
+    const noNotifications = document.getElementById('no-notifications');
+    const notificationsList = document.getElementById('notifications-list');
+
+    if (notifications.length === 0) {
+        noNotifications.classList.remove('hidden');
+        notificationsList.classList.add('hidden');
+        return;
+    }
+
+    noNotifications.classList.add('hidden');
+    notificationsList.classList.remove('hidden');
+
+    notificationsList.innerHTML = notifications.map(notification => {
+        const iconClass = {
+            'success': 'ri-check-circle-line text-green-500',
+            'error': 'ri-error-warning-line text-red-500',
+            'info': 'ri-information-line text-blue-500',
+            'warning': 'ri-alert-line text-yellow-500'
+        }[notification.type] || 'ri-information-line text-gray-500';
+
+        return `
+            <div class="p-4 border-b border-gray-100 flex items-start">
+                <div class="w-8 h-8 flex items-center justify-center rounded-full mr-4 flex-shrink-0">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="flex-1">
+                    <p class="text-gray-800 text-sm">${notification.message}</p>
+                    <p class="text-gray-500 text-xs mt-1">${notification.timestamp.toLocaleTimeString()}</p>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function clearNotifications() {
+    notifications = [];
+    updateNotificationsDisplay();
+}
+
+// Display scan results
+function displayScanResults(results) {
+    // Show results section
+    document.getElementById('no-results').classList.add('hidden');
+    document.getElementById('results-tabs').classList.remove('hidden');
+
+    // Populate subdomains
+    const subdomainsList = document.getElementById('subdomains-list');
+    if (results.subdomains && results.subdomains.length > 0) {
+        subdomainsList.innerHTML = results.subdomains.map(subdomain => `
+            <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span class="text-sm font-medium text-gray-800">${subdomain}</span>
+                <span class="text-xs text-gray-500">Subdomain</span>
+            </div>
+        `).join('');
+    } else {
+        subdomainsList.innerHTML = '<p class="text-gray-500 text-sm">No subdomains found</p>';
+    }
+
+    // Populate ports
+    const portsList = document.getElementById('ports-list');
+    if (results.ports && results.ports.length > 0) {
+        portsList.innerHTML = results.ports.map(port => `
+            <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span class="text-sm font-medium text-gray-800">${port.host}:${port.port}</span>
+                <span class="text-xs text-gray-500">${port.service || 'Unknown'}</span>
+            </div>
+        `).join('');
+    } else {
+        portsList.innerHTML = '<p class="text-gray-500 text-sm">No open ports found</p>';
+    }
+
+    // Populate vulnerabilities
+    const vulnerabilitiesList = document.getElementById('vulnerabilities-list');
+    if (results.vulnerabilities && results.vulnerabilities.length > 0) {
+        vulnerabilitiesList.innerHTML = results.vulnerabilities.map(vuln => {
+            const severityColor = {
+                'critical': 'text-red-600 bg-red-100',
+                'high': 'text-orange-600 bg-orange-100',
+                'medium': 'text-yellow-600 bg-yellow-100',
+                'low': 'text-blue-600 bg-blue-100'
+            }[vuln.severity] || 'text-gray-600 bg-gray-100';
+
+            return `
+                <div class="p-2 bg-gray-50 rounded">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-medium text-gray-800">${vuln.name}</span>
+                        <span class="text-xs px-2 py-1 rounded ${severityColor}">${vuln.severity.toUpperCase()}</span>
+                    </div>
+                    <p class="text-xs text-gray-600">${vuln.host}</p>
+                </div>
+            `;
+        }).join('');
+    } else {
+        vulnerabilitiesList.innerHTML = '<p class="text-gray-500 text-sm">No vulnerabilities found</p>';
+    }
+
+    // Show vulnerability details
+    displayVulnerabilityDetails(results.vulnerabilities);
+}
+
+function displayVulnerabilityDetails(vulnerabilities) {
+    if (!vulnerabilities || vulnerabilities.length === 0) {
+        return;
+    }
+
+    document.getElementById('no-vulnerabilities').classList.add('hidden');
+    document.getElementById('vulnerabilities-details').classList.remove('hidden');
+
+    const detailsContainer = document.getElementById('vulnerabilities-details');
+    detailsContainer.innerHTML = vulnerabilities.map(vuln => {
+        const severityColor = {
+            'critical': 'border-red-200 bg-red-50',
+            'high': 'border-orange-200 bg-orange-50',
+            'medium': 'border-yellow-200 bg-yellow-50',
+            'low': 'border-blue-200 bg-blue-50'
+        }[vuln.severity] || 'border-gray-200 bg-gray-50';
+
+        return `
+            <div class="p-4 border rounded-lg ${severityColor}">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-medium text-gray-800">${vuln.name}</h4>
+                    <span class="text-xs px-2 py-1 rounded bg-white border">${vuln.severity.toUpperCase()}</span>
+                </div>
+                <p class="text-sm text-gray-600 mb-2">${vuln.description || 'No description available'}</p>
+                <div class="text-xs text-gray-500">
+                    <p><strong>Host:</strong> ${vuln.host}</p>
+                    ${vuln.cve ? `<p><strong>CVE:</strong> ${vuln.cve}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Create attack surface map
+function createAttackSurfaceMap(results) {
+    const mapContainer = document.getElementById('attack-surface-map');
+    const placeholder = document.getElementById('map-placeholder');
+
+    // Hide placeholder
+    placeholder.classList.add('hidden');
+
+    // Create nodes and edges for Cytoscape
+    const elements = [];
+    const domain = results.domain;
+
+    // Add main domain node
+    elements.push({
+        data: { id: domain, label: domain, type: 'domain' },
+        position: { x: 200, y: 150 }
+    });
+
+    // Add subdomain nodes
+    if (results.subdomains) {
+        results.subdomains.forEach((subdomain, index) => {
+            const angle = (index * 2 * Math.PI) / results.subdomains.length;
+            const radius = 120;
+            const x = 200 + radius * Math.cos(angle);
+            const y = 150 + radius * Math.sin(angle);
+
+            elements.push({
+                data: { id: subdomain, label: subdomain, type: 'subdomain' },
+                position: { x, y }
+            });
+
+            // Add edge from domain to subdomain
+            elements.push({
+                data: { id: `${domain}-${subdomain}`, source: domain, target: subdomain }
+            });
+        });
+    }
+
+    // Add port nodes
+    if (results.ports) {
+        results.ports.forEach((port, index) => {
+            const portId = `${port.host}:${port.port}`;
+            const hostNode = elements.find(el => el.data.id === port.host);
+
+            if (hostNode) {
+                const hostPos = hostNode.position;
+                const portAngle = (index * Math.PI) / 4;
+                const portRadius = 40;
+                const x = hostPos.x + portRadius * Math.cos(portAngle);
+                const y = hostPos.y + portRadius * Math.sin(portAngle);
+
+                elements.push({
+                    data: { id: portId, label: port.port.toString(), type: 'port', service: port.service },
+                    position: { x, y }
+                });
+
+                // Add edge from host to port
+                elements.push({
+                    data: { id: `${port.host}-${portId}`, source: port.host, target: portId }
+                });
+            }
+        });
+    }
+
+    // Initialize Cytoscape
+    attackSurfaceMap = cytoscape({
+        container: mapContainer,
+        elements: elements,
+        style: [
+            {
+                selector: 'node[type="domain"]',
+                style: {
+                    'background-color': '#3b82f6',
+                    'label': 'data(label)',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'color': 'white',
+                    'font-size': '12px',
+                    'width': 60,
+                    'height': 60
+                }
+            },
+            {
+                selector: 'node[type="subdomain"]',
+                style: {
+                    'background-color': '#10b981',
+                    'label': 'data(label)',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'color': 'white',
+                    'font-size': '10px',
+                    'width': 50,
+                    'height': 50
+                }
+            },
+            {
+                selector: 'node[type="port"]',
+                style: {
+                    'background-color': '#ef4444',
+                    'label': 'data(label)',
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'color': 'white',
+                    'font-size': '8px',
+                    'width': 30,
+                    'height': 30
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 2,
+                    'line-color': '#d1d5db',
+                    'target-arrow-color': '#d1d5db',
+                    'target-arrow-shape': 'triangle'
+                }
+            }
+        ],
+        layout: {
+            name: 'preset'
+        },
+        userZoomingEnabled: true,
+        userPanningEnabled: true,
+        boxSelectionEnabled: false
+    });
+
+    // Add click event for node details
+    attackSurfaceMap.on('tap', 'node', function(evt) {
+        const node = evt.target;
+        const data = node.data();
+
+        let details = `<strong>${data.label}</strong><br>Type: ${data.type}`;
+        if (data.service) {
+            details += `<br>Service: ${data.service}`;
+        }
+
+        // You could show a tooltip or modal here
+        console.log('Node clicked:', data);
+    });
+}
+
+// Report download
+function downloadReport() {
+    if (!currentScanId) {
+        addNotification('error', 'No scan results available for download');
+        return;
+    }
+
+    window.open(`/api/scan/${currentScanId}/report`, '_blank');
+}
+</script>
+{% endblock %}
