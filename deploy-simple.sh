@@ -64,8 +64,9 @@ if [ ! -f .env ]; then
 fi
 
 # Deploy without SSL
-print_status "Deploying application without SSL..."
+print_status "Deploying application with real security scanning tools..."
 print_status "Ports: HTTP=8090, Direct=8077"
+print_status "Installing: Subfinder, Naabu, Nuclei"
 
 if docker-compose up -d --build; then
     print_success "Deployment successful!"
@@ -115,6 +116,11 @@ if docker-compose up -d --build; then
     echo "Default credentials:"
     echo "  • Username: admin"
     echo "  • Password: password"
+    echo ""
+    echo "🎯 NEW: Real Security Scanning Available!"
+    echo "  • Navigate to 'Real Scanning' in the sidebar"
+    echo "  • Test tools: Subfinder, Naabu, Nuclei"
+    echo "  • Perform real domain scans"
     echo ""
     echo "Useful commands:"
     echo "  • View logs: docker-compose logs -f"

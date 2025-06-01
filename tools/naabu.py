@@ -1,0 +1,201 @@
+"""
+Naabu integration for port scanning
+"""
+
+import json
+import re
+from typing import Dict, List, Any, Optional
+from .base_scanner import BaseScanner, BaseScannerError
+
+class NaabuScanner(BaseScanner):
+    """Naabu port scanner"""
+    
+    def __init__(self, tool_path: Optional[str] = None):
+        super().__init__('naabu', tool_path)
+        self.timeout = 300  # 5 minutes for port scanning
+    
+    def scan(self, targets: List[str], **kwargs) -> Dict[str, Any]:
+        """
+        Run Naabu to scan for open ports
+        
+        Args:
+            targets: List of hosts/IPs to scan
+            **kwargs: Additional options
+                - ports: Port range (e.g., "1-1000", "80,443,8080")
+                - top_ports: Scan top N ports
+                - rate: Packets per second
+                - timeout: Connection timeout
+                - retries: Number of retries
+        
+        Returns:
+            Dict containing scan results
+        """
+        if not targets:
+            raise BaseScannerError("No targets provided for port scan")
+        
+        # Create temporary file with targets
+        targets_content = '\n'.join(targets)
+        targets_file = self._create_temp_file(targets_content)
+        
+        try:
+            # Build command
+            cmd = [self.tool_path, '-list', targets_file]
+            
+            # Add JSON output
+            cmd.extend(['-json'])
+            
+            # Add port specification
+            ports = kwargs.get('ports')
+            top_ports = kwargs.get('top_ports')
+            
+            if ports:
+                cmd.extend(['-p', str(ports)])
+            elif top_ports:
+                cmd.extend(['-top-ports', str(top_ports)])
+            else:
+                # Default to top 1000 ports
+                cmd.extend(['-top-ports', '1000'])
+            
+            # Add optional parameters
+            rate = kwargs.get('rate', 1000)
+            cmd.extend(['-rate', str(rate)])
+            
+            timeout = kwargs.get('timeout', 5)
+            cmd.extend(['-timeout', str(timeout)])
+            
+            retries = kwargs.get('retries', 3)
+            cmd.extend(['-retries', str(retries)])
+            
+            # Add silent mode
+            if kwargs.get('silent', True):
+                cmd.append('-silent')
+            
+            # Run the scan
+            result = self._run_command(cmd)
+            
+            if not result['success']:
+                raise BaseScannerError(f"Naabu scan failed: {result['stderr']}")
+            
+            # Parse results
+            open_ports = self.parse_output(result['stdout'])
+            
+            return {
+                'tool': 'naabu',
+                'targets': targets,
+                'open_ports': open_ports,
+                'total_ports': len(open_ports),
+                'scan_config': {
+                    'ports': ports or f'top-{top_ports or 1000}',
+                    'rate': rate,
+                    'timeout': timeout,
+                    'retries': retries
+                },
+                'raw_output': result['stdout']
+            }
+            
+        finally:
+            self._cleanup_temp_file(targets_file)
+    
+    def scan_single_host(self, host: str, **kwargs) -> Dict[str, Any]:
+        """Scan a single host for open ports"""
+        return self.scan([host], **kwargs)
+    
+    def parse_output(self, output: str) -> List[Dict[str, Any]]:
+        """Parse Naabu JSON output"""
+        open_ports = []
+        
+        if not output.strip():
+            return open_ports
+        
+        for line in output.strip().split('\n'):
+            if not line.strip():
+                continue
+                
+            try:
+                # Try to parse as JSON
+                data = json.loads(line)
+                port_info = {
+                    'host': data.get('host', ''),
+                    'ip': data.get('ip', ''),
+                    'port': data.get('port', 0),
+                    'protocol': data.get('protocol', 'tcp'),
+                    'timestamp': data.get('timestamp', '')
+                }
+                open_ports.append(port_info)
+            except json.JSONDecodeError:
+                # Fallback to plain text parsing (host:port format)
+                if ':' in line:
+                    try:
+                        host, port = line.strip().split(':')
+                        port_info = {
+                            'host': host,
+                            'ip': '',
+                            'port': int(port),
+                            'protocol': 'tcp',
+                            'timestamp': ''
+                        }
+                        open_ports.append(port_info)
+                    except ValueError:
+                        continue
+        
+        return open_ports
+    
+    def scan_with_service_detection(self, targets: List[str], **kwargs) -> Dict[str, Any]:
+        """Run Naabu with service detection"""
+        # Add service detection flag
+        kwargs['service_detection'] = True
+        
+        # Create temporary file with targets
+        targets_content = '\n'.join(targets)
+        targets_file = self._create_temp_file(targets_content)
+        
+        try:
+            cmd = [self.tool_path, '-list', targets_file, '-json', '-sV']
+            
+            # Add port specification
+            ports = kwargs.get('ports', 'top-1000')
+            if ports.startswith('top-'):
+                cmd.extend(['-top-ports', ports.split('-')[1]])
+            else:
+                cmd.extend(['-p', str(ports)])
+            
+            result = self._run_command(cmd)
+            
+            if not result['success']:
+                raise BaseScannerError(f"Naabu service detection failed: {result['stderr']}")
+            
+            open_ports = self.parse_output(result['stdout'])
+            
+            return {
+                'tool': 'naabu',
+                'targets': targets,
+                'open_ports': open_ports,
+                'total_ports': len(open_ports),
+                'service_detection': True,
+                'raw_output': result['stdout']
+            }
+            
+        finally:
+            self._cleanup_temp_file(targets_file)
+    
+    def get_common_ports(self) -> Dict[str, List[int]]:
+        """Get common port lists"""
+        return {
+            'top_100': list(range(1, 101)),
+            'top_1000': list(range(1, 1001)),
+            'web_ports': [80, 443, 8080, 8443, 8000, 8888, 3000, 5000],
+            'database_ports': [3306, 5432, 1433, 27017, 6379, 5984],
+            'mail_ports': [25, 110, 143, 993, 995, 587],
+            'ftp_ports': [21, 22, 990],
+            'remote_access': [22, 23, 3389, 5900, 5901]
+        }
+    
+    def scan_common_ports(self, targets: List[str], port_category: str = 'web_ports') -> Dict[str, Any]:
+        """Scan common ports by category"""
+        common_ports = self.get_common_ports()
+        
+        if port_category not in common_ports:
+            raise BaseScannerError(f"Unknown port category: {port_category}")
+        
+        ports = ','.join(map(str, common_ports[port_category]))
+        return self.scan(targets, ports=ports)

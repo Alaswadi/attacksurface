@@ -84,6 +84,12 @@ def create_app(config_name=None):
                              recent_assets=recent_assets,
                              alerts=alerts,
                              chart_data=chart_data)
+
+    @app.route('/real-scanning')
+    @login_required
+    def real_scanning():
+        """Real security scanning page"""
+        return render_template('real_scanning.html')
     
     # Authentication routes
     from routes.auth import auth_bp
@@ -92,6 +98,10 @@ def create_app(config_name=None):
     # API routes
     from routes.api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
+
+    # Real scanning routes
+    from routes.real_scanning import real_scanning_bp
+    app.register_blueprint(real_scanning_bp)
     
     return app
 
