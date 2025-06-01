@@ -163,17 +163,40 @@ class ScannerManager:
     
     def subdomain_scan_only(self, domain: str, **kwargs) -> Dict[str, Any]:
         """Perform subdomain discovery only"""
+        logger.info(f"🔍 SUBFINDER: Starting subdomain discovery for {domain}")
+        logger.info(f"🔍 SUBFINDER: Parameters: {kwargs}")
+
         if not self.subfinder:
+            logger.error("🔍 SUBFINDER: Tool not available")
             raise BaseScannerError("Subfinder not available")
-        
-        return self.subfinder.scan(domain, **kwargs)
+
+        try:
+            logger.info("🔍 SUBFINDER: Executing scan...")
+            result = self.subfinder.scan(domain, **kwargs)
+            logger.info(f"🔍 SUBFINDER: Scan completed, found {len(result.get('subdomains', []))} subdomains")
+            return result
+        except Exception as e:
+            logger.error(f"🔍 SUBFINDER: Scan failed: {str(e)}")
+            raise
     
     def port_scan_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """Perform port scanning only"""
+        logger.info(f"🔌 NAABU: Starting port scan on {len(targets)} targets")
+        logger.info(f"🔌 NAABU: Targets: {', '.join(targets[:3])}{'...' if len(targets) > 3 else ''}")
+        logger.info(f"🔌 NAABU: Parameters: {kwargs}")
+
         if not self.naabu:
+            logger.error("🔌 NAABU: Tool not available")
             raise BaseScannerError("Naabu not available")
-        
-        return self.naabu.scan(targets, **kwargs)
+
+        try:
+            logger.info("🔌 NAABU: Executing port scan...")
+            result = self.naabu.scan(targets, **kwargs)
+            logger.info(f"🔌 NAABU: Port scan completed, found {len(result.get('open_ports', []))} open ports")
+            return result
+        except Exception as e:
+            logger.error(f"🔌 NAABU: Port scan failed: {str(e)}")
+            raise
     
     def vulnerability_scan_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """Perform vulnerability scanning only"""

@@ -56,8 +56,13 @@ class BaseScanner(ABC):
     
     def _run_command(self, cmd: List[str], input_data: Optional[str] = None) -> Dict[str, Any]:
         """Run a command and return the result"""
+        import time
+
         try:
-            logger.info(f"Running command: {' '.join(cmd)}")
+            logger.info(f"⚡ COMMAND: {' '.join(cmd)}")
+            logger.info(f"⏱️  TIMEOUT: {self.timeout} seconds")
+
+            start_time = time.time()
 
             process = subprocess.Popen(
                 cmd,
@@ -69,11 +74,21 @@ class BaseScanner(ABC):
 
             stdout, stderr = process.communicate(input=input_data, timeout=self.timeout)
 
+            end_time = time.time()
+            execution_time = end_time - start_time
+
+            logger.info(f"✅ COMMAND COMPLETED in {execution_time:.2f} seconds")
+            logger.info(f"📤 RETURN CODE: {process.returncode}")
+
+            if stderr:
+                logger.info(f"⚠️  STDERR: {stderr.strip()}")
+
             return {
                 'returncode': process.returncode,
                 'stdout': stdout,
                 'stderr': stderr,
-                'success': process.returncode == 0
+                'success': process.returncode == 0,
+                'execution_time': execution_time
             }
 
         except subprocess.TimeoutExpired:

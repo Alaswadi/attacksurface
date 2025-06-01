@@ -61,6 +61,8 @@ class RealScanningService:
         """Perform a quick scan without nuclei for faster response"""
         from datetime import datetime
 
+        logger.info(f"🚀 QUICK SCAN STARTED for domain: {domain}")
+
         scan_results = {
             'domain': domain,
             'start_time': datetime.utcnow().isoformat(),
@@ -73,19 +75,38 @@ class RealScanningService:
 
         try:
             # Subdomain discovery
-            logger.info(f"Starting subdomain discovery for {domain}")
+            logger.info(f"🔍 STEP 1: Starting subdomain discovery for {domain}")
+            logger.info(f"📋 Subfinder parameters: silent=True, max_time=60 seconds")
+
             subdomains = self.scanner_manager.subdomain_scan_only(domain, silent=True, max_time=60)
             scan_results['subdomains'] = subdomains.get('subdomains', [])
 
+            logger.info(f"✅ STEP 1 COMPLETE: Found {len(scan_results['subdomains'])} subdomains")
+            for i, sub in enumerate(scan_results['subdomains'][:5]):  # Log first 5
+                logger.info(f"   📍 Subdomain {i+1}: {sub.get('host', 'unknown')}")
+            if len(scan_results['subdomains']) > 5:
+                logger.info(f"   📍 ... and {len(scan_results['subdomains']) - 5} more subdomains")
+
             # Port scanning on discovered subdomains
             if scan_results['subdomains']:
-                logger.info("Starting port scanning")
                 hosts = [sub['host'] for sub in scan_results['subdomains']]
+                logger.info(f"🔌 STEP 2: Starting port scanning on {len(hosts)} hosts")
+                logger.info(f"📋 Naabu parameters: top_ports=100, rate=2000, timeout=3")
+                logger.info(f"🎯 Scanning hosts: {', '.join(hosts[:3])}{'...' if len(hosts) > 3 else ''}")
+
                 ports = self.scanner_manager.port_scan_only(hosts, top_ports=100, rate=2000, timeout=3)
                 scan_results['open_ports'] = ports.get('open_ports', [])
 
+                logger.info(f"✅ STEP 2 COMPLETE: Found {len(scan_results['open_ports'])} open ports")
+                for i, port in enumerate(scan_results['open_ports'][:5]):  # Log first 5
+                    logger.info(f"   🔓 Port {i+1}: {port.get('host', 'unknown')}:{port.get('port', 'unknown')}")
+                if len(scan_results['open_ports']) > 5:
+                    logger.info(f"   🔓 ... and {len(scan_results['open_ports']) - 5} more open ports")
+            else:
+                logger.info("⚠️  STEP 2 SKIPPED: No subdomains found to scan")
+
             # Skip nuclei for quick response
-            logger.info("Skipping vulnerability scan for quick response")
+            logger.info("⚡ STEP 3: Skipping vulnerability scan for quick response")
 
             # Create summary
             scan_results['scan_summary'] = {
@@ -94,12 +115,15 @@ class RealScanningService:
                 'vulnerabilities_found': 0  # No nuclei scan
             }
 
+            logger.info(f"📊 SCAN SUMMARY: {scan_results['scan_summary']['subdomains_found']} subdomains, {scan_results['scan_summary']['ports_found']} open ports")
+
         except Exception as e:
             error_msg = f"Quick scan error: {str(e)}"
-            logger.error(error_msg)
+            logger.error(f"❌ SCAN ERROR: {error_msg}")
             scan_results['errors'].append(error_msg)
 
         scan_results['end_time'] = datetime.utcnow().isoformat()
+        logger.info(f"🏁 QUICK SCAN COMPLETED for {domain}")
         return scan_results
     
     def _process_scan_results(self, scan_results: Dict[str, Any], organization_id: int) -> Dict[str, Any]:
