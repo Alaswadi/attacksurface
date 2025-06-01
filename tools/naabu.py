@@ -47,14 +47,19 @@ class NaabuScanner(BaseScanner):
             # Add port specification
             ports = kwargs.get('ports')
             top_ports = kwargs.get('top_ports')
-            
+
             if ports:
                 cmd.extend(['-p', str(ports)])
             elif top_ports:
-                cmd.extend(['-top-ports', str(top_ports)])
+                # Use -tp parameter for top ports (correct naabu parameter)
+                if top_ports <= 1000:
+                    cmd.extend(['-tp', str(top_ports)])
+                else:
+                    # For larger port counts, use port range instead
+                    cmd.extend(['-p', f'1-{min(top_ports, 65535)}'])
             else:
                 # Default to top 1000 ports
-                cmd.extend(['-top-ports', '1000'])
+                cmd.extend(['-tp', '1000'])
             
             # Add optional parameters
             rate = kwargs.get('rate', 1000)
@@ -155,7 +160,7 @@ class NaabuScanner(BaseScanner):
             # Add port specification
             ports = kwargs.get('ports', 'top-1000')
             if ports.startswith('top-'):
-                cmd.extend(['-top-ports', ports.split('-')[1]])
+                cmd.extend(['-tp', ports.split('-')[1]])
             else:
                 cmd.extend(['-p', str(ports)])
             
