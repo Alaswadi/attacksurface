@@ -46,8 +46,8 @@ RUN echo "Installing security tools..." \
     && export CGO_ENABLED=1 \
     && echo "Installing Subfinder..." \
     && timeout 300 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest || (echo "Subfinder install failed, retrying..." && go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest) \
-    && echo "Installing Naabu..." \
-    && timeout 300 go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest || (echo "Naabu install failed, retrying..." && go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest) \
+    && echo "Installing Masscan..." \
+    && apt-get update && apt-get install -y masscan \
     && echo "Installing Nuclei..." \
     && timeout 300 go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest || (echo "Nuclei install failed, retrying..." && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest) \
     && echo "Installing Httpx..." \
@@ -58,14 +58,14 @@ RUN echo "Installing security tools..." \
 RUN echo "Verifying tool installations..." \
     && ls -la /go/bin/ \
     && /go/bin/subfinder -version || echo "Subfinder version check failed" \
-    && /go/bin/naabu -version || echo "Naabu version check failed" \
+    && masscan --version || echo "Masscan version check failed" \
     && /go/bin/nuclei -version || echo "Nuclei version check failed" \
     && /go/bin/httpx -version || echo "Httpx version check failed" \
     && cp /go/bin/subfinder /usr/local/bin/subfinder \
-    && cp /go/bin/naabu /usr/local/bin/naabu \
+    && ln -s /usr/bin/masscan /usr/local/bin/masscan \
     && cp /go/bin/nuclei /usr/local/bin/nuclei \
     && cp /go/bin/httpx /usr/local/bin/httpx \
-    && chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/nuclei /usr/local/bin/httpx \
+    && chmod +x /usr/local/bin/subfinder /usr/local/bin/nuclei /usr/local/bin/httpx \
     && echo "All tools copied to /usr/local/bin successfully"
 
 # Copy requirements first for better caching

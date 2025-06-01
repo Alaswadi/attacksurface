@@ -367,14 +367,14 @@ class RealScanningService:
         else:
             results['subfinder'] = {'status': 'not_available'}
         
-        if self.available_tools.get('naabu'):
+        if self.available_tools.get('masscan'):
             try:
-                test_result = self.scanner_manager.naabu.scan(['8.8.8.8'], top_ports=10, timeout=10)
-                results['naabu'] = {'status': 'working', 'test_result': 'success'}
+                test_result = self.scanner_manager.masscan.scan(['8.8.8.8'], top_ports=10, timeout=10)
+                results['masscan'] = {'status': 'working', 'test_result': 'success'}
             except Exception as e:
-                results['naabu'] = {'status': 'error', 'error': str(e)}
+                results['masscan'] = {'status': 'error', 'error': str(e)}
         else:
-            results['naabu'] = {'status': 'not_available'}
+            results['masscan'] = {'status': 'not_available'}
         
         if self.available_tools.get('nuclei'):
             try:

@@ -350,14 +350,14 @@ function startSubfinderScan() {
     });
 }
 
-function startNaabuScan() {
-    const targets = document.getElementById('naabuTargets').value.trim();
+function startMasscanScan() {
+    const targets = document.getElementById('masscanTargets').value.trim();
     if (!targets) {
         showError('Please enter target hosts');
         return;
     }
 
-    showLoading('Running Naabu...');
+    showLoading('Running Masscan...');
 
     fetch('/api/scan/ports', {
         method: 'POST',
@@ -370,25 +370,25 @@ function startNaabuScan() {
         })
     })
     .then(response => {
-        console.log('Naabu response:', response.status, response.statusText);
+        console.log('Masscan response:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         return response.json();
     })
     .then(data => {
-        console.log('Naabu data:', data);
+        console.log('Masscan data:', data);
         hideLoading();
         if (data.success) {
-            displayIndividualScanResults('Naabu', data.results);
+            displayIndividualScanResults('Masscan', data.results);
         } else {
-            showError('Naabu scan failed: ' + data.error);
+            showError('Masscan scan failed: ' + data.error);
         }
     })
     .catch(error => {
-        console.error('Naabu error:', error);
+        console.error('Masscan error:', error);
         hideLoading();
-        showError('Naabu error: ' + error.message);
+        showError('Masscan error: ' + error.message);
     });
 }
 

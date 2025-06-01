@@ -137,31 +137,31 @@ def scan_subdomains():
 @real_scanning_bp.route('/ports', methods=['POST'])
 @login_required
 def scan_ports():
-    """Scan for open ports only"""
+    """Scan for open ports only using Masscan"""
     try:
         data = request.get_json()
-        
+
         if not data or 'targets' not in data:
             return jsonify({
                 'success': False,
                 'error': 'Targets are required'
             }), 400
-        
+
         targets = data['targets']
         if not isinstance(targets, list):
             targets = [targets]
-        
+
         # Get scan options
         options = data.get('options', {})
-        
-        # Perform port scan
+
+        # Perform port scan with Masscan
         results = scanning_service.scanner_manager.port_scan_only(targets, **options)
-        
+
         return jsonify({
             'success': True,
             'results': results
         })
-        
+
     except Exception as e:
         logger.error(f"Error scanning ports: {str(e)}")
         return jsonify({
