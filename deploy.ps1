@@ -192,7 +192,7 @@ function Show-Status {
     Write-Host ""
     Write-Host "Access your application at:" -ForegroundColor Cyan
     Write-Host "  • HTTPS: https://localhost:443" -ForegroundColor White
-    Write-Host "  • HTTP:  http://localhost:8080 (redirects to HTTPS)" -ForegroundColor White
+    Write-Host "  • HTTP:  http://localhost:8088 (redirects to HTTPS)" -ForegroundColor White
     Write-Host "  • Direct: http://localhost:8077" -ForegroundColor White
     Write-Host ""
     Write-Host "Default credentials:" -ForegroundColor Cyan

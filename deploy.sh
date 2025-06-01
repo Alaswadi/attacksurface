@@ -151,7 +151,7 @@ show_status() {
     echo ""
     echo "Access your application at:"
     echo "  • HTTPS: https://localhost:443"
-    echo "  • HTTP:  http://localhost:8080 (redirects to HTTPS)"
+    echo "  • HTTP:  http://localhost:8088 (redirects to HTTPS)"
     echo "  • Direct: http://localhost:8077"
     echo ""
     echo "Default credentials:"

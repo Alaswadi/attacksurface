@@ -286,7 +286,7 @@ def simulate_scan(scan_id, domain):
         sample_ports = [
             {'host': domain, 'port': 80, 'service': 'http'},
             {'host': domain, 'port': 443, 'service': 'https'},
-            {'host': f'api.{domain}', 'port': 8080, 'service': 'http-alt'},
+            {'host': f'api.{domain}', 'port': 8088, 'service': 'http-alt'},
             {'host': f'admin.{domain}', 'port': 22, 'service': 'ssh'}
         ]
 

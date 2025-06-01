@@ -47,7 +47,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - **System Requirements**:
   - 4GB+ RAM
   - 10GB+ disk space
-  - Ports 8080, 443, 8077 available
+  - Ports 8088, 443, 8077 available
 
 ## 🏗️ **Architecture Overview**
 
@@ -74,7 +74,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 | Service | Description | Port | Health Check |
 |---------|-------------|------|--------------|
-| **nginx** | Reverse proxy with SSL | 8080, 443 | `/health` |
+| **nginx** | Reverse proxy with SSL | 8088, 443 | `/health` |
 | **web** | Flask application | 8077 | `/api/dashboard/stats` |
 | **db** | PostgreSQL database | 5432 | `pg_isready` |
 | **redis** | Cache and session store | 6379 | `redis-cli ping` |
@@ -83,7 +83,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ## 🌐 **Access Points**
 
 - **Primary**: https://localhost:443 (SSL)
-- **HTTP**: http://localhost:8080 (redirects to HTTPS)
+- **HTTP**: http://localhost:8088 (redirects to HTTPS)
 - **Direct**: http://localhost:8077 (bypass proxy)
 
 ## ⚙️ **Configuration**
@@ -101,7 +101,7 @@ FLASK_CONFIG=production
 
 # Ports
 WEB_PORT=8077
-NGINX_PORT=8080
+NGINX_PORT=8088
 NGINX_SSL_PORT=443
 
 # Database
@@ -144,7 +144,7 @@ MAIL_PASSWORD=your-app-password
 ### Health Endpoints
 ```bash
 # Nginx health
-curl http://localhost:8080/health
+curl http://localhost:8088/health
 
 # Application health
 curl http://localhost:8077/api/dashboard/stats
@@ -291,7 +291,7 @@ docker-compose exec web env | grep -E "(DATABASE|REDIS|SECRET)"
 **Port Conflicts**
 ```bash
 # Check port usage
-netstat -tulpn | grep -E "(8080|443|8077)"
+netstat -tulpn | grep -E "(8088|443|8077)"
 
 # Change ports in .env
 WEB_PORT=8078
@@ -340,12 +340,12 @@ cp /etc/letsencrypt/live/yourdomain.com/privkey.pem nginx/ssl/key.pem
 ### 3. Firewall Configuration
 ```bash
 # Ubuntu/Debian
-ufw allow 8080/tcp
+ufw allow 8088/tcp
 ufw allow 443/tcp
 ufw enable
 
 # CentOS/RHEL
-firewall-cmd --permanent --add-port=8080/tcp
+firewall-cmd --permanent --add-port=8088/tcp
 firewall-cmd --permanent --add-port=443/tcp
 firewall-cmd --reload
 ```
