@@ -12,6 +12,7 @@ gunicorn==21.2.0
 requests==2.31.0
 celery==5.3.4
 redis==5.0.1
+PyYAML==6.0.1
 
 # Additional production dependencies
 eventlet==0.33.3
