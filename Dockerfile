@@ -50,6 +50,8 @@ RUN echo "Installing security tools..." \
     && timeout 300 go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest || (echo "Naabu install failed, retrying..." && go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest) \
     && echo "Installing Nuclei..." \
     && timeout 300 go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest || (echo "Nuclei install failed, retrying..." && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest) \
+    && echo "Installing Httpx..." \
+    && timeout 300 go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest || (echo "Httpx install failed, retrying..." && go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest) \
     && echo "All tools installed successfully"
 
 # Verify installations and create symlinks for easier access
@@ -58,10 +60,12 @@ RUN echo "Verifying tool installations..." \
     && /go/bin/subfinder -version || echo "Subfinder version check failed" \
     && /go/bin/naabu -version || echo "Naabu version check failed" \
     && /go/bin/nuclei -version || echo "Nuclei version check failed" \
+    && /go/bin/httpx -version || echo "Httpx version check failed" \
     && cp /go/bin/subfinder /usr/local/bin/subfinder \
     && cp /go/bin/naabu /usr/local/bin/naabu \
     && cp /go/bin/nuclei /usr/local/bin/nuclei \
-    && chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/nuclei \
+    && cp /go/bin/httpx /usr/local/bin/httpx \
+    && chmod +x /usr/local/bin/subfinder /usr/local/bin/naabu /usr/local/bin/nuclei /usr/local/bin/httpx \
     && echo "All tools copied to /usr/local/bin successfully"
 
 # Copy requirements first for better caching

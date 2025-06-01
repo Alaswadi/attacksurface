@@ -385,5 +385,15 @@ class RealScanningService:
                 results['nuclei'] = {'status': 'error', 'error': str(e)}
         else:
             results['nuclei'] = {'status': 'not_available'}
-        
+
+        if self.available_tools.get('httpx'):
+            try:
+                # Test with a simple HTTP probe
+                test_result = self.scanner_manager.httpx.scan(['httpbin.org'], timeout=10)
+                results['httpx'] = {'status': 'working', 'test_result': 'success'}
+            except Exception as e:
+                results['httpx'] = {'status': 'error', 'error': str(e)}
+        else:
+            results['httpx'] = {'status': 'not_available'}
+
         return results

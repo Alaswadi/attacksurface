@@ -8,6 +8,7 @@ from datetime import datetime
 from .subfinder import SubfinderScanner
 from .naabu import NaabuScanner
 from .nuclei import NucleiScanner
+from .httpx import HttpxScanner
 from .base_scanner import BaseScannerError, ToolNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class ScannerManager:
         self.subfinder = None
         self.naabu = None
         self.nuclei = None
+        self.httpx = None
         self._initialize_scanners()
     
     def _initialize_scanners(self):
@@ -40,28 +42,38 @@ class ScannerManager:
             logger.info("Nuclei initialized successfully")
         except ToolNotFoundError:
             logger.warning("Nuclei not found - vulnerability scanning will be unavailable")
+
+        try:
+            self.httpx = HttpxScanner()
+            logger.info("Httpx initialized successfully")
+        except ToolNotFoundError:
+            logger.warning("Httpx not found - HTTP probing will be unavailable")
     
     def get_available_tools(self) -> Dict[str, bool]:
         """Get status of available tools"""
         return {
             'subfinder': self.subfinder is not None and self.subfinder.is_available(),
             'naabu': self.naabu is not None and self.naabu.is_available(),
-            'nuclei': self.nuclei is not None and self.nuclei.is_available()
+            'nuclei': self.nuclei is not None and self.nuclei.is_available(),
+            'httpx': self.httpx is not None and self.httpx.is_available()
         }
     
     def get_tool_versions(self) -> Dict[str, str]:
         """Get versions of available tools"""
         versions = {}
-        
+
         if self.subfinder:
             versions['subfinder'] = self.subfinder.get_version()
-        
+
         if self.naabu:
             versions['naabu'] = self.naabu.get_version()
-        
+
         if self.nuclei:
             versions['nuclei'] = self.nuclei.get_version()
-        
+
+        if self.httpx:
+            versions['httpx'] = self.httpx.get_version()
+
         return versions
     
     def full_scan(self, domain: str, **kwargs) -> Dict[str, Any]:
@@ -79,10 +91,12 @@ class ScannerManager:
             'domain': domain,
             'start_time': datetime.utcnow().isoformat(),
             'subdomains': [],
+            'alive_hosts': [],
             'open_ports': [],
             'vulnerabilities': [],
             'scan_summary': {
                 'subdomains_found': 0,
+                'alive_hosts_found': 0,
                 'ports_found': 0,
                 'vulnerabilities_found': 0
             },
@@ -106,33 +120,76 @@ class ScannerManager:
             else:
                 scan_results['errors'].append("Subfinder not available")
             
-            # Step 2: Port Scanning
-            logger.info("Starting port scanning")
-            if self.naabu and scan_results['subdomains']:
+            # Step 2: HTTP Probing (check which hosts are alive)
+            logger.info("🌐 STEP 2: Starting HTTP probing to check alive hosts")
+            if self.httpx and scan_results['subdomains']:
                 try:
                     # Extract hosts from subdomains
                     hosts = [sub['host'] for sub in scan_results['subdomains']]
                     # Add the main domain
                     if domain not in hosts:
                         hosts.append(domain)
-                    
+
+                    logger.info(f"🌐 HTTPX: Probing {len(hosts)} hosts for HTTP services")
+                    httpx_config = kwargs.get('httpx', {})
+                    probe_results = self.httpx.scan(hosts, **httpx_config)
+                    scan_results['alive_hosts'] = probe_results['alive_hosts']
+                    scan_results['scan_summary']['alive_hosts_found'] = len(probe_results['alive_hosts'])
+                    logger.info(f"✅ STEP 2 COMPLETE: Found {len(probe_results['alive_hosts'])} alive hosts")
+
+                    # Log alive hosts
+                    for i, host in enumerate(scan_results['alive_hosts'][:5]):
+                        logger.info(f"   🌐 Alive host {i+1}: {host.get('url', 'unknown')} (status: {host.get('status_code', 'unknown')})")
+                    if len(scan_results['alive_hosts']) > 5:
+                        logger.info(f"   🌐 ... and {len(scan_results['alive_hosts']) - 5} more alive hosts")
+
+                except Exception as e:
+                    error_msg = f"Httpx probe failed: {str(e)}"
+                    logger.error(error_msg)
+                    scan_results['errors'].append(error_msg)
+            else:
+                if not self.httpx:
+                    logger.info("⚠️  STEP 2 SKIPPED: Httpx not available")
+                    scan_results['errors'].append("Httpx not available")
+                else:
+                    logger.info("⚠️  STEP 2 SKIPPED: No subdomains found for HTTP probing")
+                    scan_results['errors'].append("No subdomains found for HTTP probing")
+
+            # Step 3: Port Scanning (only on alive hosts)
+            logger.info("🔌 STEP 3: Starting port scanning on alive hosts")
+            alive_host_names = []
+            if scan_results['alive_hosts']:
+                # Extract hostnames from alive hosts
+                alive_host_names = list(set([host['host'] for host in scan_results['alive_hosts']]))
+                logger.info(f"🔌 NAABU: Scanning {len(alive_host_names)} alive hosts")
+            elif scan_results['subdomains']:
+                # Fallback to all subdomains if httpx failed
+                alive_host_names = [sub['host'] for sub in scan_results['subdomains']]
+                if domain not in alive_host_names:
+                    alive_host_names.append(domain)
+                logger.info(f"🔌 NAABU: Fallback - scanning {len(alive_host_names)} discovered hosts")
+
+            if self.naabu and alive_host_names:
+                try:
                     naabu_config = kwargs.get('naabu', {})
-                    port_results = self.naabu.scan(hosts, **naabu_config)
+                    port_results = self.naabu.scan(alive_host_names, **naabu_config)
                     scan_results['open_ports'] = port_results['open_ports']
                     scan_results['scan_summary']['ports_found'] = len(port_results['open_ports'])
-                    logger.info(f"Found {len(port_results['open_ports'])} open ports")
+                    logger.info(f"✅ STEP 3 COMPLETE: Found {len(port_results['open_ports'])} open ports")
                 except Exception as e:
                     error_msg = f"Naabu scan failed: {str(e)}"
                     logger.error(error_msg)
                     scan_results['errors'].append(error_msg)
             else:
                 if not self.naabu:
+                    logger.info("⚠️  STEP 3 SKIPPED: Naabu not available")
                     scan_results['errors'].append("Naabu not available")
                 else:
-                    scan_results['errors'].append("No subdomains found for port scanning")
+                    logger.info("⚠️  STEP 3 SKIPPED: No alive hosts found for port scanning")
+                    scan_results['errors'].append("No alive hosts found for port scanning")
             
-            # Step 3: Vulnerability Scanning
-            logger.info("Starting vulnerability scanning")
+            # Step 4: Vulnerability Scanning
+            logger.info("🔍 STEP 4: Starting vulnerability scanning")
             if self.nuclei and scan_results['open_ports']:
                 try:
                     # Build target URLs from open ports
@@ -202,8 +259,27 @@ class ScannerManager:
         """Perform vulnerability scanning only"""
         if not self.nuclei:
             raise BaseScannerError("Nuclei not available")
-        
+
         return self.nuclei.scan(targets, **kwargs)
+
+    def http_probe_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
+        """Perform HTTP probing only"""
+        logger.info(f"🌐 HTTPX: Starting HTTP probe on {len(targets)} targets")
+        logger.info(f"🌐 HTTPX: Targets: {', '.join(targets[:3])}{'...' if len(targets) > 3 else ''}")
+        logger.info(f"🌐 HTTPX: Parameters: {kwargs}")
+
+        if not self.httpx:
+            logger.error("🌐 HTTPX: Tool not available")
+            raise BaseScannerError("Httpx not available")
+
+        try:
+            logger.info("🌐 HTTPX: Executing HTTP probe...")
+            result = self.httpx.scan(targets, **kwargs)
+            logger.info(f"🌐 HTTPX: Probe completed, found {len(result.get('alive_hosts', []))} alive hosts")
+            return result
+        except Exception as e:
+            logger.error(f"🌐 HTTPX: Probe failed: {str(e)}")
+            raise
     
     def _build_target_urls(self, open_ports: List[Dict[str, Any]]) -> List[str]:
         """Build target URLs from open ports"""
@@ -239,6 +315,12 @@ class ScannerManager:
                 'silent': True,
                 'max_time': 60  # 1 minute
             },
+            'httpx': {
+                'ports': [80, 443, 8080, 8443],  # Common HTTP ports only
+                'timeout': 5,
+                'threads': 50,
+                'silent': True
+            },
             'naabu': {
                 'top_ports': 100,  # Top 100 ports only
                 'rate': 2000,
@@ -263,6 +345,14 @@ class ScannerManager:
                 'recursive': True,
                 'max_time': 300  # 5 minutes
             },
+            'httpx': {
+                'ports': [80, 443, 8080, 8443, 8000, 3000, 9000, 9090],  # More ports for deep scan
+                'timeout': 10,
+                'threads': 100,
+                'silent': True,
+                'tech_detect': True,
+                'follow_redirects': True
+            },
             'naabu': {
                 'top_ports': 10000,  # Top 10k ports
                 'rate': 1000,
@@ -276,5 +366,5 @@ class ScannerManager:
                 'timeout': 10
             }
         }
-        
+
         return self.full_scan(domain, **config)
