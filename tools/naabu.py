@@ -51,15 +51,20 @@ class NaabuScanner(BaseScanner):
             if ports:
                 cmd.extend(['-p', str(ports)])
             elif top_ports:
-                # Use -tp parameter for top ports (correct naabu parameter)
-                if top_ports <= 1000:
-                    cmd.extend(['-tp', str(top_ports)])
+                # Use explicit port list instead of -tp parameter
+                if top_ports <= 50:
+                    # Top 50 most common ports
+                    common_ports = "21,22,23,25,53,80,110,111,135,139,143,443,993,995,1723,3306,3389,5432,5900,8080"
+                    cmd.extend(['-p', common_ports])
+                elif top_ports <= 100:
+                    # Top 100 ports - use nmap's top ports
+                    cmd.extend(['-p', '1-1000'])
                 else:
-                    # For larger port counts, use port range instead
-                    cmd.extend(['-p', f'1-{min(top_ports, 65535)}'])
+                    # For larger port counts, use port range
+                    cmd.extend(['-p', f'1-{min(top_ports * 10, 65535)}'])
             else:
-                # Default to top 1000 ports
-                cmd.extend(['-tp', '1000'])
+                # Default to common ports
+                cmd.extend(['-p', '21,22,23,25,53,80,110,135,139,143,443,993,995,1723,3306,3389,5432,5900,8080'])
             
             # Add optional parameters
             rate = kwargs.get('rate', 1000)
@@ -160,7 +165,13 @@ class NaabuScanner(BaseScanner):
             # Add port specification
             ports = kwargs.get('ports', 'top-1000')
             if ports.startswith('top-'):
-                cmd.extend(['-tp', ports.split('-')[1]])
+                # Convert top-X to explicit port range
+                port_count = int(ports.split('-')[1])
+                if port_count <= 50:
+                    common_ports = "21,22,23,25,53,80,110,111,135,139,143,443,993,995,1723,3306,3389,5432,5900,8080"
+                    cmd.extend(['-p', common_ports])
+                else:
+                    cmd.extend(['-p', f'1-{min(port_count * 10, 65535)}'])
             else:
                 cmd.extend(['-p', str(ports)])
             
