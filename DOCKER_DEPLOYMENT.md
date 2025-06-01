@@ -45,7 +45,7 @@ docker-compose logs -f web
 ### 4. Access Application
 - **HTTP**: http://localhost (redirects to HTTPS)
 - **HTTPS**: https://localhost
-- **Direct Web**: http://localhost:8080
+- **Direct Web**: http://localhost:8077
 
 ## 🏗️ **Architecture**
 
@@ -59,7 +59,7 @@ docker-compose logs -f web
 ### Ports
 - `80`: HTTP (redirects to HTTPS)
 - `443`: HTTPS (main access)
-- `8080`: Direct web access (optional)
+- `8077`: Direct web access (optional)
 
 ### Volumes
 - `postgres_data`: Database persistence
@@ -77,7 +77,7 @@ DB_PASSWORD=secure_database_password_change_me
 REDIS_PASSWORD=redis_password_change_me
 
 # Ports
-WEB_PORT=8080
+WEB_PORT=8077
 NGINX_PORT=80
 NGINX_SSL_PORT=443
 
@@ -179,7 +179,7 @@ docker-compose logs -f web celery
 
 ### Health Endpoints
 - `http://localhost/health`: Nginx health
-- `http://localhost:8080/api/dashboard/stats`: Application health
+- `http://localhost:8077/api/dashboard/stats`: Application health
 
 ### Log Locations
 - Application: `./logs/app.log`

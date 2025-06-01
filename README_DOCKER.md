@@ -47,7 +47,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - **System Requirements**:
   - 4GB+ RAM
   - 10GB+ disk space
-  - Ports 80, 443, 8080 available
+  - Ports 80, 443, 8077 available
 
 ## 🏗️ **Architecture Overview**
 
@@ -75,7 +75,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 | Service | Description | Port | Health Check |
 |---------|-------------|------|--------------|
 | **nginx** | Reverse proxy with SSL | 80, 443 | `/health` |
-| **web** | Flask application | 8080 | `/api/dashboard/stats` |
+| **web** | Flask application | 8077 | `/api/dashboard/stats` |
 | **db** | PostgreSQL database | 5432 | `pg_isready` |
 | **redis** | Cache and session store | 6379 | `redis-cli ping` |
 | **celery** | Background task worker | - | Process monitoring |
@@ -84,7 +84,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 - **Primary**: https://localhost (SSL with redirect)
 - **HTTP**: http://localhost (redirects to HTTPS)
-- **Direct**: http://localhost:8080 (bypass proxy)
+- **Direct**: http://localhost:8077 (bypass proxy)
 
 ## ⚙️ **Configuration**
 
@@ -100,7 +100,7 @@ REDIS_PASSWORD=redis_password_change_me
 FLASK_CONFIG=production
 
 # Ports
-WEB_PORT=8080
+WEB_PORT=8077
 NGINX_PORT=80
 NGINX_SSL_PORT=443
 
@@ -147,7 +147,7 @@ MAIL_PASSWORD=your-app-password
 curl http://localhost/health
 
 # Application health
-curl http://localhost:8080/api/dashboard/stats
+curl http://localhost:8077/api/dashboard/stats
 
 # Database health
 docker-compose exec db pg_isready -U attacksurface_user
@@ -291,10 +291,10 @@ docker-compose exec web env | grep -E "(DATABASE|REDIS|SECRET)"
 **Port Conflicts**
 ```bash
 # Check port usage
-netstat -tulpn | grep -E "(80|443|8080)"
+netstat -tulpn | grep -E "(80|443|8077)"
 
 # Change ports in .env
-WEB_PORT=8081
+WEB_PORT=8078
 NGINX_PORT=8080
 ```
 

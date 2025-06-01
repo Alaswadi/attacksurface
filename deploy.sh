@@ -130,7 +130,7 @@ wait_for_services() {
     # Wait for web application
     print_status "Waiting for web application..."
     timeout=60
-    while ! curl -f http://localhost:8080/api/dashboard/stats &> /dev/null; do
+    while ! curl -f http://localhost:8077/api/dashboard/stats &> /dev/null; do
         sleep 2
         timeout=$((timeout - 2))
         if [ $timeout -le 0 ]; then
@@ -152,7 +152,7 @@ show_status() {
     echo "Access your application at:"
     echo "  • HTTPS: https://localhost"
     echo "  • HTTP:  http://localhost (redirects to HTTPS)"
-    echo "  • Direct: http://localhost:8080"
+    echo "  • Direct: http://localhost:8077"
     echo ""
     echo "Default credentials:"
     echo "  • Username: admin"

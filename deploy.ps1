@@ -167,7 +167,7 @@ function Wait-ForServices {
         Start-Sleep -Seconds 2
         $timeout -= 2
         try {
-            $response = Invoke-WebRequest -Uri "http://localhost:8080/api/dashboard/stats" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
+            $response = Invoke-WebRequest -Uri "http://localhost:8077/api/dashboard/stats" -UseBasicParsing -TimeoutSec 5 -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
                 break
             }
@@ -193,7 +193,7 @@ function Show-Status {
     Write-Host "Access your application at:" -ForegroundColor Cyan
     Write-Host "  • HTTPS: https://localhost" -ForegroundColor White
     Write-Host "  • HTTP:  http://localhost (redirects to HTTPS)" -ForegroundColor White
-    Write-Host "  • Direct: http://localhost:8080" -ForegroundColor White
+    Write-Host "  • Direct: http://localhost:8077" -ForegroundColor White
     Write-Host ""
     Write-Host "Default credentials:" -ForegroundColor Cyan
     Write-Host "  • Username: admin" -ForegroundColor White
