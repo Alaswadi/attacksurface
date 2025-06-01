@@ -72,7 +72,7 @@ services:
     container_name: attacksurface_nginx
     restart: unless-stopped
     ports:
-      - "${NGINX_PORT:-8088}:80"
+      - "${NGINX_PORT:-8090}:80"
     volumes:
       - ./logs/nginx:/var/log/nginx
     depends_on:
