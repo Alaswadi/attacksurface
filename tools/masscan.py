@@ -1,10 +1,13 @@
 """
-Masscan Scanner - High-speed port scanner
+Masscan Scanner - High-speed port scanner with fallback to Python socket scanning
 """
 
 import json
 import logging
-import re
+import socket
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Any, Optional
 from .base_scanner import BaseScanner, BaseScannerError
 
@@ -106,13 +109,23 @@ class MasscanScanner(BaseScanner):
             # Add other useful options
             cmd.extend(['--open-only'])  # Only show open ports
             cmd.extend(['--banners'])    # Grab banners when possible
+
+            # Add connection method to avoid raw socket requirements
+            cmd.extend(['--connection-timeout', '3'])
+
+            # Use adapter-ip to avoid interface issues
+            cmd.extend(['--adapter-ip', '0.0.0.0'])
             
             # Run the scan
             result = self._run_command(cmd)
-            
-            if not result['success']:
+
+            # If masscan fails due to permissions, fall back to Python socket scanning
+            if not result['success'] and 'permission denied' in result['stderr'].lower():
+                logger.warning("Masscan failed due to permissions, falling back to Python socket scanning")
+                return self._python_port_scan(targets, **kwargs)
+            elif not result['success']:
                 raise BaseScannerError(f"Masscan scan failed: {result['stderr']}")
-            
+
             # Parse results
             open_ports = self.parse_output(result['stdout'])
             
@@ -131,6 +144,90 @@ class MasscanScanner(BaseScanner):
             
         finally:
             self._cleanup_temp_file(targets_file)
+
+    def _python_port_scan(self, targets: List[str], **kwargs) -> Dict[str, Any]:
+        """Fallback Python socket-based port scanning"""
+        logger.info("🔌 PYTHON SCAN: Starting socket-based port scanning")
+
+        # Get port specification
+        ports = kwargs.get('ports')
+        top_ports = kwargs.get('top_ports')
+
+        if ports:
+            if isinstance(ports, str):
+                if ',' in ports:
+                    port_list = [int(p.strip()) for p in ports.split(',')]
+                elif '-' in ports:
+                    start, end = map(int, ports.split('-'))
+                    port_list = list(range(start, min(end + 1, 65536)))
+                else:
+                    port_list = [int(ports)]
+            else:
+                port_list = [int(ports)]
+        elif top_ports:
+            if top_ports <= 50:
+                port_list = [21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 993, 995, 1723, 3306, 3389, 5432, 5900, 8080, 8443, 9000, 9090, 3000, 5000, 8000, 8888, 9999]
+            else:
+                port_list = list(range(1, min(top_ports + 1, 1001)))
+        else:
+            port_list = [21, 22, 23, 25, 53, 80, 110, 135, 139, 143, 443, 993, 995, 1723, 3306, 3389, 5432, 5900, 8080]
+
+        timeout = kwargs.get('timeout', 3)
+        open_ports = []
+
+        def scan_port(host, port):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(timeout)
+                result = sock.connect_ex((host, port))
+                sock.close()
+
+                if result == 0:
+                    return {
+                        'host': host,
+                        'ip': host,
+                        'port': port,
+                        'protocol': 'tcp',
+                        'status': 'open',
+                        'service': '',
+                        'banner': '',
+                        'timestamp': time.time(),
+                        'reason': 'syn-ack',
+                        'ttl': 0
+                    }
+            except Exception:
+                pass
+            return None
+
+        # Use ThreadPoolExecutor for concurrent scanning
+        max_workers = min(100, len(targets) * len(port_list))
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+
+            for target in targets:
+                for port in port_list:
+                    future = executor.submit(scan_port, target, port)
+                    futures.append(future)
+
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    open_ports.append(result)
+
+        logger.info(f"🔌 PYTHON SCAN: Found {len(open_ports)} open ports")
+
+        return {
+            'tool': 'python_socket_scan',
+            'targets': targets,
+            'open_ports': open_ports,
+            'scan_config': {
+                'ports': ports or top_ports or 'common',
+                'timeout': timeout,
+                'method': 'socket_connect'
+            },
+            'raw_output': f"Python socket scan completed: {len(open_ports)} open ports found"
+        }
     
     def parse_output(self, output: str) -> List[Dict[str, Any]]:
         """Parse masscan JSON output"""

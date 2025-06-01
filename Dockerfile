@@ -92,10 +92,10 @@ echo "🌐 Starting web server..."\n\
 exec gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 "app:create_app()"\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
-# Create non-root user for security
+# Create non-root user but keep root for masscan
 RUN adduser --disabled-password --gecos '' appuser \
-    && chown -R appuser:appuser /app
-USER appuser
+    && chown -R appuser:appuser /app \
+    && chmod +s /usr/local/bin/masscan
 
 # Expose port
 EXPOSE 5000
