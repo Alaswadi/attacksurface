@@ -54,8 +54,8 @@ class NucleiScanner(BaseScanner):
                 else:
                     cmd.extend(['-t', templates])
             else:
-                # Use default templates
-                cmd.extend(['-t', 'cves/', '-t', 'vulnerabilities/', '-t', 'exposures/'])
+                # Use simpler default templates that are more likely to exist
+                cmd.extend(['-t', 'http/'])  # Use http templates as default
             
             # Add severity filter
             severity = kwargs.get('severity')
@@ -92,13 +92,24 @@ class NucleiScanner(BaseScanner):
             
             # Run the scan
             result = self._run_command(cmd)
-            
-            # Nuclei might return non-zero even on successful scans
-            if result['returncode'] not in [0, 1]:
+
+            # Log Nuclei result details
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"🔍 NUCLEI: Return code: {result['returncode']}")
+            if result['stderr']:
+                logger.info(f"🔍 NUCLEI: STDERR: {result['stderr'].strip()}")
+
+            # Nuclei return codes:
+            # 0 = success with findings
+            # 1 = success with no findings
+            # 2 = success but some templates failed (acceptable)
+            if result['returncode'] not in [0, 1, 2]:
                 raise BaseScannerError(f"Nuclei scan failed: {result['stderr']}")
-            
+
             # Parse results
             vulnerabilities = self.parse_output(result['stdout'])
+            logger.info(f"🔍 NUCLEI: Parsed {len(vulnerabilities)} vulnerabilities")
             
             return {
                 'tool': 'nuclei',

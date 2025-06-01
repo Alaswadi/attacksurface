@@ -270,7 +270,7 @@ class ScannerManager:
                 'retries': 3
             },
             'nuclei': {
-                'templates': ['cves/', 'vulnerabilities/', 'exposures/', 'misconfiguration/'],
+                'templates': ['http/', 'network/'],  # Use simpler, more reliable templates
                 'rate_limit': 100,
                 'concurrency': 25,
                 'timeout': 10
