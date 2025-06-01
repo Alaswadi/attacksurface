@@ -1,8 +1,10 @@
 # Port Configuration Update Summary
 
-## 🔄 **Port Change: 8080 → 8077**
+## 🔄 **Port Changes: 8080 → 8077 & 80 → 8080**
 
-Successfully updated the Docker configuration to use port **8077** instead of **8080** for the web application.
+Successfully updated the Docker configuration to use:
+- Port **8077** instead of **8080** for direct web application access
+- Port **8080** instead of **80** for HTTP traffic (Nginx proxy)
 
 ## 📝 **Files Updated**
 
@@ -19,14 +21,14 @@ Successfully updated the Docker configuration to use port **8077** instead of **
 
 ## 🌐 **Updated Access Points**
 
-### **Before (Port 8080)**
-- Primary: https://localhost
-- HTTP: http://localhost (redirects to HTTPS)
+### **Before (Ports 80 & 8080)**
+- Primary: https://localhost:443
+- HTTP: http://localhost:80 (redirects to HTTPS)
 - Direct: http://localhost:8080
 
-### **After (Port 8077)**
-- Primary: https://localhost
-- HTTP: http://localhost (redirects to HTTPS)
+### **After (Ports 8080 & 8077)**
+- Primary: https://localhost:443
+- HTTP: http://localhost:8080 (redirects to HTTPS)
 - Direct: http://localhost:8077
 
 ## ⚙️ **Configuration Changes**
@@ -35,20 +37,30 @@ Successfully updated the Docker configuration to use port **8077** instead of **
 ```bash
 # OLD
 WEB_PORT=8080
+NGINX_PORT=80
 
 # NEW
 WEB_PORT=8077
+NGINX_PORT=8080
 ```
 
 ### **Docker Compose**
 ```yaml
 # OLD
-ports:
-  - "${WEB_PORT:-8080}:5000"
+nginx:
+  ports:
+    - "${NGINX_PORT:-80}:80"
+web:
+  ports:
+    - "${WEB_PORT:-8080}:5000"
 
 # NEW
-ports:
-  - "${WEB_PORT:-8077}:5000"
+nginx:
+  ports:
+    - "${NGINX_PORT:-8080}:80"
+web:
+  ports:
+    - "${WEB_PORT:-8077}:5000"
 ```
 
 ## 🔍 **Health Check Updates**
@@ -71,17 +83,18 @@ curl http://localhost:8077/api/dashboard/stats
 
 | Service | Internal Port | External Port | Purpose |
 |---------|---------------|---------------|---------|
-| nginx | 80, 443 | 80, 443 | HTTP/HTTPS proxy |
+| nginx | 80, 443 | **8080**, 443 | HTTP/HTTPS proxy |
 | web | 5000 | **8077** | Direct web access |
 | db | 5432 | - | Database (internal) |
 | redis | 6379 | - | Cache (internal) |
 
 ## 🚀 **Deployment Impact**
 
-### **No Breaking Changes**
-- Nginx proxy still serves on ports 80/443
+### **Important Changes**
+- **HTTP port changed**: 80 → 8080 (avoids conflict with existing server)
+- **Direct web port changed**: 8080 → 8077
+- **HTTPS port unchanged**: Still on 443
 - Internal container communication unchanged
-- Only direct web access port changed
 
 ### **Updated Commands**
 ```bash
@@ -92,7 +105,7 @@ curl http://localhost:8077/api/dashboard/stats
 open http://localhost:8077
 
 # Port conflict checks
-netstat -tulpn | grep -E "(80|443|8077)"
+netstat -tulpn | grep -E "(8080|443|8077)"
 ```
 
 ## ✅ **Verification**
@@ -111,23 +124,27 @@ To verify the port change is working:
 
 3. **Test access points**:
    ```bash
-   # Primary access (should work)
-   curl -k https://localhost
-   
-   # Direct access (should work on new port)
+   # Primary HTTPS access (should work)
+   curl -k https://localhost:443
+
+   # HTTP access (should redirect to HTTPS)
+   curl http://localhost:8080
+
+   # Direct web access (should work on new port)
    curl http://localhost:8077/api/dashboard/stats
-   
-   # Old port (should fail)
-   curl http://localhost:8080/api/dashboard/stats
+
+   # Old HTTP port (should fail if server uses port 80)
+   curl http://localhost:80
    ```
 
 ## 🔧 **Rollback Instructions**
 
-If you need to revert to port 8080:
+If you need to revert to original ports (80 & 8080):
 
 1. **Update .env file**:
    ```bash
    WEB_PORT=8080
+   NGINX_PORT=80
    ```
 
 2. **Restart services**:
@@ -136,15 +153,23 @@ If you need to revert to port 8080:
    docker-compose up -d
    ```
 
+**Note**: Only do this if port 80 is available on your server.
+
 ## 📋 **Next Steps**
 
 1. **Test deployment** with new port configuration
-2. **Update firewall rules** if applicable (allow port 8077)
-3. **Update monitoring** to check port 8077
-4. **Update documentation** in your deployment guides
+2. **Update firewall rules** if applicable (allow ports 8080, 8077)
+3. **Update monitoring** to check ports 8080 and 8077
+4. **Update any external references** to use new ports
+5. **Verify SSL certificates** work with port 443
 
 ---
 
-**✅ Port change from 8080 to 8077 completed successfully!**
+**✅ Port changes completed successfully!**
 
-All Docker configuration files, documentation, and deployment scripts have been updated to use the new port. The application will now be accessible on port 8077 for direct access, while maintaining the primary HTTPS access on port 443.
+All Docker configuration files, documentation, and deployment scripts have been updated to use the new ports:
+- **HTTP**: Port 8080 (instead of 80) - avoids conflict with existing server
+- **Direct Web**: Port 8077 (instead of 8080) - direct Flask app access
+- **HTTPS**: Port 443 (unchanged) - primary secure access
+
+The application will now work on servers where port 80 is already in use.

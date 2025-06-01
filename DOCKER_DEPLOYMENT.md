@@ -43,8 +43,8 @@ docker-compose logs -f web
 ```
 
 ### 4. Access Application
-- **HTTP**: http://localhost (redirects to HTTPS)
-- **HTTPS**: https://localhost
+- **HTTP**: http://localhost:8080 (redirects to HTTPS)
+- **HTTPS**: https://localhost:443
 - **Direct Web**: http://localhost:8077
 
 ## 🏗️ **Architecture**
@@ -57,7 +57,7 @@ docker-compose logs -f web
 - **celery**: Background task worker
 
 ### Ports
-- `80`: HTTP (redirects to HTTPS)
+- `8080`: HTTP (redirects to HTTPS)
 - `443`: HTTPS (main access)
 - `8077`: Direct web access (optional)
 
@@ -78,7 +78,7 @@ REDIS_PASSWORD=redis_password_change_me
 
 # Ports
 WEB_PORT=8077
-NGINX_PORT=80
+NGINX_PORT=8080
 NGINX_SSL_PORT=443
 
 # Mail (Optional)
@@ -117,7 +117,7 @@ cp /etc/letsencrypt/live/yourdomain.com/privkey.pem nginx/ssl/key.pem
 ### 3. Firewall Setup
 ```bash
 # Allow only necessary ports
-ufw allow 80/tcp
+ufw allow 8080/tcp
 ufw allow 443/tcp
 ufw enable
 ```
@@ -178,7 +178,7 @@ docker-compose logs -f web celery
 ## 📊 **Monitoring & Health Checks**
 
 ### Health Endpoints
-- `http://localhost/health`: Nginx health
+- `http://localhost:8080/health`: Nginx health
 - `http://localhost:8077/api/dashboard/stats`: Application health
 
 ### Log Locations
