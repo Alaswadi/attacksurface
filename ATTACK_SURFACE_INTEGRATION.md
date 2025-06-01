@@ -129,7 +129,7 @@ GET  /api/scan/{id}/report       # Download HTML report
 - test.{domain}
 
 ### **Ports**
-- 80/http, 443/https (main domain)
+- 80/http, 8433/https (main domain)
 - 8088/http-alt (api subdomain)
 - 22/ssh (admin subdomain)
 

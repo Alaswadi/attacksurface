@@ -44,7 +44,7 @@ docker-compose logs -f web
 
 ### 4. Access Application
 - **HTTP**: http://localhost:8088 (redirects to HTTPS)
-- **HTTPS**: https://localhost:443
+- **HTTPS**: https://localhost:8433
 - **Direct Web**: http://localhost:8077
 
 ## 🏗️ **Architecture**
@@ -58,7 +58,7 @@ docker-compose logs -f web
 
 ### Ports
 - `8088`: HTTP (redirects to HTTPS)
-- `443`: HTTPS (main access)
+- `8433`: HTTPS (main access)
 - `8077`: Direct web access (optional)
 
 ### Volumes
@@ -79,7 +79,7 @@ REDIS_PASSWORD=redis_password_change_me
 # Ports
 WEB_PORT=8077
 NGINX_PORT=8088
-NGINX_SSL_PORT=443
+NGINX_SSL_PORT=8433
 
 # Mail (Optional)
 MAIL_SERVER=smtp.gmail.com
@@ -118,7 +118,7 @@ cp /etc/letsencrypt/live/yourdomain.com/privkey.pem nginx/ssl/key.pem
 ```bash
 # Allow only necessary ports
 ufw allow 8088/tcp
-ufw allow 443/tcp
+ufw allow 8433/tcp
 ufw enable
 ```
 

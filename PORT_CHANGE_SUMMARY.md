@@ -22,12 +22,12 @@ Successfully updated the Docker configuration to use:
 ## 🌐 **Updated Access Points**
 
 ### **Before (Ports 80 & 8088)**
-- Primary: https://localhost:443
+- Primary: https://localhost:8433
 - HTTP: http://localhost:80 (redirects to HTTPS)
 - Direct: http://localhost:8088
 
 ### **After (Ports 8088 & 8077)**
-- Primary: https://localhost:443
+- Primary: https://localhost:8433
 - HTTP: http://localhost:8088 (redirects to HTTPS)
 - Direct: http://localhost:8077
 
@@ -83,7 +83,7 @@ curl http://localhost:8077/api/dashboard/stats
 
 | Service | Internal Port | External Port | Purpose |
 |---------|---------------|---------------|---------|
-| nginx | 80, 443 | **8088**, 443 | HTTP/HTTPS proxy |
+| nginx | 80, 8433 | **8088**, 8433 | HTTP/HTTPS proxy |
 | web | 5000 | **8077** | Direct web access |
 | db | 5432 | - | Database (internal) |
 | redis | 6379 | - | Cache (internal) |
@@ -93,7 +93,7 @@ curl http://localhost:8077/api/dashboard/stats
 ### **Important Changes**
 - **HTTP port changed**: 80 → 8088 (avoids conflict with existing server)
 - **Direct web port changed**: 8088 → 8077
-- **HTTPS port unchanged**: Still on 443
+- **HTTPS port unchanged**: Still on 8433
 - Internal container communication unchanged
 
 ### **Updated Commands**
@@ -105,7 +105,7 @@ curl http://localhost:8077/api/dashboard/stats
 open http://localhost:8077
 
 # Port conflict checks
-netstat -tulpn | grep -E "(8088|443|8077)"
+netstat -tulpn | grep -E "(8088|8433|8077)"
 ```
 
 ## ✅ **Verification**
@@ -125,7 +125,7 @@ To verify the port change is working:
 3. **Test access points**:
    ```bash
    # Primary HTTPS access (should work)
-   curl -k https://localhost:443
+   curl -k https://localhost:8433
 
    # HTTP access (should redirect to HTTPS)
    curl http://localhost:8088
@@ -161,7 +161,7 @@ If you need to revert to original ports (80 & 8088):
 2. **Update firewall rules** if applicable (allow ports 8088, 8077)
 3. **Update monitoring** to check ports 8088 and 8077
 4. **Update any external references** to use new ports
-5. **Verify SSL certificates** work with port 443
+5. **Verify SSL certificates** work with port 8433
 
 ---
 
@@ -170,6 +170,6 @@ If you need to revert to original ports (80 & 8088):
 All Docker configuration files, documentation, and deployment scripts have been updated to use the new ports:
 - **HTTP**: Port 8088 (instead of 80) - avoids conflict with existing server
 - **Direct Web**: Port 8077 (instead of 8088) - direct Flask app access
-- **HTTPS**: Port 443 (unchanged) - primary secure access
+- **HTTPS**: Port 8433 (unchanged) - primary secure access
 
 The application will now work on servers where port 80 is already in use.
