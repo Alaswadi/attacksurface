@@ -32,8 +32,15 @@ function checkToolStatus() {
     showLoading('Checking security tools status...');
 
     fetch('/api/scan/status')
-        .then(response => response.json())
+        .then(response => {
+            console.log('Tool status response:', response.status, response.statusText);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('Tool status data:', data);
             hideLoading();
             if (data.success) {
                 displayToolStatus(data.status);
@@ -42,6 +49,7 @@ function checkToolStatus() {
             }
         })
         .catch(error => {
+            console.error('Tool status error:', error);
             hideLoading();
             showError('Error checking tool status: ' + error.message);
         });
@@ -263,8 +271,27 @@ function startScan(domain, scanType, config = null) {
         },
         body: JSON.stringify(data)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            return response.text().then(text => {
+                console.error('Non-JSON response:', text);
+                throw new Error('Server returned non-JSON response: ' + text.substring(0, 200));
+            });
+        }
+
+        return response.json();
+    })
     .then(data => {
+        console.log('Scan response data:', data);
         hideScanProgress();
         if (data.success) {
             displayScanResults(data.scan_results);
@@ -275,6 +302,7 @@ function startScan(domain, scanType, config = null) {
         }
     })
     .catch(error => {
+        console.error('Scan error details:', error);
         hideScanProgress();
         showError('Scan error: ' + error.message);
     });
