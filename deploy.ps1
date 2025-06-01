@@ -191,7 +191,7 @@ function Show-Status {
     Write-Success "🎉 Deployment completed successfully!"
     Write-Host ""
     Write-Host "Access your application at:" -ForegroundColor Cyan
-    Write-Host "  • HTTPS: https://localhost:8433" -ForegroundColor White
+    Write-Host "  • HTTPS: https://localhost:8443" -ForegroundColor White
     Write-Host "  • HTTP:  http://localhost:8088 (redirects to HTTPS)" -ForegroundColor White
     Write-Host "  • Direct: http://localhost:8077" -ForegroundColor White
     Write-Host ""

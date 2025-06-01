@@ -150,7 +150,7 @@ show_status() {
     print_success "🎉 Deployment completed successfully!"
     echo ""
     echo "Access your application at:"
-    echo "  • HTTPS: https://localhost:8433"
+    echo "  • HTTPS: https://localhost:8443"
     echo "  • HTTP:  http://localhost:8088 (redirects to HTTPS)"
     echo "  • Direct: http://localhost:8077"
     echo ""
