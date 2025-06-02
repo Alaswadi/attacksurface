@@ -9,12 +9,14 @@ import time
 import random
 import logging
 
-# Import scanning service
+# Import scanning service (same as real scanning routes)
 try:
-    from services.real_scanning_service import scanning_service
-except ImportError:
+    from services.real_scanning_service import RealScanningService
+    scanning_service = RealScanningService()
+    logging.info("✅ ASSETS: Scanning service initialized successfully")
+except ImportError as e:
     scanning_service = None
-    logging.warning("Real scanning service not available")
+    logging.warning(f"❌ ASSETS: Real scanning service not available: {str(e)}")
 
 api_bp = Blueprint('api', __name__)
 
