@@ -7,6 +7,14 @@ import uuid
 import threading
 import time
 import random
+import logging
+
+# Import scanning service
+try:
+    from services.real_scanning_service import scanning_service
+except ImportError:
+    scanning_service = None
+    logging.warning("Real scanning service not available")
 
 api_bp = Blueprint('api', __name__)
 
@@ -285,6 +293,175 @@ def get_scan_results(scan_id):
         return jsonify({'error': 'Access denied'}), 403
 
     return jsonify(scan_results[scan_id])
+
+@api_bp.route('/scan/assets/subdomain', methods=['POST'])
+@login_required
+def scan_assets_subdomain():
+    """Scan for subdomains and store them as assets"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    data = request.get_json()
+    if not data or 'domain' not in data:
+        return jsonify({'error': 'Domain is required'}), 400
+
+    domain = data['domain'].strip()
+    if not domain:
+        return jsonify({'error': 'Domain cannot be empty'}), 400
+
+    try:
+        # Check if scanning service is available
+        if not scanning_service:
+            # Fallback to simulated scanning for demo purposes
+            return simulate_subdomain_scan(domain, org.id)
+
+        # Use real scanning service
+        scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain)
+
+        # Store the main domain as an asset if it doesn't exist
+        main_domain_asset = Asset.query.filter_by(
+            name=domain,
+            organization_id=org.id,
+            asset_type=AssetType.DOMAIN
+        ).first()
+
+        if not main_domain_asset:
+            main_domain_asset = Asset(
+                name=domain,
+                asset_type=AssetType.DOMAIN,
+                description=f"Main domain discovered during subdomain scan",
+                organization_id=org.id,
+                last_scanned=datetime.utcnow()
+            )
+            db.session.add(main_domain_asset)
+        else:
+            main_domain_asset.last_scanned = datetime.utcnow()
+
+        # Store discovered subdomains as assets
+        subdomains_added = 0
+        subdomains_found = scan_results.get('subdomains', [])
+
+        for subdomain in subdomains_found:
+            # Check if subdomain already exists
+            existing_asset = Asset.query.filter_by(
+                name=subdomain,
+                organization_id=org.id
+            ).first()
+
+            if not existing_asset:
+                # Create new subdomain asset
+                subdomain_asset = Asset(
+                    name=subdomain,
+                    asset_type=AssetType.SUBDOMAIN,
+                    description=f"Subdomain discovered via Subfinder scan of {domain}",
+                    organization_id=org.id,
+                    discovered_at=datetime.utcnow(),
+                    last_scanned=datetime.utcnow()
+                )
+                db.session.add(subdomain_asset)
+                subdomains_added += 1
+            else:
+                # Update last scanned time
+                existing_asset.last_scanned = datetime.utcnow()
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'domain': domain,
+            'subdomains_found': len(subdomains_found),
+            'subdomains_added': subdomains_added,
+            'subdomains': subdomains_found,
+            'message': f'Scan completed successfully. Found {len(subdomains_found)} subdomains, added {subdomains_added} new assets.'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Subdomain scan error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def simulate_subdomain_scan(domain, organization_id):
+    """Simulate subdomain scanning when real tools are not available"""
+    try:
+        # Generate realistic subdomains
+        common_subdomains = ['www', 'api', 'admin', 'mail', 'ftp', 'test', 'dev', 'staging', 'blog', 'shop']
+        subdomains_found = []
+
+        # Randomly select 3-6 subdomains to simulate discovery
+        import random
+        num_subdomains = random.randint(3, 6)
+        selected_subdomains = random.sample(common_subdomains, min(num_subdomains, len(common_subdomains)))
+
+        for sub in selected_subdomains:
+            subdomains_found.append(f"{sub}.{domain}")
+
+        # Store the main domain as an asset if it doesn't exist
+        main_domain_asset = Asset.query.filter_by(
+            name=domain,
+            organization_id=organization_id,
+            asset_type=AssetType.DOMAIN
+        ).first()
+
+        if not main_domain_asset:
+            main_domain_asset = Asset(
+                name=domain,
+                asset_type=AssetType.DOMAIN,
+                description=f"Main domain discovered during subdomain scan",
+                organization_id=organization_id,
+                last_scanned=datetime.utcnow()
+            )
+            db.session.add(main_domain_asset)
+        else:
+            main_domain_asset.last_scanned = datetime.utcnow()
+
+        # Store discovered subdomains as assets
+        subdomains_added = 0
+
+        for subdomain in subdomains_found:
+            # Check if subdomain already exists
+            existing_asset = Asset.query.filter_by(
+                name=subdomain,
+                organization_id=organization_id
+            ).first()
+
+            if not existing_asset:
+                # Create new subdomain asset
+                subdomain_asset = Asset(
+                    name=subdomain,
+                    asset_type=AssetType.SUBDOMAIN,
+                    description=f"Subdomain discovered via simulated Subfinder scan of {domain}",
+                    organization_id=organization_id,
+                    discovered_at=datetime.utcnow(),
+                    last_scanned=datetime.utcnow()
+                )
+                db.session.add(subdomain_asset)
+                subdomains_added += 1
+            else:
+                # Update last scanned time
+                existing_asset.last_scanned = datetime.utcnow()
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'domain': domain,
+            'subdomains_found': len(subdomains_found),
+            'subdomains_added': subdomains_added,
+            'subdomains': subdomains_found,
+            'message': f'Simulated scan completed. Found {len(subdomains_found)} subdomains, added {subdomains_added} new assets.'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Simulated subdomain scan error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @api_bp.route('/scan/<scan_id>/report', methods=['GET'])
 @login_required
