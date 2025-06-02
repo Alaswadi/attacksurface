@@ -311,15 +311,20 @@ def scan_assets_subdomain():
         return jsonify({'error': 'Domain cannot be empty'}), 400
 
     try:
-        # Use the same approach as the real scanning page
-        if scanning_service and scanning_service.scanner_manager.subfinder:
-            # Real Subfinder is available - use it
+        # Use the exact same approach as the real scanning page - just call it directly
+        if not scanning_service:
+            # No scanning service available - use simulation
+            logging.warning(f"🔍 ASSETS: Scanning service not available, using simulation for {domain}")
+            return simulate_subdomain_scan(domain, org.id)
+
+        try:
+            # Call the real scanning method (same as real scanning page)
             logging.info(f"🔍 ASSETS: Starting real Subfinder scan for {domain}")
             scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain)
             logging.info(f"🔍 ASSETS: Real scan completed, found {len(scan_results.get('subdomains', []))} subdomains")
-        else:
-            # Subfinder not available - use simulation
-            logging.warning(f"🔍 ASSETS: Subfinder not available, using simulation for {domain}")
+        except Exception as scan_error:
+            # If real scanning fails (e.g., Subfinder not available), fall back to simulation
+            logging.warning(f"🔍 ASSETS: Real scanning failed ({str(scan_error)}), using simulation for {domain}")
             return simulate_subdomain_scan(domain, org.id)
 
         # Store the main domain as an asset if it doesn't exist
