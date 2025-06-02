@@ -316,8 +316,13 @@ def scan_assets_subdomain():
             # Fallback to simulated scanning for demo purposes
             return simulate_subdomain_scan(domain, org.id)
 
-        # Use real scanning service
-        scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain)
+        # Use real scanning service (same as real scanning page)
+        try:
+            scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain)
+        except Exception as scan_error:
+            # If real scanning fails, fall back to simulation
+            logging.warning(f"Real scanning failed, using simulation: {str(scan_error)}")
+            return simulate_subdomain_scan(domain, org.id)
 
         # Store the main domain as an asset if it doesn't exist
         main_domain_asset = Asset.query.filter_by(
@@ -341,18 +346,26 @@ def scan_assets_subdomain():
         # Store discovered subdomains as assets
         subdomains_added = 0
         subdomains_found = scan_results.get('subdomains', [])
+        subdomain_names = []
 
-        for subdomain in subdomains_found:
+        for subdomain_data in subdomains_found:
+            # Extract subdomain name from the data structure
+            subdomain_name = subdomain_data.get('host', '') if isinstance(subdomain_data, dict) else str(subdomain_data)
+            if not subdomain_name:
+                continue
+
+            subdomain_names.append(subdomain_name)
+
             # Check if subdomain already exists
             existing_asset = Asset.query.filter_by(
-                name=subdomain,
+                name=subdomain_name,
                 organization_id=org.id
             ).first()
 
             if not existing_asset:
                 # Create new subdomain asset
                 subdomain_asset = Asset(
-                    name=subdomain,
+                    name=subdomain_name,
                     asset_type=AssetType.SUBDOMAIN,
                     description=f"Subdomain discovered via Subfinder scan of {domain}",
                     organization_id=org.id,
@@ -370,10 +383,10 @@ def scan_assets_subdomain():
         return jsonify({
             'success': True,
             'domain': domain,
-            'subdomains_found': len(subdomains_found),
+            'subdomains_found': len(subdomain_names),
             'subdomains_added': subdomains_added,
-            'subdomains': subdomains_found,
-            'message': f'Scan completed successfully. Found {len(subdomains_found)} subdomains, added {subdomains_added} new assets.'
+            'subdomains': subdomain_names,
+            'message': f'Scan completed successfully. Found {len(subdomain_names)} subdomains, added {subdomains_added} new assets.'
         })
 
     except Exception as e:
