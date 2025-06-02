@@ -8,6 +8,7 @@ import threading
 import time
 import random
 import logging
+import socket
 
 # Import scanning service (same as real scanning routes)
 try:
@@ -19,6 +20,18 @@ except ImportError as e:
     logging.warning(f"❌ ASSETS: Real scanning service not available: {str(e)}")
 
 api_bp = Blueprint('api', __name__)
+
+def resolve_domain_to_ip(domain):
+    """Resolve domain name to IP address for Masscan"""
+    try:
+        # Remove any protocol prefix
+        clean_domain = domain.replace('http://', '').replace('https://', '').split('/')[0]
+        ip = socket.gethostbyname(clean_domain)
+        logging.info(f"🔍 DNS: Resolved {clean_domain} -> {ip}")
+        return ip
+    except socket.gaierror as e:
+        logging.warning(f"🔍 DNS: Failed to resolve {domain}: {str(e)}")
+        return None
 
 # In-memory storage for scan results (in production, use Redis or database)
 scan_results = {}
@@ -340,27 +353,46 @@ def scan_assets_subdomain():
                     hosts_to_scan.append(domain)
 
                 if hosts_to_scan:
-                    logging.info(f"🔌 ASSETS: Starting Masscan port scan on {len(hosts_to_scan)} hosts")
-                    try:
-                        # Use top 100 ports for faster scanning
-                        port_results = scanning_service.scanner_manager.port_scan_only(hosts_to_scan, top_ports=100, timeout=30)
-                        open_ports = port_results.get('open_ports', [])
-                        logging.info(f"🔌 ASSETS: Masscan completed, found {len(open_ports)} open ports")
+                    # Resolve domains to IP addresses for Masscan
+                    logging.info(f"� ASSETS: Resolving {len(hosts_to_scan)} domains to IP addresses")
+                    ip_to_domain_map = {}  # Map IPs back to domain names
+                    ips_to_scan = []
 
-                        # Organize ports by host
-                        for port_info in open_ports:
-                            host = port_info.get('host', '')
-                            port = port_info.get('port', '')
-                            service = port_info.get('service', '')
-                            if host and port:
-                                if host not in all_ports:
-                                    all_ports[host] = []
-                                all_ports[host].append({
-                                    'port': port,
-                                    'service': service
-                                })
-                    except Exception as port_error:
-                        logging.warning(f"🔌 ASSETS: Port scanning failed: {str(port_error)}")
+                    for host in hosts_to_scan:
+                        ip = resolve_domain_to_ip(host)
+                        if ip:
+                            ips_to_scan.append(ip)
+                            ip_to_domain_map[ip] = host
+
+                    if ips_to_scan:
+                        logging.info(f"�🔌 ASSETS: Starting Masscan port scan on {len(ips_to_scan)} IP addresses")
+                        try:
+                            # Use top 100 ports for faster scanning
+                            port_results = scanning_service.scanner_manager.port_scan_only(ips_to_scan, top_ports=100, timeout=30)
+                            open_ports = port_results.get('open_ports', [])
+                            logging.info(f"🔌 ASSETS: Masscan completed, found {len(open_ports)} open ports")
+
+                            # Organize ports by original domain name (not IP)
+                            for port_info in open_ports:
+                                ip = port_info.get('host', '')
+                                port = port_info.get('port', '')
+                                service = port_info.get('service', '')
+
+                                # Map IP back to original domain name
+                                original_domain = ip_to_domain_map.get(ip, ip)
+
+                                if original_domain and port:
+                                    if original_domain not in all_ports:
+                                        all_ports[original_domain] = []
+                                    all_ports[original_domain].append({
+                                        'port': port,
+                                        'service': service
+                                    })
+                        except Exception as port_error:
+                            logging.warning(f"🔌 ASSETS: Port scanning failed: {str(port_error)}")
+                            all_ports = {}
+                    else:
+                        logging.warning(f"🔌 ASSETS: No domains could be resolved to IP addresses")
                         all_ports = {}
 
             logging.info(f"✅ ASSETS: Complete scan finished for {domain}")
@@ -432,7 +464,6 @@ def scan_assets_subdomain():
                 subdomain_asset = Asset(
                     name=subdomain_name,
                     asset_type=AssetType.SUBDOMAIN,
-                    description=f"Subdomain discovered via Subfinder scan of {domain}",
                     organization_id=org.id,
                     discovered_at=datetime.utcnow(),
                     last_scanned=datetime.utcnow(),
