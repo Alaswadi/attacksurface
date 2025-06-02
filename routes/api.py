@@ -17,24 +17,73 @@ scan_status = {}
 @api_bp.route('/assets', methods=['GET'])
 @login_required
 def get_assets():
-    """Get all assets for the current user's organization"""
+    """Get all assets for the current user's organization with filtering support"""
     org = Organization.query.filter_by(user_id=current_user.id).first()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
-    
-    assets = Asset.query.filter_by(organization_id=org.id, is_active=True).all()
-    
+
+    # Get query parameters for filtering
+    asset_type = request.args.get('type')
+    status = request.args.get('status')
+    risk_level = request.args.get('risk_level')
+    search = request.args.get('search')
+
+    # Base query
+    query = Asset.query.filter_by(organization_id=org.id)
+
+    # Apply filters
+    if asset_type and asset_type != 'all':
+        try:
+            query = query.filter(Asset.asset_type == AssetType(asset_type))
+        except ValueError:
+            pass
+
+    if status:
+        if status == 'active':
+            query = query.filter(Asset.is_active == True)
+        elif status == 'inactive':
+            query = query.filter(Asset.is_active == False)
+    else:
+        # Default to active assets only
+        query = query.filter(Asset.is_active == True)
+
+    if search:
+        query = query.filter(Asset.name.ilike(f'%{search}%'))
+
+    assets = query.all()
+
     assets_data = []
     for asset in assets:
+        # Get vulnerability count and highest severity for this asset
+        vulns = Vulnerability.query.filter_by(asset_id=asset.id, is_resolved=False).all()
+        vuln_count = len(vulns)
+
+        # Determine risk level based on vulnerabilities
+        risk_level = 'none'
+        if vulns:
+            severities = [v.severity for v in vulns]
+            if SeverityLevel.CRITICAL in severities:
+                risk_level = 'critical'
+            elif SeverityLevel.HIGH in severities:
+                risk_level = 'high'
+            elif SeverityLevel.MEDIUM in severities:
+                risk_level = 'medium'
+            elif SeverityLevel.LOW in severities:
+                risk_level = 'low'
+
         assets_data.append({
             'id': asset.id,
             'name': asset.name,
             'type': asset.asset_type.value,
             'description': asset.description,
             'discovered_at': asset.discovered_at.isoformat(),
-            'last_scanned': asset.last_scanned.isoformat() if asset.last_scanned else None
+            'last_scanned': asset.last_scanned.isoformat() if asset.last_scanned else None,
+            'is_active': asset.is_active,
+            'vulnerability_count': vuln_count,
+            'risk_level': risk_level,
+            'metadata': asset.asset_metadata or {}
         })
-    
+
     return jsonify({'assets': assets_data})
 
 @api_bp.route('/assets', methods=['POST'])

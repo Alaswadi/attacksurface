@@ -1,0 +1,632 @@
+{% extends "base.html" %}
+
+{% block title %}Assets - Attack Surface Monitoring{% endblock %}
+
+{% block content %}
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-gray-700 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+        <!-- Logo Section -->
+        <div class="flex items-center justify-center py-4 mb-4">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <i class="ri-shield-keyhole-line ri-lg text-blue-400"></i>
+            </div>
+            <span id="logo-text" class="ml-3 text-lg font-semibold text-blue-400 opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-2">
+            <!-- Dashboard -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="dashboard" title="Dashboard">
+                <div class="flex items-center">
+                    <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Assets -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer bg-gray-600 transition-colors relative" data-section="assets" title="Assets">
+                <div class="flex items-center">
+                    <i class="ri-computer-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="vulnerabilities" title="Vulnerabilities">
+                <div class="flex items-center">
+                    <i class="ri-shield-check-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
+                <div class="flex items-center">
+                    <i class="ri-notification-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
+                    <span class="alert-badge bg-red-500 text-white rounded-full ml-auto opacity-0 transition-opacity duration-300">3</span>
+                </div>
+            </div>
+
+            <!-- Scans -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="scans" title="Scans">
+                <div class="flex items-center">
+                    <i class="ri-search-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Scans</span>
+                </div>
+            </div>
+
+            <!-- Reports -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="reports" title="Reports">
+                <div class="flex items-center">
+                    <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="settings" title="Settings">
+                <div class="flex items-center">
+                    <i class="ri-settings-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Toggle Button -->
+        <div class="p-2">
+            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center" title="Toggle Sidebar">
+                <i class="ri-menu-line ri-lg min-w-[24px]"></i>
+                <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+            <h1 class="text-xl font-semibold text-gray-800">Assets</h1>
+
+            <div class="flex items-center space-x-4">
+                <!-- Search -->
+                <div class="relative">
+                    <input type="search" id="asset-search" placeholder="Search assets..."
+                           class="w-80 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <i class="ri-search-line absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                </div>
+                <!-- Add Asset Button -->
+                <button id="add-asset-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
+                    <i class="ri-add-line mr-2"></i>Add Asset
+                </button>
+
+                <!-- User Menu -->
+                <div class="relative">
+                    <button class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100" onclick="toggleUserMenu()">
+                        <i class="ri-user-line text-gray-600"></i>
+                    </button>
+                    <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
+                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Assets Content -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Total Assets</h3>
+                    <p class="text-5xl font-semibold text-gray-800">{{ total_assets }}</p>
+                    <p class="text-sm text-gray-500 mt-1">All discovered assets</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">At Risk</h3>
+                    <p class="text-5xl font-semibold text-orange-600">{{ at_risk }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Assets with vulnerabilities</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Critical Exposure</h3>
+                    <p class="text-5xl font-semibold text-red-600">{{ critical_exposure }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Critical vulnerabilities</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Secure</h3>
+                    <p class="text-5xl font-semibold text-green-600">{{ secure_assets }}</p>
+                    <p class="text-sm text-gray-500 mt-1">No known vulnerabilities</p>
+                </div>
+            </div>
+
+            <!-- Asset Type Tabs -->
+            <div class="bg-white rounded shadow-sm border border-gray-100 mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="flex space-x-8 px-6">
+                        <button class="asset-type-tab py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600" data-type="all">
+                            All
+                        </button>
+                        <button class="asset-type-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-type="domain">
+                            Domains
+                        </button>
+                        <button class="asset-type-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-type="ip_address">
+                            IPs
+                        </button>
+                        <button class="asset-type-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-type="subdomain">
+                            Subdomains
+                        </button>
+                        <button class="asset-type-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-type="cloud_resource">
+                            Cloud
+                        </button>
+                        <button class="asset-type-tab py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-type="service">
+                            Apps
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Filters -->
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex space-x-4">
+                        <!-- Status Filter -->
+                        <div class="relative">
+                            <select id="status-filter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                            <i class="ri-arrow-down-s-line absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                        </div>
+
+                        <!-- Risk Level Filter -->
+                        <div class="relative">
+                            <select id="risk-filter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">Risk Level</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                                <option value="none">None</option>
+                            </select>
+                            <i class="ri-arrow-down-s-line absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                        </div>
+
+                        <!-- Tags Filter -->
+                        <div class="relative">
+                            <select id="tags-filter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">Tags</option>
+                                <option value="production">Production</option>
+                                <option value="staging">Staging</option>
+                                <option value="development">Development</option>
+                            </select>
+                            <i class="ri-arrow-down-s-line absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assets Table -->
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="name">
+                                    Asset Name
+                                    <i class="ri-arrow-up-down-line ml-1"></i>
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="type">
+                                    Type
+                                    <i class="ri-arrow-up-down-line ml-1"></i>
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="status">
+                                    Status
+                                    <i class="ri-arrow-up-down-line ml-1"></i>
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="risk">
+                                    Risk Level
+                                    <i class="ri-arrow-up-down-line ml-1"></i>
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="last_scan">
+                                    Last Scan
+                                    <i class="ri-arrow-up-down-line ml-1"></i>
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="assets-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Assets will be loaded here via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Loading State -->
+                <div id="loading-state" class="p-8 text-center">
+                    <i class="ri-loader-4-line text-2xl text-gray-400 animate-spin"></i>
+                    <p class="text-gray-500 mt-2">Loading assets...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="empty-state" class="p-8 text-center hidden">
+                    <i class="ri-computer-line text-4xl text-gray-400 mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No assets found</h3>
+                    <p class="text-gray-500 mb-4">Get started by adding your first asset or running a scan.</p>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        <i class="ri-add-line mr-2"></i>Add Asset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let sidebarExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+let currentAssetType = 'all';
+let currentSort = { field: 'name', direction: 'asc' };
+let assetsData = [];
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSidebar();
+    initializeAssetTabs();
+    initializeFilters();
+    initializeSearch();
+    initializeSorting();
+    loadAssets();
+
+    // Add click event to toggle button
+    document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+
+    // Add click events to navigation items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const section = this.getAttribute('data-section');
+            if (section === 'dashboard') {
+                window.location.href = '/dashboard';
+            } else if (section === 'scans') {
+                window.location.href = '/real-scanning';
+            }
+            // Add other navigation logic here
+        });
+    });
+});
+
+// Sidebar functionality (same as dashboard)
+function initializeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleButton = document.getElementById('sidebar-toggle');
+
+    if (sidebarExpanded) {
+        expandSidebar();
+    } else {
+        collapseSidebar();
+    }
+}
+
+function expandSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleIcon = document.querySelector('#sidebar-toggle i');
+    const toggleText = document.getElementById('toggle-text');
+
+    sidebar.classList.remove('w-16');
+    sidebar.classList.add('w-64');
+
+    setTimeout(() => {
+        logoText.classList.remove('opacity-0');
+        logoText.classList.add('opacity-100');
+        navTexts.forEach(text => {
+            text.classList.remove('opacity-0');
+            text.classList.add('opacity-100');
+        });
+    }, 150);
+
+    toggleIcon.className = 'ri-menu-fold-line ri-lg';
+    toggleText.textContent = 'Collapse';
+    document.getElementById('sidebar-toggle').title = 'Collapse sidebar';
+
+    sidebarExpanded = true;
+    localStorage.setItem('sidebarExpanded', 'true');
+}
+
+function collapseSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleIcon = document.querySelector('#sidebar-toggle i');
+    const toggleText = document.getElementById('toggle-text');
+
+    logoText.classList.remove('opacity-100');
+    logoText.classList.add('opacity-0');
+    navTexts.forEach(text => {
+        text.classList.remove('opacity-100');
+        text.classList.add('opacity-0');
+    });
+
+    setTimeout(() => {
+        sidebar.classList.remove('w-64');
+        sidebar.classList.add('w-16');
+    }, 150);
+
+    toggleIcon.className = 'ri-menu-line ri-lg';
+    toggleText.textContent = 'Expand';
+    document.getElementById('sidebar-toggle').title = 'Expand sidebar';
+
+    sidebarExpanded = false;
+    localStorage.setItem('sidebarExpanded', 'false');
+}
+
+function toggleSidebar() {
+    if (sidebarExpanded) {
+        collapseSidebar();
+    } else {
+        expandSidebar();
+    }
+}
+
+function toggleUserMenu() {
+    const menu = document.getElementById('userMenu');
+    menu.classList.toggle('hidden');
+}
+
+// Close user menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('userMenu');
+    const button = event.target.closest('button');
+    if (!button || !button.onclick) {
+        menu.classList.add('hidden');
+    }
+});
+
+// Asset type tabs
+function initializeAssetTabs() {
+    document.querySelectorAll('.asset-type-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const assetType = this.getAttribute('data-type');
+            setActiveAssetTab(assetType);
+            currentAssetType = assetType;
+            filterAssets();
+        });
+    });
+}
+
+function setActiveAssetTab(assetType) {
+    document.querySelectorAll('.asset-type-tab').forEach(tab => {
+        tab.classList.remove('border-blue-500', 'text-blue-600');
+        tab.classList.add('border-transparent', 'text-gray-500');
+    });
+
+    const activeTab = document.querySelector(`[data-type="${assetType}"]`);
+    if (activeTab) {
+        activeTab.classList.remove('border-transparent', 'text-gray-500');
+        activeTab.classList.add('border-blue-500', 'text-blue-600');
+    }
+}
+
+// Filters
+function initializeFilters() {
+    ['status-filter', 'risk-filter', 'tags-filter'].forEach(filterId => {
+        document.getElementById(filterId).addEventListener('change', filterAssets);
+    });
+}
+
+// Search
+function initializeSearch() {
+    const searchInput = document.getElementById('asset-search');
+    let searchTimeout;
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(filterAssets, 300);
+    });
+}
+
+// Sorting
+function initializeSorting() {
+    document.querySelectorAll('[data-sort]').forEach(header => {
+        header.addEventListener('click', function() {
+            const field = this.getAttribute('data-sort');
+            if (currentSort.field === field) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.field = field;
+                currentSort.direction = 'asc';
+            }
+            sortAssets();
+            renderAssets();
+        });
+    });
+}
+
+// Load assets from API
+async function loadAssets() {
+    try {
+        const response = await fetch('/api/assets');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        assetsData = data.assets || [];
+        
+        document.getElementById('loading-state').style.display = 'none';
+        
+        if (assetsData.length === 0) {
+            document.getElementById('empty-state').classList.remove('hidden');
+        } else {
+            renderAssets();
+        }
+    } catch (error) {
+        console.error('Error loading assets:', error);
+        document.getElementById('loading-state').innerHTML = `
+            <i class="ri-error-warning-line text-2xl text-red-400"></i>
+            <p class="text-red-500 mt-2">Error loading assets</p>
+        `;
+    }
+}
+
+// Filter assets
+function filterAssets() {
+    let filteredAssets = [...assetsData];
+
+    // Filter by asset type
+    if (currentAssetType !== 'all') {
+        filteredAssets = filteredAssets.filter(asset => asset.type === currentAssetType);
+    }
+
+    // Filter by search
+    const searchTerm = document.getElementById('asset-search').value.toLowerCase();
+    if (searchTerm) {
+        filteredAssets = filteredAssets.filter(asset =>
+            asset.name.toLowerCase().includes(searchTerm)
+        );
+    }
+
+    // Filter by status
+    const statusFilter = document.getElementById('status-filter').value;
+    if (statusFilter) {
+        filteredAssets = filteredAssets.filter(asset => {
+            if (statusFilter === 'active') return asset.is_active;
+            if (statusFilter === 'inactive') return !asset.is_active;
+            return true;
+        });
+    }
+
+    // Filter by risk level
+    const riskFilter = document.getElementById('risk-filter').value;
+    if (riskFilter) {
+        filteredAssets = filteredAssets.filter(asset => asset.risk_level === riskFilter);
+    }
+
+    // Filter by tags
+    const tagsFilter = document.getElementById('tags-filter').value;
+    if (tagsFilter) {
+        // Add tags filtering logic here when tags are implemented
+    }
+
+    renderAssets(filteredAssets);
+}
+
+// Sort assets
+function sortAssets() {
+    assetsData.sort((a, b) => {
+        let aValue = a[currentSort.field] || '';
+        let bValue = b[currentSort.field] || '';
+
+        if (typeof aValue === 'string') {
+            aValue = aValue.toLowerCase();
+            bValue = bValue.toLowerCase();
+        }
+
+        if (currentSort.direction === 'asc') {
+            return aValue > bValue ? 1 : -1;
+        } else {
+            return aValue < bValue ? 1 : -1;
+        }
+    });
+}
+
+// Render assets table
+function renderAssets(assets = assetsData) {
+    const tbody = document.getElementById('assets-table-body');
+
+    if (assets.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                    No assets match your current filters
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = assets.map(asset => {
+        // Get asset type icon
+        const typeIcon = getAssetTypeIcon(asset.type);
+
+        // Get status badge
+        const statusBadge = getStatusBadge(asset.is_active);
+
+        // Get risk level badge
+        const riskBadge = getRiskLevelBadge(asset.risk_level);
+
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 h-8 w-8">
+                            <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                <i class="${typeIcon} text-blue-600"></i>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <div class="text-sm font-medium text-gray-900">${asset.name}</div>
+                            <div class="text-sm text-gray-500">${asset.description || 'No description'}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        ${asset.type.replace('_', ' ').toUpperCase()}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    ${statusBadge}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    ${riskBadge}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${asset.last_scanned ? new Date(asset.last_scanned).toLocaleDateString() : 'Never'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button class="text-blue-600 hover:text-blue-900 mr-3">View</button>
+                    <button class="text-gray-600 hover:text-gray-900">Edit</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Helper functions for rendering
+function getAssetTypeIcon(type) {
+    const icons = {
+        'domain': 'ri-global-line',
+        'subdomain': 'ri-links-line',
+        'ip_address': 'ri-server-line',
+        'cloud_resource': 'ri-cloud-line',
+        'service': 'ri-apps-line'
+    };
+    return icons[type] || 'ri-computer-line';
+}
+
+function getStatusBadge(isActive) {
+    if (isActive) {
+        return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>';
+    } else {
+        return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>';
+    }
+}
+
+function getRiskLevelBadge(riskLevel) {
+    const badges = {
+        'critical': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Critical</span>',
+        'high': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">High</span>',
+        'medium': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Medium</span>',
+        'low': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Low</span>',
+        'none': '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">None</span>'
+    };
+    return badges[riskLevel] || badges['none'];
+}
+</script>
+{% endblock %}

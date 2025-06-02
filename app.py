@@ -90,6 +90,45 @@ def create_app(config_name=None):
     def real_scanning():
         """Real security scanning page"""
         return render_template('real_scanning.html')
+
+    @app.route('/assets')
+    @login_required
+    def assets():
+        """Assets management page"""
+        # Get user's organization
+        org = Organization.query.filter_by(user_id=current_user.id).first()
+        if not org:
+            # Create default organization for user
+            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
+            db.session.add(org)
+            db.session.commit()
+
+        # Get asset statistics
+        total_assets = Asset.query.filter_by(organization_id=org.id, is_active=True).count()
+
+        # Assets with vulnerabilities (at risk)
+        assets_with_vulns = db.session.query(Asset.id).join(Vulnerability).filter(
+            Asset.organization_id == org.id,
+            Asset.is_active == True,
+            Vulnerability.is_resolved == False
+        ).distinct().count()
+
+        # Critical exposure (assets with critical vulnerabilities)
+        critical_exposure = db.session.query(Asset.id).join(Vulnerability).filter(
+            Asset.organization_id == org.id,
+            Asset.is_active == True,
+            Vulnerability.severity == SeverityLevel.CRITICAL,
+            Vulnerability.is_resolved == False
+        ).distinct().count()
+
+        # Secure assets (no unresolved vulnerabilities)
+        secure_assets = total_assets - assets_with_vulns
+
+        return render_template('assets.html',
+                             total_assets=total_assets,
+                             at_risk=assets_with_vulns,
+                             critical_exposure=critical_exposure,
+                             secure_assets=secure_assets)
     
     # Authentication routes
     from routes.auth import auth_bp
@@ -127,9 +166,9 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         
-        # Create sample data if no users exist
-        if User.query.count() == 0:
-            create_sample_data()
+        # Create sample data if no users exist (commented out for production)
+        # if User.query.count() == 0:
+        #     create_sample_data()
     
     app.run(debug=True)
 

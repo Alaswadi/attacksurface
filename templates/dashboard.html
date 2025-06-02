@@ -648,7 +648,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const section = this.getAttribute('data-section');
             setActiveNavItem(section);
 
-            // Here you can add logic to show different content sections
+            // Navigate to different pages
+            if (section === 'assets') {
+                window.location.href = '/assets';
+            } else if (section === 'scans') {
+                window.location.href = '/real-scanning';
+            }
+            // Add other navigation logic here
             console.log(`Navigating to: ${section}`);
         });
     });
