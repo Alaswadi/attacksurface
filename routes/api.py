@@ -320,10 +320,50 @@ def scan_assets_subdomain():
             return simulate_subdomain_scan(domain, org.id)
 
         try:
-            # Call the real scanning method (same as real scanning page)
+            # Step 1: Subdomain discovery with Subfinder
             logging.info(f"🔍 ASSETS: Starting real Subfinder scan for {domain}")
             scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain)
-            logging.info(f"🔍 ASSETS: Real scan completed, found {len(scan_results.get('subdomains', []))} subdomains")
+            logging.info(f"🔍 ASSETS: Subfinder completed, found {len(scan_results.get('subdomains', []))} subdomains")
+
+            # Step 2: Port scanning with Masscan on discovered subdomains
+            subdomains_found = scan_results.get('subdomains', [])
+            all_ports = {}
+
+            if subdomains_found:
+                # Extract subdomain hosts for port scanning
+                hosts_to_scan = [subdomain_data.get('host', '') if isinstance(subdomain_data, dict) else str(subdomain_data)
+                               for subdomain_data in subdomains_found]
+                hosts_to_scan = [host for host in hosts_to_scan if host]  # Remove empty hosts
+
+                # Add the main domain to port scanning
+                if domain not in hosts_to_scan:
+                    hosts_to_scan.append(domain)
+
+                if hosts_to_scan:
+                    logging.info(f"🔌 ASSETS: Starting Masscan port scan on {len(hosts_to_scan)} hosts")
+                    try:
+                        # Use top 100 ports for faster scanning
+                        port_results = scanning_service.scanner_manager.port_scan_only(hosts_to_scan, top_ports=100, timeout=30)
+                        open_ports = port_results.get('open_ports', [])
+                        logging.info(f"🔌 ASSETS: Masscan completed, found {len(open_ports)} open ports")
+
+                        # Organize ports by host
+                        for port_info in open_ports:
+                            host = port_info.get('host', '')
+                            port = port_info.get('port', '')
+                            service = port_info.get('service', '')
+                            if host and port:
+                                if host not in all_ports:
+                                    all_ports[host] = []
+                                all_ports[host].append({
+                                    'port': port,
+                                    'service': service
+                                })
+                    except Exception as port_error:
+                        logging.warning(f"🔌 ASSETS: Port scanning failed: {str(port_error)}")
+                        all_ports = {}
+
+            logging.info(f"✅ ASSETS: Complete scan finished for {domain}")
         except Exception as scan_error:
             # If real scanning fails (e.g., Subfinder not available), fall back to simulation
             logging.warning(f"🔍 ASSETS: Real scanning failed ({str(scan_error)}), using simulation for {domain}")
@@ -336,16 +376,29 @@ def scan_assets_subdomain():
             asset_type=AssetType.DOMAIN
         ).first()
 
+        # Get port information for the main domain
+        domain_ports = all_ports.get(domain, [])
+
         if not main_domain_asset:
+            asset_metadata = {
+                'ports': domain_ports,
+                'scan_source': 'subfinder_masscan'
+            }
             main_domain_asset = Asset(
                 name=domain,
                 asset_type=AssetType.DOMAIN,
                 description=f"Main domain discovered during subdomain scan",
                 organization_id=org.id,
-                last_scanned=datetime.utcnow()
+                last_scanned=datetime.utcnow(),
+                asset_metadata=asset_metadata
             )
             db.session.add(main_domain_asset)
         else:
+            # Update existing domain asset with port information
+            existing_metadata = main_domain_asset.asset_metadata or {}
+            existing_metadata['ports'] = domain_ports
+            existing_metadata['scan_source'] = 'subfinder_masscan'
+            main_domain_asset.asset_metadata = existing_metadata
             main_domain_asset.last_scanned = datetime.utcnow()
 
         # Store discovered subdomains as assets
@@ -361,6 +414,9 @@ def scan_assets_subdomain():
 
             subdomain_names.append(subdomain_name)
 
+            # Get port information for this subdomain
+            ports_info = all_ports.get(subdomain_name, [])
+
             # Check if subdomain already exists
             existing_asset = Asset.query.filter_by(
                 name=subdomain_name,
@@ -368,19 +424,28 @@ def scan_assets_subdomain():
             ).first()
 
             if not existing_asset:
-                # Create new subdomain asset
+                # Create new subdomain asset with port information
+                asset_metadata = {
+                    'ports': ports_info,
+                    'scan_source': 'subfinder_masscan'
+                }
                 subdomain_asset = Asset(
                     name=subdomain_name,
                     asset_type=AssetType.SUBDOMAIN,
                     description=f"Subdomain discovered via Subfinder scan of {domain}",
                     organization_id=org.id,
                     discovered_at=datetime.utcnow(),
-                    last_scanned=datetime.utcnow()
+                    last_scanned=datetime.utcnow(),
+                    asset_metadata=asset_metadata
                 )
                 db.session.add(subdomain_asset)
                 subdomains_added += 1
             else:
-                # Update last scanned time
+                # Update existing asset with new port information and last scanned time
+                existing_metadata = existing_asset.asset_metadata or {}
+                existing_metadata['ports'] = ports_info
+                existing_metadata['scan_source'] = 'subfinder_masscan'
+                existing_asset.asset_metadata = existing_metadata
                 existing_asset.last_scanned = datetime.utcnow()
 
         db.session.commit()
