@@ -6,7 +6,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from .subfinder import SubfinderScanner
-from .masscan import MasscanScanner
+from .naabu import NaabuScanner
 from .nuclei import NucleiScanner
 from .httpx import HttpxScanner
 from .base_scanner import BaseScannerError, ToolNotFoundError
@@ -18,7 +18,7 @@ class ScannerManager:
     
     def __init__(self):
         self.subfinder = None
-        self.masscan = None
+        self.naabu = None
         self.nuclei = None
         self.httpx = None
         self._initialize_scanners()
@@ -32,10 +32,10 @@ class ScannerManager:
             logger.warning("Subfinder not found - subdomain discovery will be unavailable")
         
         try:
-            self.masscan = MasscanScanner()
-            logger.info("Masscan initialized successfully")
+            self.naabu = NaabuScanner()
+            logger.info("Naabu initialized successfully")
         except ToolNotFoundError:
-            logger.warning("Masscan not found - port scanning will be unavailable")
+            logger.warning("Naabu not found - port scanning will be unavailable")
         
         try:
             self.nuclei = NucleiScanner()
@@ -53,7 +53,7 @@ class ScannerManager:
         """Get status of available tools"""
         return {
             'subfinder': self.subfinder is not None and self.subfinder.is_available(),
-            'masscan': self.masscan is not None and self.masscan.is_available(),
+            'naabu': self.naabu is not None and self.naabu.is_available(),
             'nuclei': self.nuclei is not None and self.nuclei.is_available(),
             'httpx': self.httpx is not None and self.httpx.is_available()
         }
@@ -65,8 +65,8 @@ class ScannerManager:
         if self.subfinder:
             versions['subfinder'] = self.subfinder.get_version()
 
-        if self.masscan:
-            versions['masscan'] = self.masscan.get_version()
+        if self.naabu:
+            versions['naabu'] = self.naabu.get_version()
 
         if self.nuclei:
             versions['nuclei'] = self.nuclei.get_version()
@@ -161,29 +161,29 @@ class ScannerManager:
             if scan_results['alive_hosts']:
                 # Extract hostnames from alive hosts
                 alive_host_names = list(set([host['host'] for host in scan_results['alive_hosts']]))
-                logger.info(f"🔌 MASSCAN: Scanning {len(alive_host_names)} alive hosts")
+                logger.info(f"🔌 NAABU: Scanning {len(alive_host_names)} alive hosts")
             elif scan_results['subdomains']:
                 # Fallback to all subdomains if httpx failed
                 alive_host_names = [sub['host'] for sub in scan_results['subdomains']]
                 if domain not in alive_host_names:
                     alive_host_names.append(domain)
-                logger.info(f"🔌 MASSCAN: Fallback - scanning {len(alive_host_names)} discovered hosts")
+                logger.info(f"🔌 NAABU: Fallback - scanning {len(alive_host_names)} discovered hosts")
 
-            if self.masscan and alive_host_names:
+            if self.naabu and alive_host_names:
                 try:
-                    masscan_config = kwargs.get('masscan', {})
-                    port_results = self.masscan.scan(alive_host_names, **masscan_config)
+                    naabu_config = kwargs.get('naabu', {})
+                    port_results = self.naabu.scan(alive_host_names, **naabu_config)
                     scan_results['open_ports'] = port_results['open_ports']
                     scan_results['scan_summary']['ports_found'] = len(port_results['open_ports'])
                     logger.info(f"✅ STEP 3 COMPLETE: Found {len(port_results['open_ports'])} open ports")
                 except Exception as e:
-                    error_msg = f"Masscan scan failed: {str(e)}"
+                    error_msg = f"Naabu scan failed: {str(e)}"
                     logger.error(error_msg)
                     scan_results['errors'].append(error_msg)
             else:
-                if not self.masscan:
-                    logger.info("⚠️  STEP 3 SKIPPED: Masscan not available")
-                    scan_results['errors'].append("Masscan not available")
+                if not self.naabu:
+                    logger.info("⚠️  STEP 3 SKIPPED: Naabu not available")
+                    scan_results['errors'].append("Naabu not available")
                 else:
                     logger.info("⚠️  STEP 3 SKIPPED: No alive hosts found for port scanning")
                     scan_results['errors'].append("No alive hosts found for port scanning")
@@ -238,21 +238,21 @@ class ScannerManager:
     
     def port_scan_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """Perform port scanning only"""
-        logger.info(f"🔌 MASSCAN: Starting port scan on {len(targets)} targets")
-        logger.info(f"🔌 MASSCAN: Targets: {', '.join(targets[:3])}{'...' if len(targets) > 3 else ''}")
-        logger.info(f"🔌 MASSCAN: Parameters: {kwargs}")
+        logger.info(f"🔌 NAABU: Starting port scan on {len(targets)} targets")
+        logger.info(f"🔌 NAABU: Targets: {', '.join(targets[:3])}{'...' if len(targets) > 3 else ''}")
+        logger.info(f"🔌 NAABU: Parameters: {kwargs}")
 
-        if not self.masscan:
-            logger.error("🔌 MASSCAN: Tool not available")
-            raise BaseScannerError("Masscan not available")
+        if not self.naabu:
+            logger.error("🔌 NAABU: Tool not available")
+            raise BaseScannerError("Naabu not available")
 
         try:
-            logger.info("🔌 MASSCAN: Executing port scan...")
-            result = self.masscan.scan(targets, **kwargs)
-            logger.info(f"🔌 MASSCAN: Port scan completed, found {len(result.get('open_ports', []))} open ports")
+            logger.info("🔌 NAABU: Executing port scan...")
+            result = self.naabu.scan(targets, **kwargs)
+            logger.info(f"🔌 NAABU: Port scan completed, found {len(result.get('open_ports', []))} open ports")
             return result
         except Exception as e:
-            logger.error(f"🔌 MASSCAN: Port scan failed: {str(e)}")
+            logger.error(f"🔌 NAABU: Port scan failed: {str(e)}")
             raise
     
     def vulnerability_scan_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
@@ -321,9 +321,9 @@ class ScannerManager:
                 'threads': 100,  # More threads
                 'silent': True
             },
-            'masscan': {
+            'naabu': {
                 'top_ports': 50,  # Reduced to top 50 ports for speed
-                'rate': 5000,  # Much faster rate than naabu
+                'rate': 2000,  # Fast rate for Naabu
                 'timeout': 2,  # Faster timeout
                 'retries': 1  # Fewer retries
             },
@@ -354,9 +354,9 @@ class ScannerManager:
                 'tech_detect': True,
                 'follow_redirects': True
             },
-            'masscan': {
+            'naabu': {
                 'top_ports': 1000,  # Top 1k ports for deep scan
-                'rate': 2000,  # Faster than naabu
+                'rate': 1000,  # Moderate rate for Naabu
                 'timeout': 5,
                 'retries': 3
             },

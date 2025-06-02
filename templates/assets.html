@@ -870,7 +870,7 @@ function showScanProgress() {
 
         // Update message based on progress
         if (progress > 30 && phase === 1) {
-            progressMessage.textContent = 'Running Masscan to discover open ports...';
+            progressMessage.textContent = 'Running Naabu to discover open ports...';
             phase = 2;
         } else if (progress > 70 && phase === 2) {
             progressMessage.textContent = 'Storing discovered assets...';
