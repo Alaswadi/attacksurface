@@ -71,21 +71,20 @@ class NaabuScanner(BaseScanner):
                 # Default to top 20 critical ports for speed
                 cmd.extend(['-p', '22,80,443,21,23,25,53,110,143,993,995,3389,3306,5432,8080,8443,135,139,111,993'])
             
-            # Add optional parameters - optimized for speed to avoid 504 timeouts
-            rate = kwargs.get('rate', 2000)  # Increased rate for faster scanning
+            # Add optional parameters - using only supported Naabu parameters
+            rate = kwargs.get('rate', 1000)  # Packets per second
             cmd.extend(['-rate', str(rate)])
 
-            timeout = kwargs.get('timeout', 2)  # Reduced timeout to avoid hanging
-            cmd.extend(['-timeout', str(timeout)])
+            # Add concurrency limit
+            cmd.extend(['-c', '25'])  # Concurrent goroutines (reduced for stability)
 
-            retries = kwargs.get('retries', 1)  # Reduced retries for speed
+            # Add timeout (connection timeout)
+            timeout = kwargs.get('timeout', 3)
+            cmd.extend(['-timeout', f'{timeout}s'])
+
+            # Add retries
+            retries = kwargs.get('retries', 1)
             cmd.extend(['-retries', str(retries)])
-
-            # Add connection timeout for faster scanning
-            cmd.extend(['-c', '50'])  # Limit concurrent connections
-
-            # Add host timeout to prevent hanging on unresponsive hosts
-            cmd.extend(['-host-timeout', '30'])  # 30 second host timeout
             
             # Add silent mode
             if kwargs.get('silent', True):

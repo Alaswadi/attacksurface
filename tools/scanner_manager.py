@@ -323,8 +323,8 @@ class ScannerManager:
             },
             'naabu': {
                 'top_ports': 20,  # Reduced to top 20 critical ports for speed
-                'rate': 3000,  # Fast rate for Naabu
-                'timeout': 2,  # Faster timeout
+                'rate': 1000,  # Conservative rate for Naabu
+                'timeout': 3,  # Conservative timeout
                 'retries': 1  # Fewer retries
             },
             'nuclei': {
@@ -356,9 +356,9 @@ class ScannerManager:
             },
             'naabu': {
                 'top_ports': 50,  # Reduced to top 50 ports even for deep scan
-                'rate': 2000,  # Moderate rate for Naabu
-                'timeout': 3,  # Reduced timeout
-                'retries': 2  # Reduced retries
+                'rate': 1000,  # Conservative rate for Naabu
+                'timeout': 5,  # Conservative timeout
+                'retries': 1  # Reduced retries
             },
             'nuclei': {
                 'templates': ['http/', 'network/'],  # Use simpler, more reliable templates

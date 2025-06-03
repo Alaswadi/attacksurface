@@ -368,7 +368,7 @@ def scan_assets_subdomain():
                         logging.info(f"�🔌 ASSETS: Starting Naabu port scan on {len(ips_to_scan)} IP addresses")
                         try:
                             # Use top 20 critical ports for faster scanning and avoid 504 timeouts
-                            port_results = scanning_service.scanner_manager.port_scan_only(ips_to_scan, top_ports=20, timeout=15)
+                            port_results = scanning_service.scanner_manager.port_scan_only(ips_to_scan, top_ports=20, timeout=3, rate=1000)
                             open_ports = port_results.get('open_ports', [])
                             logging.info(f"🔌 ASSETS: Naabu completed, found {len(open_ports)} open ports")
 
