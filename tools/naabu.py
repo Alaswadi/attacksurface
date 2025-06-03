@@ -9,10 +9,10 @@ from .base_scanner import BaseScanner, BaseScannerError
 
 class NaabuScanner(BaseScanner):
     """Naabu port scanner"""
-    
+
     def __init__(self, tool_path: Optional[str] = None):
         super().__init__('naabu', tool_path)
-        self.timeout = 300  # 5 minutes for port scanning
+        self.timeout = 120  # Reduced to 2 minutes to prevent 504 timeouts
     
     def scan(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """
@@ -51,30 +51,41 @@ class NaabuScanner(BaseScanner):
             if ports:
                 cmd.extend(['-p', str(ports)])
             elif top_ports:
-                # Use explicit port list instead of -tp parameter
-                if top_ports <= 50:
-                    # Top 50 most common ports
-                    common_ports = "21,22,23,25,53,80,110,111,135,139,143,443,993,995,1723,3306,3389,5432,5900,8080"
-                    cmd.extend(['-p', common_ports])
+                # Use explicit port list for most critical ports to avoid timeouts
+                if top_ports <= 20:
+                    # Top 20 most critical ports (fastest scan)
+                    critical_ports = "22,80,443,21,23,25,53,110,143,993,995,3389,3306,5432,8080,8443,135,139,111,993"
+                    cmd.extend(['-p', critical_ports])
+                elif top_ports <= 50:
+                    # Top 50 most important ports (balanced speed/coverage)
+                    important_ports = "21,22,23,25,53,80,110,111,135,139,143,443,993,995,1723,3306,3389,5432,5900,8080,8443,8000,9000,3000,5000,8888,9090,1433,27017,6379,5984,587,465,636,389,88,445,1521,5060,161,162,69,123,514,515,631,873,902,1080"
+                    cmd.extend(['-p', important_ports])
                 elif top_ports <= 100:
-                    # Top 100 ports - use nmap's top ports
-                    cmd.extend(['-p', '1-1000'])
+                    # Top 100 ports - focus on common services only
+                    common_services = "21-25,53,80,110-111,135,139,143,443,993,995,1433,1521,1723,3306,3389,5432,5900,8000,8080,8443,8888,9000,9090"
+                    cmd.extend(['-p', common_services])
                 else:
-                    # For larger port counts, use port range
-                    cmd.extend(['-p', f'1-{min(top_ports * 10, 65535)}'])
+                    # For larger port counts, use very limited range to avoid timeouts
+                    cmd.extend(['-p', '21-25,53,80,110,135,139,143,443,993,995,3306,3389,5432,8080,8443'])
             else:
-                # Default to common ports
-                cmd.extend(['-p', '21,22,23,25,53,80,110,135,139,143,443,993,995,1723,3306,3389,5432,5900,8080'])
+                # Default to top 20 critical ports for speed
+                cmd.extend(['-p', '22,80,443,21,23,25,53,110,143,993,995,3389,3306,5432,8080,8443,135,139,111,993'])
             
-            # Add optional parameters
-            rate = kwargs.get('rate', 1000)
+            # Add optional parameters - optimized for speed to avoid 504 timeouts
+            rate = kwargs.get('rate', 2000)  # Increased rate for faster scanning
             cmd.extend(['-rate', str(rate)])
-            
-            timeout = kwargs.get('timeout', 5)
+
+            timeout = kwargs.get('timeout', 2)  # Reduced timeout to avoid hanging
             cmd.extend(['-timeout', str(timeout)])
-            
-            retries = kwargs.get('retries', 3)
+
+            retries = kwargs.get('retries', 1)  # Reduced retries for speed
             cmd.extend(['-retries', str(retries)])
+
+            # Add connection timeout for faster scanning
+            cmd.extend(['-c', '50'])  # Limit concurrent connections
+
+            # Add host timeout to prevent hanging on unresponsive hosts
+            cmd.extend(['-host-timeout', '30'])  # 30 second host timeout
             
             # Add silent mode
             if kwargs.get('silent', True):
@@ -195,23 +206,32 @@ class NaabuScanner(BaseScanner):
             self._cleanup_temp_file(targets_file)
     
     def get_common_ports(self) -> Dict[str, List[int]]:
-        """Get common port lists"""
+        """Get common port lists optimized for speed"""
         return {
-            'top_100': list(range(1, 101)),
-            'top_1000': list(range(1, 1001)),
-            'web_ports': [80, 443, 8080, 8443, 8000, 8888, 3000, 5000],
-            'database_ports': [3306, 5432, 1433, 27017, 6379, 5984],
-            'mail_ports': [25, 110, 143, 993, 995, 587],
+            'critical_20': [22, 80, 443, 21, 23, 25, 53, 110, 143, 993, 995, 3389, 3306, 5432, 8080, 8443, 135, 139, 111, 993],
+            'important_50': [21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 993, 995, 1723, 3306, 3389, 5432, 5900, 8080, 8443, 8000, 9000, 3000, 5000, 8888, 9090, 1433, 27017, 6379, 5984, 587, 465, 636, 389, 88, 445, 1521, 5060, 161, 162, 69, 123, 514, 515, 631, 873, 902, 1080],
+            'web_ports': [80, 443, 8080, 8443, 8000, 8888, 3000, 5000, 9000, 9090],
+            'database_ports': [3306, 5432, 1433, 27017, 6379, 5984, 1521],
+            'mail_ports': [25, 110, 143, 993, 995, 587, 465],
             'ftp_ports': [21, 22, 990],
-            'remote_access': [22, 23, 3389, 5900, 5901]
+            'remote_access': [22, 23, 3389, 5900, 5901],
+            'network_services': [53, 88, 135, 139, 389, 445, 636]
         }
     
-    def scan_common_ports(self, targets: List[str], port_category: str = 'web_ports') -> Dict[str, Any]:
-        """Scan common ports by category"""
+    def scan_common_ports(self, targets: List[str], port_category: str = 'critical_20') -> Dict[str, Any]:
+        """Scan common ports by category - defaults to critical_20 for speed"""
         common_ports = self.get_common_ports()
-        
+
         if port_category not in common_ports:
             raise BaseScannerError(f"Unknown port category: {port_category}")
-        
+
         ports = ','.join(map(str, common_ports[port_category]))
         return self.scan(targets, ports=ports)
+
+    def quick_scan(self, targets: List[str]) -> Dict[str, Any]:
+        """Perform a quick scan of only the most critical ports to avoid timeouts"""
+        return self.scan(targets,
+                        top_ports=20,
+                        rate=3000,
+                        timeout=1,
+                        retries=1)
