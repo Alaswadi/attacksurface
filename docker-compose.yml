@@ -119,7 +119,7 @@ services:
     build: .
     container_name: attacksurface_celery
     restart: unless-stopped
-    command: celery -A app.celery worker --loglevel=info
+    command: celery -A celery_app.celery worker --loglevel=info
     environment:
       - FLASK_CONFIG=production
       - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}

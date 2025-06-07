@@ -7,18 +7,41 @@ from forms import LoginForm, RegisterForm
 import os
 from datetime import datetime, timedelta
 import random
+from celery import Celery
+
+def make_celery(app):
+    """Create Celery instance and configure it with Flask app context"""
+    celery = Celery(
+        app.import_name,
+        backend=app.config['CELERY_RESULT_BACKEND'],
+        broker=app.config['CELERY_BROKER_URL']
+    )
+    celery.conf.update(app.config)
+
+    class ContextTask(celery.Task):
+        """Make celery tasks work with Flask app context"""
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery.Task = ContextTask
+    return celery
 
 def create_app(config_name=None):
     app = Flask(__name__)
-    
+
     if config_name is None:
         config_name = os.environ.get('FLASK_CONFIG', 'default')
-    
+
     app.config.from_object(config[config_name])
-    
+
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
+
+    # Initialize Celery
+    celery = make_celery(app)
+    app.celery = celery
     
     # Initialize Flask-Login
     login_manager = LoginManager()
