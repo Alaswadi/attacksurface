@@ -6,7 +6,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from .subfinder import SubfinderScanner
-from .naabu import NaabuScanner
+from .nmap import NmapScanner
 from .nuclei import NucleiScanner
 from .httpx import HttpxScanner
 from .base_scanner import BaseScannerError, ToolNotFoundError
@@ -32,10 +32,10 @@ class ScannerManager:
             logger.warning("Subfinder not found - subdomain discovery will be unavailable")
         
         try:
-            self.naabu = NaabuScanner()
-            logger.info("Naabu initialized successfully")
+            self.nmap = NmapScanner()
+            logger.info("Nmap initialized successfully")
         except ToolNotFoundError:
-            logger.warning("Naabu not found - port scanning will be unavailable")
+            logger.warning("Nmap not found - port scanning will be unavailable")
         
         try:
             self.nuclei = NucleiScanner()
@@ -53,7 +53,7 @@ class ScannerManager:
         """Get status of available tools"""
         return {
             'subfinder': self.subfinder is not None and self.subfinder.is_available(),
-            'naabu': self.naabu is not None and self.naabu.is_available(),
+            'nmap': self.nmap is not None and self.nmap.is_available(),
             'nuclei': self.nuclei is not None and self.nuclei.is_available(),
             'httpx': self.httpx is not None and self.httpx.is_available()
         }
@@ -65,8 +65,8 @@ class ScannerManager:
         if self.subfinder:
             versions['subfinder'] = self.subfinder.get_version()
 
-        if self.naabu:
-            versions['naabu'] = self.naabu.get_version()
+        if self.nmap:
+            versions['nmap'] = self.nmap.get_version()
 
         if self.nuclei:
             versions['nuclei'] = self.nuclei.get_version()
@@ -161,29 +161,29 @@ class ScannerManager:
             if scan_results['alive_hosts']:
                 # Extract hostnames from alive hosts
                 alive_host_names = list(set([host['host'] for host in scan_results['alive_hosts']]))
-                logger.info(f"🔌 NAABU: Scanning {len(alive_host_names)} alive hosts")
+                logger.info(f"🔌 NMAP: Scanning {len(alive_host_names)} alive hosts")
             elif scan_results['subdomains']:
                 # Fallback to all subdomains if httpx failed
                 alive_host_names = [sub['host'] for sub in scan_results['subdomains']]
                 if domain not in alive_host_names:
                     alive_host_names.append(domain)
-                logger.info(f"🔌 NAABU: Fallback - scanning {len(alive_host_names)} discovered hosts")
+                logger.info(f"🔌 NMAP: Fallback - scanning {len(alive_host_names)} discovered hosts")
 
-            if self.naabu and alive_host_names:
+            if self.nmap and alive_host_names:
                 try:
-                    naabu_config = kwargs.get('naabu', {})
-                    port_results = self.naabu.scan(alive_host_names, **naabu_config)
+                    nmap_config = kwargs.get('nmap', {})
+                    port_results = self.nmap.scan(alive_host_names, **nmap_config)
                     scan_results['open_ports'] = port_results['open_ports']
                     scan_results['scan_summary']['ports_found'] = len(port_results['open_ports'])
                     logger.info(f"✅ STEP 3 COMPLETE: Found {len(port_results['open_ports'])} open ports")
                 except Exception as e:
-                    error_msg = f"Naabu scan failed: {str(e)}"
+                    error_msg = f"Nmap scan failed: {str(e)}"
                     logger.error(error_msg)
                     scan_results['errors'].append(error_msg)
             else:
-                if not self.naabu:
-                    logger.info("⚠️  STEP 3 SKIPPED: Naabu not available")
-                    scan_results['errors'].append("Naabu not available")
+                if not self.nmap:
+                    logger.info("⚠️  STEP 3 SKIPPED: Nmap not available")
+                    scan_results['errors'].append("Nmap not available")
                 else:
                     logger.info("⚠️  STEP 3 SKIPPED: No alive hosts found for port scanning")
                     scan_results['errors'].append("No alive hosts found for port scanning")
@@ -238,21 +238,21 @@ class ScannerManager:
     
     def port_scan_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """Perform port scanning only"""
-        logger.info(f"🔌 NAABU: Starting port scan on {len(targets)} targets")
-        logger.info(f"🔌 NAABU: Targets: {', '.join(targets[:3])}{'...' if len(targets) > 3 else ''}")
-        logger.info(f"🔌 NAABU: Parameters: {kwargs}")
+        logger.info(f"🔌 NMAP: Starting port scan on {len(targets)} targets")
+        logger.info(f"🔌 NMAP: Targets: {', '.join(targets[:3])}{'...' if len(targets) > 3 else ''}")
+        logger.info(f"🔌 NMAP: Parameters: {kwargs}")
 
-        if not self.naabu:
-            logger.error("🔌 NAABU: Tool not available")
-            raise BaseScannerError("Naabu not available")
+        if not self.nmap:
+            logger.error("🔌 NMAP: Tool not available")
+            raise BaseScannerError("Nmap not available")
 
         try:
-            logger.info("🔌 NAABU: Executing port scan...")
-            result = self.naabu.scan(targets, **kwargs)
-            logger.info(f"🔌 NAABU: Port scan completed, found {len(result.get('open_ports', []))} open ports")
+            logger.info("🔌 NMAP: Executing port scan...")
+            result = self.nmap.scan(targets, **kwargs)
+            logger.info(f"🔌 NMAP: Port scan completed, found {len(result.get('open_ports', []))} open ports")
             return result
         except Exception as e:
-            logger.error(f"🔌 NAABU: Port scan failed: {str(e)}")
+            logger.error(f"🔌 NMAP: Port scan failed: {str(e)}")
             raise
     
     def vulnerability_scan_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:

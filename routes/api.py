@@ -261,7 +261,7 @@ def start_scan():
         'domain': domain,
         'progress': {
             'subfinder': 0,
-            'naabu': 0,
+            'nmap': 0,
             'nuclei': 0
         },
         'message': 'Initializing scan...',
@@ -600,7 +600,7 @@ def download_report(scan_id):
     return response
 
 def simulate_scan(scan_id, domain):
-    """Simulate the scanning process with Subfinder, Naabu, and Nuclei"""
+    """Simulate the scanning process with Subfinder, Nmap, and Nuclei"""
     try:
         # Subfinder phase
         scan_status[scan_id]['message'] = 'Running Subfinder (subdomain discovery)...'
@@ -616,10 +616,10 @@ def simulate_scan(scan_id, domain):
             f'test.{domain}'
         ]
 
-        # Naabu phase
-        scan_status[scan_id]['message'] = 'Running Naabu (port scanning)...'
+        # Nmap phase
+        scan_status[scan_id]['message'] = 'Running Nmap (port scanning)...'
         for progress in range(0, 101, 25):
-            scan_status[scan_id]['progress']['naabu'] = progress
+            scan_status[scan_id]['progress']['nmap'] = progress
             time.sleep(0.4)
 
         # Generate sample ports

@@ -112,7 +112,16 @@ class NmapScanner(BaseScanner):
             
         finally:
             self._cleanup_temp_file(targets_file)
-    
+
+    def parse_output(self, output: str) -> Dict[str, Any]:
+        """Parse Nmap output (required by BaseScanner)"""
+        open_ports = self.parse_xml_output(output)
+        return {
+            'tool': 'nmap',
+            'open_ports': open_ports,
+            'total_ports': len(open_ports)
+        }
+
     def parse_xml_output(self, xml_output: str) -> List[Dict[str, Any]]:
         """Parse Nmap XML output"""
         open_ports = []
