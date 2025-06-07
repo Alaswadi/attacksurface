@@ -321,11 +321,10 @@ class ScannerManager:
                 'threads': 100,  # More threads
                 'silent': True
             },
-            'naabu': {
-                'top_ports': 20,  # Reduced to top 20 critical ports for speed
-                'rate': 1000,  # Conservative rate for Naabu
-                'timeout': 3,  # Conservative timeout
-                'retries': 1  # Fewer retries
+            'nmap': {
+                'top_ports': 10,  # Top 10 most critical ports for maximum speed
+                'timing': 'T5',  # Insane timing for speed
+                'version_detection': False  # Skip version detection for speed
             },
             'nuclei': {
                 'templates': ['http/miscellaneous/'],  # Very limited templates
@@ -354,11 +353,10 @@ class ScannerManager:
                 'tech_detect': True,
                 'follow_redirects': True
             },
-            'naabu': {
-                'top_ports': 50,  # Reduced to top 50 ports even for deep scan
-                'rate': 1000,  # Conservative rate for Naabu
-                'timeout': 5,  # Conservative timeout
-                'retries': 1  # Reduced retries
+            'nmap': {
+                'top_ports': 20,  # Top 20 critical ports for deep scan
+                'timing': 'T4',  # Aggressive timing
+                'version_detection': True  # Include version detection for deep scan
             },
             'nuclei': {
                 'templates': ['http/', 'network/'],  # Use simpler, more reliable templates

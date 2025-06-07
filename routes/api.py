@@ -338,7 +338,7 @@ def scan_assets_subdomain():
             scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain)
             logging.info(f"🔍 ASSETS: Subfinder completed, found {len(scan_results.get('subdomains', []))} subdomains")
 
-            # Step 2: Port scanning with Naabu on discovered subdomains
+            # Step 2: Port scanning with Nmap on discovered subdomains
             subdomains_found = scan_results.get('subdomains', [])
             all_ports = {}
 
@@ -365,12 +365,12 @@ def scan_assets_subdomain():
                             ip_to_domain_map[ip] = host
 
                     if ips_to_scan:
-                        logging.info(f"�🔌 ASSETS: Starting Naabu port scan on {len(ips_to_scan)} IP addresses")
+                        logging.info(f"�🔌 ASSETS: Starting Nmap port scan on {len(ips_to_scan)} IP addresses")
                         try:
-                            # Use top 20 critical ports for faster scanning and avoid 504 timeouts
-                            port_results = scanning_service.scanner_manager.port_scan_only(ips_to_scan, top_ports=20, timeout=3, rate=1000)
+                            # Use top 10 critical ports for maximum speed and avoid 504 timeouts
+                            port_results = scanning_service.scanner_manager.port_scan_only(ips_to_scan, top_ports=10, timing='T5')
                             open_ports = port_results.get('open_ports', [])
-                            logging.info(f"🔌 ASSETS: Naabu completed, found {len(open_ports)} open ports")
+                            logging.info(f"🔌 ASSETS: Nmap completed, found {len(open_ports)} open ports")
 
                             # Organize ports by original domain name (not IP)
                             for port_info in open_ports:
@@ -389,7 +389,7 @@ def scan_assets_subdomain():
                                         'service': service
                                     })
                         except Exception as port_error:
-                            logging.warning(f"🔌 ASSETS: Naabu port scanning failed: {str(port_error)}")
+                            logging.warning(f"🔌 ASSETS: Nmap port scanning failed: {str(port_error)}")
                             all_ports = {}
                     else:
                         logging.warning(f"🔌 ASSETS: No domains could be resolved to IP addresses")
@@ -414,7 +414,7 @@ def scan_assets_subdomain():
         if not main_domain_asset:
             asset_metadata = {
                 'ports': domain_ports,
-                'scan_source': 'subfinder_naabu'
+                'scan_source': 'subfinder_nmap'
             }
             main_domain_asset = Asset(
                 name=domain,
@@ -429,7 +429,7 @@ def scan_assets_subdomain():
             # Update existing domain asset with port information
             existing_metadata = main_domain_asset.asset_metadata or {}
             existing_metadata['ports'] = domain_ports
-            existing_metadata['scan_source'] = 'subfinder_naabu'
+            existing_metadata['scan_source'] = 'subfinder_nmap'
             main_domain_asset.asset_metadata = existing_metadata
             main_domain_asset.last_scanned = datetime.utcnow()
 
@@ -459,7 +459,7 @@ def scan_assets_subdomain():
                 # Create new subdomain asset with port information
                 asset_metadata = {
                     'ports': ports_info,
-                    'scan_source': 'subfinder_naabu'
+                    'scan_source': 'subfinder_nmap'
                 }
                 subdomain_asset = Asset(
                     name=subdomain_name,
@@ -475,7 +475,7 @@ def scan_assets_subdomain():
                 # Update existing asset with new port information and last scanned time
                 existing_metadata = existing_asset.asset_metadata or {}
                 existing_metadata['ports'] = ports_info
-                existing_metadata['scan_source'] = 'subfinder_naabu'
+                existing_metadata['scan_source'] = 'subfinder_nmap'
                 existing_asset.asset_metadata = existing_metadata
                 existing_asset.last_scanned = datetime.utcnow()
 
