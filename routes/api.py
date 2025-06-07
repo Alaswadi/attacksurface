@@ -104,7 +104,7 @@ def get_assets():
             'is_active': asset.is_active,
             'vulnerability_count': vuln_count,
             'risk_level': risk_level,
-            'metadata': asset.asset_metadata or {}
+            'asset_metadata': asset.asset_metadata or {}
         })
 
     return jsonify({'assets': assets_data})
