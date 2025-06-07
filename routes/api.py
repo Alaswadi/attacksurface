@@ -149,6 +149,55 @@ def create_asset():
         db.session.rollback()
         return jsonify({'error': 'Failed to create asset'}), 500
 
+@api_bp.route('/assets/<int:asset_id>', methods=['DELETE'])
+@login_required
+def delete_asset(asset_id):
+    """Delete an asset and optionally its related subdomains"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    # Find the asset to delete
+    asset = Asset.query.filter_by(id=asset_id, organization_id=org.id).first()
+    if not asset:
+        return jsonify({'error': 'Asset not found'}), 404
+
+    try:
+        # If this is a domain, also delete all associated subdomains
+        if asset.asset_type == AssetType.DOMAIN:
+            # Find all subdomains that belong to this domain
+            domain_name = asset.name
+            subdomains = Asset.query.filter(
+                Asset.organization_id == org.id,
+                Asset.asset_type == AssetType.SUBDOMAIN,
+                Asset.name.like(f'%.{domain_name}')
+            ).all()
+
+            # Delete all subdomains first
+            for subdomain in subdomains:
+                # Delete associated vulnerabilities
+                Vulnerability.query.filter_by(asset_id=subdomain.id).delete()
+                # Delete the subdomain
+                db.session.delete(subdomain)
+
+        # Delete associated vulnerabilities for the main asset
+        Vulnerability.query.filter_by(asset_id=asset.id).delete()
+
+        # Delete the main asset
+        db.session.delete(asset)
+
+        # Commit all changes
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Asset "{asset.name}" deleted successfully'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to delete asset: {str(e)}'}), 500
+
 @api_bp.route('/vulnerabilities', methods=['GET'])
 @login_required
 def get_vulnerabilities():
