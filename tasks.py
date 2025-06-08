@@ -76,70 +76,245 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
             }
         )
 
-        # Launch subdomain discovery task
-        subdomain_task = subdomain_discovery_task.delay(domain, organization_id, scan_type)
-        subdomain_results = subdomain_task.get(timeout=600)  # 10 minute timeout
+        # Execute the complete scanning workflow synchronously within this task
+        # This avoids the Celery .get() restriction by doing everything in one task
 
-        if not subdomain_results.get('success', False):
-            raise Exception(f"Subdomain discovery failed: {subdomain_results.get('error', 'Unknown error')}")
+        # Stage 1: Subdomain Discovery
+        logger.info(f"🔍 Starting subdomain discovery for {domain}")
 
-        subdomains = subdomain_results.get('subdomains', [])
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'subfinder_scanning',
+                'domain': domain,
+                'progress': 15,
+                'message': f'Running Subfinder scan for {domain}...',
+                'current_phase': 'Subfinder subdomain discovery'
+            }
+        )
+
+        # Import scanning service
+        from services.real_scanning_service import RealScanningService
+        scanning_service = RealScanningService()
+
+        # Configure Subfinder based on scan type
+        subfinder_config = {
+            'quick': {'silent': True, 'max_time': 60, 'recursive': False},
+            'deep': {'silent': True, 'max_time': 300, 'recursive': True},
+            'full': {'silent': True, 'max_time': 600, 'recursive': True, 'all_sources': True}
+        }
+
+        config = subfinder_config.get(scan_type, subfinder_config['deep'])
+
+        # Perform subdomain discovery
+        scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain, **config)
+        subdomains = scan_results.get('subdomains', [])
+
         logger.info(f"📊 Discovered {len(subdomains)} subdomains for {domain}")
 
-        # Stage 2: HTTP Probing (Batch Processing)
+        # Store subdomains in database
+        stored_count = 0
+        for subdomain in subdomains:
+            try:
+                if isinstance(subdomain, dict):
+                    hostname = subdomain.get('host', '')
+                    source = subdomain.get('source', 'subfinder')
+                    ip = subdomain.get('ip', '')
+                    timestamp = subdomain.get('timestamp', '')
+                else:
+                    hostname = str(subdomain)
+                    source = 'subfinder'
+                    ip = ''
+                    timestamp = ''
+
+                if not hostname:
+                    continue
+
+                # Check if subdomain already exists
+                existing_asset = Asset.query.filter_by(
+                    name=hostname,
+                    organization_id=organization_id
+                ).first()
+
+                if not existing_asset:
+                    asset_metadata = {
+                        'discovery_method': 'subfinder',
+                        'parent_domain': domain,
+                        'scan_type': scan_type,
+                        'source': source,
+                        'discovered_ip': ip,
+                        'discovery_timestamp': timestamp or datetime.now().isoformat()
+                    }
+
+                    asset = Asset(
+                        name=hostname,
+                        asset_type=AssetType.SUBDOMAIN,
+                        organization_id=organization_id,
+                        discovered_at=datetime.now(),
+                        is_active=True,
+                        asset_metadata=asset_metadata
+                    )
+                    db.session.add(asset)
+                    stored_count += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to store subdomain {subdomain}: {str(e)}")
+                continue
+
+        db.session.commit()
+        logger.info(f"📊 Stored {stored_count} new subdomains in database")
+
+        # Stage 2: HTTP Probing
         self.update_state(
             state='PROGRESS',
             meta={
                 'stage': 'http_probing',
                 'domain': domain,
-                'progress': 30,
+                'progress': 40,
                 'message': f'Probing {len(subdomains)} subdomains for live hosts...',
                 'current_phase': 'HTTP probing with httpx',
                 'subdomains_found': len(subdomains)
             }
         )
 
-        # Process subdomains in batches for large domains
-        batch_size = 50 if scan_type == 'quick' else 100
+        logger.info(f"🌐 Starting HTTP probing for {len(subdomains)} subdomains")
+
+        # Extract hostnames for HTTP probing
+        hostnames = []
+        for subdomain in subdomains:
+            if isinstance(subdomain, dict):
+                hostname = subdomain.get('host', '')
+            else:
+                hostname = str(subdomain)
+            if hostname:
+                hostnames.append(hostname)
+
+        # Execute HTTP probing
         alive_hosts = []
-        http_results = {}
+        http_data = {}
 
-        for i in range(0, len(subdomains), batch_size):
-            batch = subdomains[i:i + batch_size]
-            batch_num = (i // batch_size) + 1
-            total_batches = (len(subdomains) + batch_size - 1) // batch_size
+        if hostnames:
+            try:
+                # Import httpx scanner
+                from tools.httpx import HttpxScanner
+                httpx_scanner = HttpxScanner()
 
-            logger.info(f"🔍 Processing HTTP probe batch {batch_num}/{total_batches} ({len(batch)} subdomains)")
-
-            # Update progress
-            progress = 30 + (20 * (i / len(subdomains)))
-            self.update_state(
-                state='PROGRESS',
-                meta={
-                    'stage': 'http_probing',
-                    'domain': domain,
-                    'progress': int(progress),
-                    'message': f'HTTP probing batch {batch_num}/{total_batches}...',
-                    'current_phase': f'Batch {batch_num}/{total_batches}',
-                    'subdomains_found': len(subdomains),
-                    'batch_size': len(batch)
+                # Configure httpx based on scan type
+                httpx_config = {
+                    'quick': {
+                        'ports': [80, 443],
+                        'timeout': 5,
+                        'threads': 100,
+                        'tech_detect': False,
+                        'follow_redirects': False
+                    },
+                    'deep': {
+                        'ports': [80, 443, 8080, 8443, 8000, 3000],
+                        'timeout': 10,
+                        'threads': 50,
+                        'tech_detect': True,
+                        'follow_redirects': True
+                    },
+                    'full': {
+                        'ports': [80, 443, 8080, 8443, 8000, 3000, 9000, 9090],
+                        'timeout': 15,
+                        'threads': 30,
+                        'tech_detect': True,
+                        'follow_redirects': True
+                    }
                 }
-            )
 
-            # Launch HTTP probe task for this batch
-            probe_task = http_probe_task.delay(batch, scan_type)
-            probe_results = probe_task.get(timeout=300)  # 5 minute timeout per batch
+                http_config = httpx_config.get(scan_type, httpx_config['deep'])
 
-            if probe_results.get('success', False):
-                batch_alive = probe_results.get('alive_hosts', [])
-                batch_http_data = probe_results.get('http_data', {})
+                # Perform HTTP probing
+                probe_results = httpx_scanner.scan(hostnames, **http_config)
+                alive_hosts_data = probe_results.get('alive_hosts', [])
 
-                alive_hosts.extend(batch_alive)
-                http_results.update(batch_http_data)
+                # Extract alive hostnames and build HTTP data
+                for host in alive_hosts_data:
+                    hostname = host.get('host', '')
+                    if hostname:
+                        alive_hosts.append(hostname)
+                        http_data[hostname] = {
+                            'url': host.get('url', ''),
+                            'status_code': host.get('status_code', 0),
+                            'title': host.get('title', ''),
+                            'tech': host.get('tech', []),
+                            'webserver': host.get('webserver', ''),
+                            'content_length': host.get('content_length', 0),
+                            'response_time': host.get('response_time', ''),
+                            'scheme': host.get('scheme', 'http'),
+                            'port': host.get('port', 80)
+                        }
 
-                logger.info(f"✅ Batch {batch_num}: {len(batch_alive)} alive hosts found")
+            except Exception as e:
+                logger.error(f"❌ HTTP probing failed: {str(e)}")
 
-        logger.info(f"🌐 Total alive hosts found: {len(alive_hosts)}")
+        logger.info(f"🌐 HTTP probing completed: {len(alive_hosts)} alive hosts found")
+
+        # Stage 3: Port Scanning (for alive hosts only)
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'port_scanning',
+                'domain': domain,
+                'progress': 70,
+                'message': f'Port scanning {len(alive_hosts)} alive hosts...',
+                'current_phase': 'Nmap port scanning',
+                'subdomains_found': len(subdomains),
+                'alive_hosts_found': len(alive_hosts)
+            }
+        )
+
+        port_results = {}
+        if alive_hosts:
+            logger.info(f"🔍 Starting port scanning for {len(alive_hosts)} alive hosts")
+
+            try:
+                # Import nmap scanner
+                from tools.nmap import NmapScanner
+                nmap_scanner = NmapScanner()
+
+                # Configure nmap based on scan type
+                nmap_config = {
+                    'quick': {
+                        'ports': '80,443,22,21,25,53,110,143,993,995',
+                        'scan_type': 'syn',
+                        'timing': 'T4'
+                    },
+                    'deep': {
+                        'ports': '1-1000',
+                        'scan_type': 'syn',
+                        'timing': 'T3',
+                        'service_detection': True
+                    },
+                    'full': {
+                        'ports': '1-65535',
+                        'scan_type': 'syn',
+                        'timing': 'T3',
+                        'service_detection': True,
+                        'os_detection': True
+                    }
+                }
+
+                port_config = nmap_config.get(scan_type, nmap_config['deep'])
+
+                # Perform port scanning
+                for host in alive_hosts:
+                    try:
+                        host_results = nmap_scanner.scan(host, **port_config)
+                        if host_results.get('success', False):
+                            port_results[host] = host_results.get('results', {})
+                    except Exception as e:
+                        logger.warning(f"Port scan failed for {host}: {str(e)}")
+                        continue
+
+            except Exception as e:
+                logger.error(f"❌ Port scanning failed: {str(e)}")
+
+            logger.info(f"🔍 Port scanning completed for {len(alive_hosts)} hosts")
+
+        logger.info(f"🎯 Scan workflow completed: {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts")
 
         # Stage 3: Final Processing and Storage
         self.update_state(
@@ -225,7 +400,8 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
             'alive_hosts_found': len(alive_hosts),
             'subdomains': subdomains,
             'alive_hosts': alive_hosts,
-            'http_results': http_results,
+            'http_data': http_data,
+            'port_results': port_results,
             'stage': 'completed',
             'progress': 100,
             'message': f'Large-scale scan completed successfully! Found {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts.',
@@ -279,6 +455,8 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
             'scan_type': scan_type,
             'retry': True
         }
+
+# Helper functions removed - all functionality is now inline in the orchestrator task
 
 # ============================================================================
 # INDIVIDUAL SCANNING TASKS (Optimized for Large Domains)
