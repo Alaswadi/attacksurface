@@ -954,11 +954,16 @@ def start_large_domain_scan():
             import uuid
             fallback_task_id = str(uuid.uuid4())
 
-            # Start simulated scan in background thread
+            # Start simulated scan in background thread with Flask context
             import threading
+            from flask import current_app
+
+            # Get current Flask app instance for context
+            app_instance = current_app._get_current_object()
+
             scan_thread = threading.Thread(
-                target=simulate_large_scale_scan,
-                args=(fallback_task_id, domain, org.id, scan_type)
+                target=simulate_large_scale_scan_with_context,
+                args=(app_instance, fallback_task_id, domain, org.id, scan_type)
             )
             scan_thread.daemon = True
             scan_thread.start()
@@ -1088,6 +1093,13 @@ def get_celery_scan_status(task_id):
 # Global storage for fallback scan status
 fallback_scan_status = {}
 
+def simulate_large_scale_scan_with_context(app_instance, task_id, domain, organization_id, scan_type='deep'):
+    """
+    Context-aware wrapper for simulate_large_scale_scan that handles Flask application context
+    """
+    with app_instance.app_context():
+        simulate_large_scale_scan(task_id, domain, organization_id, scan_type)
+
 def simulate_large_scale_scan(task_id, domain, organization_id, scan_type='deep'):
     """
     Simulate large-scale scanning for development/fallback mode
@@ -1166,15 +1178,23 @@ def simulate_large_scale_scan(task_id, domain, organization_id, scan_type='deep'
         time.sleep(2)
 
         # Store simulated results in database
-        store_simulated_scan_results(domain, organization_id, simulated_subdomains, alive_hosts, scan_type)
+        try:
+            store_simulated_scan_results(domain, organization_id, simulated_subdomains, alive_hosts, scan_type)
+            logging.info(f"📊 Successfully stored simulated scan results for {domain}")
+        except Exception as db_error:
+            logging.error(f"❌ Failed to store simulated scan results for {domain}: {str(db_error)}")
+            # Continue with completion even if database storage fails
 
         # Mark as completed
+        from datetime import timezone
+        completion_time = datetime.now(timezone.utc)
+
         fallback_scan_status[task_id].update({
             'state': 'SUCCESS',
             'progress': 100,
             'stage': 'completed',
             'message': 'Large-scale scan completed successfully!',
-            'completed_at': datetime.now().isoformat(),
+            'completed_at': completion_time.isoformat(),
             'result': {
                 'success': True,
                 'domain': domain,
@@ -1189,11 +1209,15 @@ def simulate_large_scale_scan(task_id, domain, organization_id, scan_type='deep'
 
     except Exception as e:
         logging.error(f"❌ Fallback scan failed for {domain}: {str(e)}")
+        import traceback
+        logging.error(f"❌ Fallback scan traceback: {traceback.format_exc()}")
+
         fallback_scan_status[task_id] = {
             'state': 'FAILURE',
             'progress': 0,
             'error': str(e),
-            'domain': domain
+            'domain': domain,
+            'failed_at': datetime.now(timezone.utc).isoformat()
         }
 
 def generate_simulated_subdomains(domain, count):
@@ -1217,8 +1241,11 @@ def generate_simulated_subdomains(domain, count):
     return subdomains[:count]
 
 def store_simulated_scan_results(domain, organization_id, subdomains, alive_hosts, scan_type):
-    """Store simulated scan results in the database"""
+    """Store simulated scan results in the database with proper error handling"""
     try:
+        from datetime import timezone
+        current_time = datetime.now(timezone.utc)
+
         # Store main domain
         main_domain_asset = Asset.query.filter_by(name=domain, organization_id=organization_id).first()
         if not main_domain_asset:
@@ -1227,7 +1254,7 @@ def store_simulated_scan_results(domain, organization_id, subdomains, alive_host
                 asset_type=AssetType.DOMAIN,
                 description=f"Main domain discovered during simulated large-scale scan",
                 organization_id=organization_id,
-                last_scanned=datetime.now(),
+                last_scanned=current_time,
                 asset_metadata={
                     'scan_source': 'fallback_simulation',
                     'scan_type': scan_type,
@@ -1236,7 +1263,7 @@ def store_simulated_scan_results(domain, organization_id, subdomains, alive_host
             )
             db.session.add(main_domain_asset)
         else:
-            main_domain_asset.last_scanned = datetime.now()
+            main_domain_asset.last_scanned = current_time
 
         # Store subdomains
         for subdomain in subdomains:
@@ -1257,7 +1284,7 @@ def store_simulated_scan_results(domain, organization_id, subdomains, alive_host
                         'status_code': random.choice([200, 301, 302, 403]),
                         'title': f'{subdomain} - Simulated Page',
                         'webserver': random.choice(['nginx', 'Apache', 'Cloudflare']),
-                        'last_http_probe': datetime.now().isoformat(),
+                        'last_http_probe': current_time.isoformat(),
                         'url': f'https://{subdomain}',
                         'scheme': 'https'
                     }
@@ -1267,14 +1294,14 @@ def store_simulated_scan_results(domain, organization_id, subdomains, alive_host
                     asset_type=AssetType.SUBDOMAIN,
                     description=f"Subdomain discovered via simulated large-scale scan of {domain}",
                     organization_id=organization_id,
-                    discovered_at=datetime.now(),
-                    last_scanned=datetime.now(),
+                    discovered_at=current_time,
+                    last_scanned=current_time,
                     asset_metadata=asset_metadata
                 )
                 db.session.add(subdomain_asset)
             else:
                 # Update existing asset
-                existing_asset.last_scanned = datetime.now()
+                existing_asset.last_scanned = current_time
 
         db.session.commit()
         logging.info(f"📊 Stored simulated scan results: {len(subdomains)} subdomains for {domain}")

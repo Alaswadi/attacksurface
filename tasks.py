@@ -156,22 +156,51 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
         }
 
     except Exception as e:
-        logger.error(f"❌ Large-scale scan orchestration failed for {domain}: {str(e)}")
-        self.update_state(
-            state='FAILURE',
-            meta={
+        import traceback
+        error_message = str(e)
+        error_traceback = traceback.format_exc()
+
+        logger.error(f"❌ Large-scale scan orchestration failed for {domain}: {error_message}")
+        logger.error(f"❌ Traceback: {error_traceback}")
+
+        # Update state with proper error handling
+        try:
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'domain': domain,
+                    'error': error_message,
+                    'stage': 'failed',
+                    'progress': 0,
+                    'failed_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as state_error:
+            logger.error(f"❌ Failed to update task state: {str(state_error)}")
+
+        # Don't retry on certain types of errors to avoid infinite loops
+        if "organization" in error_message.lower() or "database" in error_message.lower():
+            logger.warning(f"⚠️ Not retrying task due to configuration/database error")
+            return {
+                'success': False,
+                'error': error_message,
                 'domain': domain,
-                'error': str(e),
-                'stage': 'failed',
-                'progress': 0
+                'scan_type': scan_type,
+                'retry': False
             }
-        )
-        self.retry(countdown=300, max_retries=2)  # Retry after 5 minutes
+
+        # Retry with exponential backoff for other errors
+        try:
+            self.retry(countdown=300, max_retries=2)
+        except Exception as retry_error:
+            logger.error(f"❌ Failed to retry task: {str(retry_error)}")
+
         return {
             'success': False,
-            'error': str(e),
+            'error': error_message,
             'domain': domain,
-            'scan_type': scan_type
+            'scan_type': scan_type,
+            'retry': True
         }
 
 # ============================================================================
@@ -306,19 +335,36 @@ def subdomain_discovery_task(self, domain: str, organization_id: int, scan_type:
         }
 
     except Exception as e:
-        logger.error(f"❌ Subdomain discovery failed for {domain}: {str(e)}")
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'domain': domain,
-                'error': str(e),
-                'stage': 'failed'
-            }
-        )
-        self.retry(countdown=120, max_retries=2)
+        import traceback
+        error_message = str(e)
+        error_traceback = traceback.format_exc()
+
+        logger.error(f"❌ Subdomain discovery failed for {domain}: {error_message}")
+        logger.error(f"❌ Traceback: {error_traceback}")
+
+        # Update state with proper error handling
+        try:
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'domain': domain,
+                    'error': error_message,
+                    'stage': 'failed',
+                    'failed_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as state_error:
+            logger.error(f"❌ Failed to update subdomain discovery task state: {str(state_error)}")
+
+        # Retry with proper error handling
+        try:
+            self.retry(countdown=120, max_retries=2)
+        except Exception as retry_error:
+            logger.error(f"❌ Failed to retry subdomain discovery task: {str(retry_error)}")
+
         return {
             'success': False,
-            'error': str(e),
+            'error': error_message,
             'domain': domain,
             'scan_type': scan_type
         }
@@ -427,18 +473,35 @@ def http_probe_task(self, subdomains: List[str], scan_type: str = 'deep'):
         }
 
     except Exception as e:
-        logger.error(f"❌ HTTP probing failed: {str(e)}")
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'error': str(e),
-                'stage': 'failed'
-            }
-        )
-        self.retry(countdown=60, max_retries=2)
+        import traceback
+        error_message = str(e)
+        error_traceback = traceback.format_exc()
+
+        logger.error(f"❌ HTTP probing failed: {error_message}")
+        logger.error(f"❌ Traceback: {error_traceback}")
+
+        # Update state with proper error handling
+        try:
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'error': error_message,
+                    'stage': 'failed',
+                    'failed_at': datetime.now().isoformat()
+                }
+            )
+        except Exception as state_error:
+            logger.error(f"❌ Failed to update HTTP probe task state: {str(state_error)}")
+
+        # Retry with proper error handling
+        try:
+            self.retry(countdown=60, max_retries=2)
+        except Exception as retry_error:
+            logger.error(f"❌ Failed to retry HTTP probe task: {str(retry_error)}")
+
         return {
             'success': False,
-            'error': str(e),
+            'error': error_message,
             'scan_type': scan_type
         }
 
