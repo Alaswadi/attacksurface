@@ -12,7 +12,7 @@ class NucleiScanner(BaseScanner):
     
     def __init__(self, tool_path: Optional[str] = None):
         super().__init__('nuclei', tool_path)
-        self.timeout = 600  # 10 minutes for vulnerability scanning
+        self.timeout = 180  # 3 minutes for vulnerability scanning (reduced from 10 minutes)
     
     def scan(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """
@@ -62,8 +62,9 @@ class NucleiScanner(BaseScanner):
                 else:
                     cmd.extend(['-t', templates])
             else:
-                # Use simpler default templates that are more likely to exist
-                cmd.extend(['-t', 'http/'])  # Use http templates as default
+                # Use default templates - just scan without specific template paths
+                # This will use all available templates
+                pass  # Don't add any template specification to use all available
             
             # Add severity filter
             severity = kwargs.get('severity')

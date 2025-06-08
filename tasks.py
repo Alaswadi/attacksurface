@@ -1882,27 +1882,27 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 from tools.nuclei import NucleiScanner
                 nuclei_scanner = NucleiScanner()
 
-                # Configure Nuclei based on scan type
+                # Configure Nuclei based on scan type - use specific fast templates
                 nuclei_config = {
                     'quick': {
-                        'templates': ['http/miscellaneous/', 'http/exposures/'],
+                        'templates': ['cves', 'exposures'],  # Use specific template categories without trailing slash
                         'rate_limit': 500,
-                        'concurrency': 100,
-                        'timeout': 60,
+                        'concurrency': 50,
+                        'timeout': 5,  # Reduced timeout per request
                         'severity': ['critical', 'high']
                     },
                     'deep': {
-                        'templates': ['http/', 'network/', 'ssl/'],
-                        'rate_limit': 100,
-                        'concurrency': 25,
-                        'timeout': 300,
+                        'templates': ['cves', 'exposures', 'vulnerabilities'],  # More templates but still focused
+                        'rate_limit': 200,
+                        'concurrency': 30,
+                        'timeout': 10,  # Reduced timeout per request
                         'severity': ['critical', 'high', 'medium']
                     },
                     'comprehensive': {
-                        'templates': ['http/', 'network/', 'ssl/', 'dns/', 'file/'],
-                        'rate_limit': 50,
-                        'concurrency': 15,
-                        'timeout': 600,
+                        'templates': ['cves', 'exposures', 'vulnerabilities', 'misconfiguration'],  # Comprehensive but not all
+                        'rate_limit': 100,
+                        'concurrency': 20,
+                        'timeout': 15,  # Reduced timeout per request
                         'severity': ['critical', 'high', 'medium', 'low']
                     }
                 }
@@ -1940,11 +1940,17 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 nuclei_targets = list(set(nuclei_targets))
                 logger.info(f"🔍 NUCLEI: Converted to {len(nuclei_targets)} target URLs: {nuclei_targets[:5] if len(nuclei_targets) > 5 else nuclei_targets}")
 
-                # Perform vulnerability scanning
-                vuln_results = nuclei_scanner.scan(nuclei_targets, **config)
-                vulnerability_results = vuln_results.get('vulnerabilities', [])
-
-                logger.info(f"🔍 NUCLEI: Found {len(vulnerability_results)} vulnerabilities")
+                # Perform vulnerability scanning with timeout handling
+                try:
+                    vuln_results = nuclei_scanner.scan(nuclei_targets, **config)
+                    vulnerability_results = vuln_results.get('vulnerabilities', [])
+                    logger.info(f"🔍 NUCLEI: Found {len(vulnerability_results)} vulnerabilities")
+                except Exception as scan_error:
+                    if "timed out" in str(scan_error).lower():
+                        logger.warning(f"⚠️ NUCLEI: Scan timed out, continuing without vulnerability results")
+                        vulnerability_results = []
+                    else:
+                        raise scan_error
 
                 # Store vulnerabilities in database and update asset metadata
                 from models import Vulnerability, SeverityLevel
