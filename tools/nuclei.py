@@ -37,7 +37,15 @@ class NucleiScanner(BaseScanner):
         # Create temporary file with targets
         targets_content = '\n'.join(targets)
         targets_file = self._create_temp_file(targets_content)
-        
+
+        # Debug: Log target information
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🔍 NUCLEI: Scanning {len(targets)} targets")
+        logger.info(f"🔍 NUCLEI: Target list: {targets}")
+        logger.info(f"🔍 NUCLEI: Target file content:")
+        logger.info(f"📄 {targets_content}")
+
         try:
             # Build command
             cmd = [self.tool_path, '-list', targets_file]
@@ -89,16 +97,24 @@ class NucleiScanner(BaseScanner):
             
             # Disable update check
             cmd.append('-disable-update-check')
-            
+
+            # Debug: Log the complete command
+            logger.info(f"🔍 NUCLEI: Executing command: {' '.join(cmd)}")
+
             # Run the scan
             result = self._run_command(cmd)
 
             # Log Nuclei result details
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(f"🔍 NUCLEI: Return code: {result['returncode']}")
             if result['stderr']:
                 logger.info(f"🔍 NUCLEI: STDERR: {result['stderr'].strip()}")
+
+            # Debug: Log raw output
+            logger.info(f"🔍 NUCLEI: Raw stdout length: {len(result['stdout'])}")
+            if result['stdout'].strip():
+                logger.info(f"🔍 NUCLEI: Raw stdout (first 500 chars): {result['stdout'][:500]}")
+            else:
+                logger.info(f"🔍 NUCLEI: No stdout output received")
 
             # Nuclei return codes:
             # 0 = success with findings

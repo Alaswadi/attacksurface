@@ -1891,8 +1891,38 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 config = nuclei_config.get(scan_type, nuclei_config['deep'])
                 logger.info(f"🔍 NUCLEI: Starting vulnerability scan with config: {config}")
 
+                # Debug: Log what alive_hosts contains
+                logger.info(f"🔍 NUCLEI: alive_hosts type: {type(alive_hosts)}")
+                logger.info(f"🔍 NUCLEI: alive_hosts content: {alive_hosts[:5] if len(alive_hosts) > 5 else alive_hosts}")
+
+                # Convert alive_hosts to proper URLs for Nuclei
+                nuclei_targets = []
+                for host in alive_hosts:
+                    if isinstance(host, str):
+                        # If it's just a hostname, create HTTP and HTTPS URLs
+                        if not host.startswith(('http://', 'https://')):
+                            nuclei_targets.append(f"http://{host}")
+                            nuclei_targets.append(f"https://{host}")
+                        else:
+                            nuclei_targets.append(host)
+                    elif isinstance(host, dict) and 'url' in host:
+                        # If it's a dict with URL, use the URL
+                        nuclei_targets.append(host['url'])
+                    elif isinstance(host, dict) and 'host' in host:
+                        # If it's a dict with host, create URLs
+                        hostname = host['host']
+                        if not hostname.startswith(('http://', 'https://')):
+                            nuclei_targets.append(f"http://{hostname}")
+                            nuclei_targets.append(f"https://{hostname}")
+                        else:
+                            nuclei_targets.append(hostname)
+
+                # Remove duplicates
+                nuclei_targets = list(set(nuclei_targets))
+                logger.info(f"🔍 NUCLEI: Converted to {len(nuclei_targets)} target URLs: {nuclei_targets[:5] if len(nuclei_targets) > 5 else nuclei_targets}")
+
                 # Perform vulnerability scanning
-                vuln_results = nuclei_scanner.scan(alive_hosts, **config)
+                vuln_results = nuclei_scanner.scan(nuclei_targets, **config)
                 vulnerability_results = vuln_results.get('vulnerabilities', [])
 
                 logger.info(f"🔍 NUCLEI: Found {len(vulnerability_results)} vulnerabilities")
