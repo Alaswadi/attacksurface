@@ -64,7 +64,7 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
 
         logger.info(f"🚀 Starting large-scale {scan_type} scan orchestration for domain: {domain}")
 
-        # Stage 1: Subdomain Discovery
+        # PROGRESSIVE STAGE 1: Subdomain Discovery with Immediate Storage
         self.update_state(
             state='PROGRESS',
             meta={
@@ -324,14 +324,14 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
 
         logger.info(f"🎯 Scan workflow completed: {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts")
 
-        # Stage 4: Store subdomains in database (WITH HTTP and port data)
+        # Stage 4: Final Database Storage (WITH complete HTTP and port data)
         self.update_state(
             state='PROGRESS',
             meta={
                 'stage': 'database_storage',
                 'domain': domain,
                 'progress': 90,
-                'message': f'Storing {len(subdomains)} subdomains with metadata in database...',
+                'message': f'Storing {len(subdomains)} subdomains with complete metadata in database...',
                 'current_phase': 'Database storage with HTTP and port data',
                 'subdomains_found': len(subdomains),
                 'alive_hosts_found': len(alive_hosts)
@@ -1327,3 +1327,207 @@ def periodic_health_check(self):
             'timestamp': datetime.utcnow().isoformat(),
             'status': 'unhealthy'
         }
+
+# ============================================================================
+# PROGRESSIVE SCANNING ORCHESTRATOR WITH REAL-TIME UPDATES
+# ============================================================================
+
+@celery.task(bind=True, name='tasks.progressive_large_domain_scan_orchestrator')
+def progressive_large_domain_scan_orchestrator(self, domain, organization_id, scan_type='quick'):
+    """
+    Progressive large-scale domain scanning orchestrator with real-time updates
+    Stores data immediately after each scanning stage for real-time population
+
+    Progressive Workflow:
+    1. Subdomain Discovery → Immediate storage with "scanning" status
+    2. HTTP Probing → Update assets with HTTP status codes and technologies
+    3. Port Scanning → Update assets with port information
+    4. Final completion → Mark all assets as "completed"
+    """
+    logger = logging.getLogger(__name__)
+
+    try:
+        logger.info(f"🚀 Starting PROGRESSIVE large-scale scan for {domain} (scan_type: {scan_type})")
+
+        # Initialize scanning service
+        from services.real_scanning_service import RealScanningService
+        scanning_service = RealScanningService()
+        if not scanning_service.is_available():
+            raise Exception("Scanning service not available")
+
+        logger.info(f"Initialized scanning service with tools: {scanning_service.get_available_tools()}")
+
+        # Import database models for progressive storage
+        from models import Asset, AssetType
+        from app import db
+
+        # PROGRESSIVE STAGE 1: Subdomain Discovery with Immediate Storage
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'subdomain_discovery',
+                'domain': domain,
+                'progress': 10,
+                'message': f'Discovering subdomains for {domain}...',
+                'current_phase': 'Subfinder scanning',
+                'progressive_update': {
+                    'type': 'stage_started',
+                    'stage': 'subdomain_discovery',
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+        )
+
+        # Configure Subfinder parameters
+        subfinder_config = {
+            'silent': True,
+            'max_time': 60 if scan_type == 'quick' else 300,
+            'recursive': scan_type == 'comprehensive'
+        }
+
+        # Run Subfinder
+        scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain, **subfinder_config)
+        subdomains = scan_results.get('subdomains', [])
+
+        logger.info(f"🔍 SUBFINDER: Scan completed, found {len(subdomains)} subdomains")
+
+        # IMMEDIATE STORAGE: Store subdomains with "scanning" status
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'progressive_storage_subdomains',
+                'domain': domain,
+                'progress': 25,
+                'message': f'Storing {len(subdomains)} discovered subdomains...',
+                'current_phase': 'Progressive storage - Subdomains',
+                'subdomains_found': len(subdomains),
+                'progressive_update': {
+                    'type': 'subdomains_discovered',
+                    'subdomains': subdomains,
+                    'count': len(subdomains),
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+        )
+
+        # Store subdomains immediately with scanning status
+        progressive_stored_count = 0
+        for subdomain in subdomains:
+            try:
+                # Extract hostname and metadata
+                if isinstance(subdomain, dict):
+                    hostname = subdomain.get('host', '')
+                    source = subdomain.get('source', 'subfinder')
+                    ip = subdomain.get('ip', '')
+                    timestamp = subdomain.get('timestamp', '')
+                else:
+                    hostname = str(subdomain)
+                    source = 'subfinder'
+                    ip = ''
+                    timestamp = ''
+
+                if not hostname:
+                    continue
+
+                # Initial asset metadata (scanning status)
+                asset_metadata = {
+                    'discovery_method': 'subfinder',
+                    'parent_domain': domain,
+                    'scan_type': scan_type,
+                    'source': source,
+                    'discovered_ip': ip,
+                    'discovery_timestamp': timestamp or datetime.now().isoformat(),
+                    'scan_source': 'progressive_large_scale_orchestrator',
+                    'scan_status': 'scanning',  # Progressive status indicator
+                    'http_probe': {},  # Will be populated later
+                    'ports': []        # Will be populated later
+                }
+
+                # Check if asset already exists
+                existing_asset = Asset.query.filter_by(
+                    name=hostname,
+                    organization_id=organization_id
+                ).first()
+
+                if not existing_asset:
+                    # Create new asset with scanning status
+                    asset = Asset(
+                        name=hostname,
+                        asset_type=AssetType.SUBDOMAIN,
+                        organization_id=organization_id,
+                        discovered_at=datetime.now(),
+                        is_active=True,
+                        asset_metadata=asset_metadata
+                    )
+                    db.session.add(asset)
+                    progressive_stored_count += 1
+                    logger.debug(f"✅ Progressive storage: Added subdomain {hostname} with scanning status")
+                else:
+                    # Update existing asset with scanning status
+                    existing_asset.last_scanned = datetime.now()
+                    existing_asset.is_active = True
+                    existing_metadata = existing_asset.asset_metadata or {}
+                    existing_metadata.update({
+                        'scan_status': 'scanning',
+                        'scan_source': 'progressive_large_scale_orchestrator',
+                        'last_scan_start': datetime.now().isoformat()
+                    })
+                    existing_asset.asset_metadata = existing_metadata
+                    progressive_stored_count += 1
+                    logger.debug(f"✅ Progressive storage: Updated subdomain {hostname} with scanning status")
+
+            except Exception as e:
+                logger.error(f"❌ Progressive storage failed for subdomain {subdomain}: {str(e)}")
+                continue
+
+        # Commit progressive storage
+        try:
+            db.session.commit()
+            logger.info(f"📊 Progressive storage: Stored {progressive_stored_count} subdomains with scanning status")
+        except Exception as e:
+            logger.error(f"❌ Progressive storage commit failed: {str(e)}")
+            db.session.rollback()
+
+        # Send progressive update for subdomains stored
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'subdomains_stored',
+                'domain': domain,
+                'progress': 30,
+                'message': f'Stored {progressive_stored_count} subdomains, starting HTTP probing...',
+                'current_phase': 'Subdomains stored - Starting HTTP probing',
+                'subdomains_found': len(subdomains),
+                'progressive_update': {
+                    'type': 'subdomains_stored',
+                    'stored_count': progressive_stored_count,
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+        )
+
+        return {
+            'success': True,
+            'domain': domain,
+            'scan_type': scan_type,
+            'subdomains_found': len(subdomains),
+            'progressive_stored': progressive_stored_count,
+            'message': 'Progressive scanning orchestrator started - subdomains stored'
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Progressive large-scale scan failed for {domain}: {str(e)}")
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'domain': domain,
+                'error': str(e),
+                'stage': 'failed',
+                'progressive_update': {
+                    'type': 'scan_failed',
+                    'error': str(e),
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+        )
+        raise

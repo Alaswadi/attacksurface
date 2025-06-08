@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, make_response
+from flask import Blueprint, jsonify, request, render_template, make_response, Response
 from flask_login import login_required, current_user
 from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel
 from datetime import datetime, timedelta
@@ -9,6 +9,7 @@ import time
 import random
 import logging
 import socket
+import queue
 
 # Import Redis checker for fallback handling
 from utils.redis_checker import check_redis_availability, get_redis_status_message
@@ -42,6 +43,10 @@ def resolve_domain_to_ip(domain):
 # In-memory storage for scan results (in production, use Redis or database)
 scan_results = {}
 scan_status = {}
+
+# Progressive scanning storage for real-time updates
+progressive_scan_updates = {}  # Store progressive updates by task_id
+progressive_scan_clients = {}  # Store SSE clients by task_id
 
 @api_bp.route('/assets', methods=['GET'])
 @login_required
@@ -1377,6 +1382,165 @@ def get_redis_system_status():
 
     except Exception as e:
         logging.error(f"Failed to get Redis status: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ============================================================================
+# PROGRESSIVE SCANNING WITH REAL-TIME UPDATES
+# ============================================================================
+
+@api_bp.route('/progressive-scan-updates/<task_id>')
+@login_required
+def progressive_scan_updates_stream(task_id):
+    """Server-Sent Events endpoint for real-time progressive scanning updates"""
+
+    def event_stream():
+        """Generate Server-Sent Events for progressive scan updates"""
+        try:
+            # Send initial connection event
+            yield f"data: {json.dumps({'type': 'connected', 'task_id': task_id, 'timestamp': datetime.now().isoformat()})}\n\n"
+
+            # Monitor for progressive updates
+            last_update_time = time.time()
+            timeout = 300  # 5 minutes timeout
+
+            while time.time() - last_update_time < timeout:
+                try:
+                    # Check for Celery task updates
+                    from celery.result import AsyncResult
+                    task = AsyncResult(task_id)
+
+                    if task.state == 'PROGRESS':
+                        task_meta = task.info or {}
+                        progressive_update = task_meta.get('progressive_update')
+
+                        if progressive_update:
+                            # Send progressive update to client
+                            yield f"data: {json.dumps({
+                                'type': 'progressive_update',
+                                'task_id': task_id,
+                                'stage': task_meta.get('stage', 'unknown'),
+                                'progress': task_meta.get('progress', 0),
+                                'message': task_meta.get('message', ''),
+                                'update': progressive_update,
+                                'timestamp': datetime.now().isoformat()
+                            })}\n\n"
+
+                            last_update_time = time.time()
+
+                    elif task.state == 'SUCCESS':
+                        # Send completion event
+                        yield f"data: {json.dumps({
+                            'type': 'completed',
+                            'task_id': task_id,
+                            'result': task.result,
+                            'timestamp': datetime.now().isoformat()
+                        })}\n\n"
+                        break
+
+                    elif task.state == 'FAILURE':
+                        # Send failure event
+                        yield f"data: {json.dumps({
+                            'type': 'failed',
+                            'task_id': task_id,
+                            'error': str(task.info),
+                            'timestamp': datetime.now().isoformat()
+                        })}\n\n"
+                        break
+
+                    # Wait before next check
+                    time.sleep(2)
+
+                except Exception as e:
+                    logging.error(f"Error in progressive scan updates stream: {str(e)}")
+                    yield f"data: {json.dumps({
+                        'type': 'error',
+                        'task_id': task_id,
+                        'error': str(e),
+                        'timestamp': datetime.now().isoformat()
+                    })}\n\n"
+                    break
+
+            # Send timeout event if no updates received
+            yield f"data: {json.dumps({
+                'type': 'timeout',
+                'task_id': task_id,
+                'message': 'No updates received within timeout period',
+                'timestamp': datetime.now().isoformat()
+            })}\n\n"
+
+        except Exception as e:
+            logging.error(f"Error in progressive scan updates stream: {str(e)}")
+            yield f"data: {json.dumps({
+                'type': 'error',
+                'task_id': task_id,
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            })}\n\n"
+
+    return Response(
+        event_stream(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Cache-Control'
+        }
+    )
+
+@api_bp.route('/large-scale-scan-progressive', methods=['POST'])
+@login_required
+def start_large_scale_scan_progressive():
+    """Start a large-scale scan with progressive real-time updates"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    data = request.get_json()
+    if not data or 'domain' not in data:
+        return jsonify({'error': 'Domain is required'}), 400
+
+    domain = data['domain'].strip()
+    scan_type = data.get('scan_type', 'quick')
+
+    if not domain:
+        return jsonify({'error': 'Domain cannot be empty'}), 400
+
+    try:
+        # Check if Celery is available
+        try:
+            from tasks import large_domain_scan_orchestrator
+            celery_available = True
+        except ImportError:
+            celery_available = False
+
+        if not celery_available:
+            return jsonify({
+                'success': False,
+                'error': 'Celery not available for progressive scanning'
+            }), 503
+
+        # Start the progressive large-scale scan
+        task = large_domain_scan_orchestrator.delay(
+            domain=domain,
+            organization_id=org.id,
+            scan_type=scan_type
+        )
+
+        return jsonify({
+            'success': True,
+            'task_id': task.id,
+            'domain': domain,
+            'scan_type': scan_type,
+            'message': 'Progressive large-scale scan started',
+            'progressive_updates_url': f'/api/progressive-scan-updates/{task.id}'
+        })
+
+    except Exception as e:
+        logging.error(f"Failed to start progressive large-scale scan: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
