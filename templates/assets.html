@@ -600,6 +600,10 @@ function initializeSorting() {
 // Load assets from API
 async function loadAssets() {
     try {
+        // Clear the table first to show loading state
+        const tbody = document.getElementById('assets-table-body');
+        tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">Loading...</td></tr>';
+
         const response = await fetch('/api/assets');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -623,6 +627,25 @@ async function loadAssets() {
             <p class="text-red-500 mt-2">Error loading assets</p>
         `;
     }
+}
+
+// Force refresh assets (clears everything and reloads)
+async function forceRefreshAssets() {
+    console.log('Force refreshing assets...');
+
+    // Clear all UI elements
+    const tbody = document.getElementById('assets-table-body');
+    tbody.innerHTML = '';
+
+    // Reset global state
+    assetsData = [];
+
+    // Show loading state
+    document.getElementById('loading-state').style.display = 'block';
+    document.getElementById('empty-state').classList.add('hidden');
+
+    // Reload assets
+    await loadAssets();
 }
 
 // Filter assets
@@ -1132,7 +1155,16 @@ async function executeDelete() {
 
             // Refresh the assets list
             console.log('Refreshing assets list after deletion');
-            await loadAssets();
+
+            // Show loading state briefly
+            document.getElementById('loading-state').style.display = 'block';
+
+            // Add a small delay to ensure backend processing is complete
+            setTimeout(async () => {
+                // Force a complete refresh
+                await forceRefreshAssets();
+                console.log('Assets list refreshed, new count:', assetsData.length);
+            }, 500);
         } else {
             throw new Error(result.error || 'Failed to delete asset');
         }
