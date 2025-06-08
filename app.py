@@ -8,6 +8,7 @@ import os
 from datetime import datetime, timedelta
 import random
 from celery import Celery
+from utils.redis_checker import initialize_redis_checker, is_redis_available, get_redis_error
 
 def make_celery(app):
     """Create Celery instance and configure it with Flask app context"""
@@ -58,6 +59,11 @@ def create_app(config_name=None):
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
+
+    # Initialize Redis checker
+    broker_url = app.config.get('broker_url') or 'redis://localhost:6379/0'
+    redis_available = initialize_redis_checker(broker_url)
+    app.config['REDIS_AVAILABLE'] = redis_available
 
     # Initialize Celery
     celery = make_celery(app)

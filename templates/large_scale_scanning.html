@@ -182,8 +182,14 @@
 
                 if (data.success) {
                     currentTaskId = data.task_id;
+                    currentMode = data.mode || 'celery';
                     document.getElementById('taskId').textContent = currentTaskId;
-                    
+
+                    // Show mode-specific information
+                    if (data.mode === 'fallback') {
+                        showFallbackNotice(data);
+                    }
+
                     // Start monitoring progress
                     startProgressMonitoring();
                 } else {
@@ -194,6 +200,8 @@
             }
         }
 
+        let currentMode = 'celery'; // Track current scanning mode
+
         function startProgressMonitoring() {
             if (progressInterval) {
                 clearInterval(progressInterval);
@@ -201,7 +209,12 @@
 
             progressInterval = setInterval(async () => {
                 try {
-                    const response = await fetch(`/api/scan/celery-status/${currentTaskId}`);
+                    // Use appropriate endpoint based on mode
+                    const endpoint = currentMode === 'fallback'
+                        ? `/api/scan/fallback-status/${currentTaskId}`
+                        : `/api/scan/celery-status/${currentTaskId}`;
+
+                    const response = await fetch(endpoint);
                     const data = await response.json();
 
                     if (data.success) {
@@ -267,6 +280,40 @@
             document.getElementById('errorMessage').textContent = message;
             document.getElementById('errorSection').classList.remove('hidden');
             document.getElementById('progressSection').classList.add('hidden');
+        }
+
+        function showFallbackNotice(data) {
+            // Create fallback notice if it doesn't exist
+            let noticeDiv = document.getElementById('fallbackNotice');
+            if (!noticeDiv) {
+                noticeDiv = document.createElement('div');
+                noticeDiv.id = 'fallbackNotice';
+                noticeDiv.className = 'bg-yellow-900 border border-yellow-700 rounded-lg p-4 mb-6';
+                noticeDiv.innerHTML = `
+                    <h3 class="text-lg font-semibold text-yellow-300 mb-2">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Fallback Mode Active
+                    </h3>
+                    <div class="text-yellow-200 text-sm space-y-2">
+                        <p><strong>Notice:</strong> ${data.notice}</p>
+                        <p><strong>Redis Status:</strong> ${data.redis_status?.error || 'Not available'}</p>
+                        <div class="mt-3">
+                            <strong>To enable full Celery functionality:</strong>
+                            <ol class="list-decimal list-inside mt-1 space-y-1">
+                                <li>Install Redis: <code class="bg-yellow-800 px-1 rounded">docker run -d --name redis-dev -p 6379:6379 redis:latest</code></li>
+                                <li>Restart the application</li>
+                                <li>Enjoy background task processing!</li>
+                            </ol>
+                        </div>
+                    </div>
+                `;
+
+                // Insert before progress section
+                const progressSection = document.getElementById('progressSection');
+                progressSection.parentNode.insertBefore(noticeDiv, progressSection);
+            }
+
+            noticeDiv.classList.remove('hidden');
         }
     </script>
 </body>

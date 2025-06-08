@@ -19,6 +19,10 @@ class Config:
     broker_url = os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
     result_backend = os.environ.get('CELERY_RESULT_BACKEND') or 'redis://localhost:6379/0'
 
+    # Development fallback settings
+    REDIS_AVAILABLE = True  # Will be checked at runtime
+    CELERY_FALLBACK_MODE = os.environ.get('CELERY_FALLBACK_MODE', 'false').lower() == 'true'
+
     # Additional Celery settings for large-scale scanning
     task_serializer = 'json'
     accept_content = ['json']
