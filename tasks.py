@@ -1878,177 +1878,187 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                     }
                 )
 
-                # Import Nuclei scanner
+                # Import Nuclei scanner and ensure templates are available
                 from tools.nuclei import NucleiScanner
                 nuclei_scanner = NucleiScanner()
 
-                # Configure Nuclei with optimized performance settings
-                nuclei_config = {
-                    'quick': {
-                        'templates': ['cves', 'exposures'],
-                        'rate_limit': 400,  # High rate limit for quick scan
-                        'concurrency': 100,  # High concurrency
-                        'bulk_size': 75,  # Optimized bulk size
-                        'scan_strategy': 'host-spray',  # Spray mode for multiple hosts
-                        'timeout': 5,
-                        'severity': ['critical', 'high']
-                    },
-                    'deep': {
-                        'templates': ['cves', 'exposures', 'vulnerabilities'],
-                        'rate_limit': 400,  # Consistent high performance
-                        'concurrency': 100,
-                        'bulk_size': 75,
-                        'scan_strategy': 'host-spray',
-                        'timeout': 10,
-                        'severity': ['critical', 'high', 'medium']
-                    },
-                    'comprehensive': {
-                        'templates': ['cves', 'exposures', 'vulnerabilities', 'misconfiguration'],
-                        'rate_limit': 400,  # Maintain high performance even for comprehensive
-                        'concurrency': 100,
-                        'bulk_size': 75,
-                        'scan_strategy': 'host-spray',
-                        'timeout': 15,
-                        'severity': ['critical', 'high', 'medium', 'low']
-                    }
-                }
+                # Ensure Nuclei templates are available
+                logger.info("🔍 NUCLEI: Checking template availability...")
+                templates_available = nuclei_scanner.ensure_templates()
 
-                config = nuclei_config.get(scan_type, nuclei_config['deep'])
-                logger.info(f"🔍 NUCLEI: Starting vulnerability scan with config: {config}")
+                if not templates_available:
+                    logger.warning("⚠️ NUCLEI: Templates not available, skipping vulnerability scanning")
+                    vulnerability_results = []
+                else:
+                    logger.info("✅ NUCLEI: Templates verified and ready")
 
-                # Debug: Log what alive_hosts contains
-                logger.info(f"🔍 NUCLEI: alive_hosts type: {type(alive_hosts)}")
-                logger.info(f"🔍 NUCLEI: alive_hosts content: {alive_hosts[:5] if len(alive_hosts) > 5 else alive_hosts}")
-
-                # Convert alive_hosts to proper URLs for Nuclei
-                nuclei_targets = []
-                for host in alive_hosts:
-                    if isinstance(host, str):
-                        # If it's just a hostname, create HTTP and HTTPS URLs
-                        if not host.startswith(('http://', 'https://')):
-                            nuclei_targets.append(f"http://{host}")
-                            nuclei_targets.append(f"https://{host}")
-                        else:
-                            nuclei_targets.append(host)
-                    elif isinstance(host, dict) and 'url' in host:
-                        # If it's a dict with URL, use the URL
-                        nuclei_targets.append(host['url'])
-                    elif isinstance(host, dict) and 'host' in host:
-                        # If it's a dict with host, create URLs
-                        hostname = host['host']
-                        if not hostname.startswith(('http://', 'https://')):
-                            nuclei_targets.append(f"http://{hostname}")
-                            nuclei_targets.append(f"https://{hostname}")
-                        else:
-                            nuclei_targets.append(hostname)
-
-                # Remove duplicates
-                nuclei_targets = list(set(nuclei_targets))
-                logger.info(f"🔍 NUCLEI: Converted to {len(nuclei_targets)} target URLs: {nuclei_targets[:5] if len(nuclei_targets) > 5 else nuclei_targets}")
-
-                # Perform vulnerability scanning with timeout handling
-                try:
-                    vuln_results = nuclei_scanner.scan(nuclei_targets, **config)
-                    vulnerability_results = vuln_results.get('vulnerabilities', [])
-                    logger.info(f"🔍 NUCLEI: Found {len(vulnerability_results)} vulnerabilities")
-                except Exception as scan_error:
-                    if "timed out" in str(scan_error).lower():
-                        logger.warning(f"⚠️ NUCLEI: Scan timed out, continuing without vulnerability results")
-                        vulnerability_results = []
-                    else:
-                        raise scan_error
-
-                # Store vulnerabilities in database and update asset metadata
-                from models import Vulnerability, SeverityLevel
-
-                severity_mapping = {
-                    'critical': SeverityLevel.CRITICAL,
-                    'high': SeverityLevel.HIGH,
-                    'medium': SeverityLevel.MEDIUM,
-                    'low': SeverityLevel.LOW,
-                    'info': SeverityLevel.INFO
-                }
-
-                for vuln_data in vulnerability_results:
-                    try:
-                        # Find the asset for this vulnerability
-                        vuln_host = vuln_data.get('host', '').replace('http://', '').replace('https://', '').split(':')[0]
-                        asset = Asset.query.filter_by(
-                            name=vuln_host,
-                            organization_id=organization_id
-                        ).first()
-
-                        if asset:
-                            # Map severity
-                            severity_str = vuln_data.get('severity', 'medium').lower()
-                            severity = severity_mapping.get(severity_str, SeverityLevel.MEDIUM)
-
-                            # Create vulnerability record
-                            vulnerability = Vulnerability(
-                                title=vuln_data.get('template_name', 'Unknown Vulnerability'),
-                                description=vuln_data.get('description', ''),
-                                severity=severity,
-                                asset_id=asset.id,
-                                organization_id=organization_id,
-                                discovered_at=datetime.now(),
-                                cve_id=vuln_data.get('cve_id'),
-                                is_resolved=False
-                            )
-                            db.session.add(vulnerability)
-
-                            # Update asset metadata with vulnerability info
-                            if asset.asset_metadata:
-                                existing_metadata = asset.asset_metadata.copy()
-                                if 'vulnerabilities' not in existing_metadata:
-                                    existing_metadata['vulnerabilities'] = []
-
-                                vuln_metadata = {
-                                    'template_name': vuln_data.get('template_name', ''),
-                                    'severity': severity_str,
-                                    'description': vuln_data.get('description', ''),
-                                    'discovered_at': datetime.now().isoformat()
-                                }
-                                if vuln_data.get('cve_id'):
-                                    vuln_metadata['cve_id'] = vuln_data.get('cve_id')
-
-                                existing_metadata['vulnerabilities'].append(vuln_metadata)
-                                existing_metadata['scan_status'] = 'vuln_complete'
-                                asset.asset_metadata = existing_metadata
-                                vulnerabilities_stored_count += 1
-
-                    except Exception as e:
-                        logger.error(f"❌ Vulnerability storage failed for {vuln_data.get('host', 'unknown')}: {str(e)}")
-                        continue
-
-                # Commit vulnerability updates
-                try:
-                    db.session.commit()
-                    logger.info(f"📊 Progressive vulnerability scanning: Stored {vulnerabilities_stored_count} vulnerabilities")
-                except Exception as e:
-                    logger.error(f"❌ Vulnerability commit failed: {str(e)}")
-                    db.session.rollback()
-
-                # Send progressive update for vulnerability scanning
-                self.update_state(
-                    state='PROGRESS',
-                    meta={
-                        'stage': 'vulnerability_scanning_complete',
-                        'domain': domain,
-                        'progress': 90,
-                        'message': f'Vulnerability scanning completed, found {len(vulnerability_results)} vulnerabilities...',
-                        'current_phase': 'Vulnerability scanning complete - Finalizing',
-                        'subdomains_found': len(subdomains),
-                        'alive_hosts_found': len(alive_hosts),
-                        'port_scan_results': len(port_scan_results),
-                        'vulnerabilities_found': len(vulnerability_results),
-                        'progressive_update': {
-                            'type': 'vulnerability_scanning_complete',
-                            'vulnerabilities_stored': vulnerabilities_stored_count,
-                            'vulnerabilities_found': len(vulnerability_results),
-                            'timestamp': datetime.now().isoformat()
+                    # Configure Nuclei with optimized performance settings
+                    nuclei_config = {
+                        'quick': {
+                            'templates': ['cves', 'exposures'],
+                            'rate_limit': 400,  # High rate limit for quick scan
+                            'concurrency': 100,  # High concurrency
+                            'bulk_size': 75,  # Optimized bulk size
+                            'scan_strategy': 'host-spray',  # Spray mode for multiple hosts
+                            'timeout': 5,
+                            'severity': ['critical', 'high']
+                        },
+                        'deep': {
+                            'templates': ['cves', 'exposures', 'vulnerabilities'],
+                            'rate_limit': 400,  # Consistent high performance
+                            'concurrency': 100,
+                            'bulk_size': 75,
+                            'scan_strategy': 'host-spray',
+                            'timeout': 10,
+                            'severity': ['critical', 'high', 'medium']
+                        },
+                        'comprehensive': {
+                            'templates': ['cves', 'exposures', 'vulnerabilities', 'misconfiguration'],
+                            'rate_limit': 400,  # Maintain high performance even for comprehensive
+                            'concurrency': 100,
+                            'bulk_size': 75,
+                            'scan_strategy': 'host-spray',
+                            'timeout': 15,
+                            'severity': ['critical', 'high', 'medium', 'low']
                         }
                     }
-                )
+
+                    config = nuclei_config.get(scan_type, nuclei_config['deep'])
+                    logger.info(f"🔍 NUCLEI: Starting vulnerability scan with config: {config}")
+
+                    # Debug: Log what alive_hosts contains
+                    logger.info(f"🔍 NUCLEI: alive_hosts type: {type(alive_hosts)}")
+                    logger.info(f"🔍 NUCLEI: alive_hosts content: {alive_hosts[:5] if len(alive_hosts) > 5 else alive_hosts}")
+
+                    # Convert alive_hosts to proper URLs for Nuclei
+                    nuclei_targets = []
+                    for host in alive_hosts:
+                        if isinstance(host, str):
+                            # If it's just a hostname, create HTTP and HTTPS URLs
+                            if not host.startswith(('http://', 'https://')):
+                                nuclei_targets.append(f"http://{host}")
+                                nuclei_targets.append(f"https://{host}")
+                            else:
+                                nuclei_targets.append(host)
+                        elif isinstance(host, dict) and 'url' in host:
+                            # If it's a dict with URL, use the URL
+                            nuclei_targets.append(host['url'])
+                        elif isinstance(host, dict) and 'host' in host:
+                            # If it's a dict with host, create URLs
+                            hostname = host['host']
+                            if not hostname.startswith(('http://', 'https://')):
+                                nuclei_targets.append(f"http://{hostname}")
+                                nuclei_targets.append(f"https://{hostname}")
+                            else:
+                                nuclei_targets.append(hostname)
+
+                    # Remove duplicates
+                    nuclei_targets = list(set(nuclei_targets))
+                    logger.info(f"🔍 NUCLEI: Converted to {len(nuclei_targets)} target URLs: {nuclei_targets[:5] if len(nuclei_targets) > 5 else nuclei_targets}")
+
+                    # Perform vulnerability scanning with timeout handling
+                    try:
+                        vuln_results = nuclei_scanner.scan(nuclei_targets, **config)
+                        vulnerability_results = vuln_results.get('vulnerabilities', [])
+                        logger.info(f"🔍 NUCLEI: Found {len(vulnerability_results)} vulnerabilities")
+                    except Exception as scan_error:
+                        if "timed out" in str(scan_error).lower():
+                            logger.warning(f"⚠️ NUCLEI: Scan timed out, continuing without vulnerability results")
+                            vulnerability_results = []
+                        else:
+                            raise scan_error
+
+                    # Store vulnerabilities in database and update asset metadata
+                    from models import Vulnerability, SeverityLevel
+
+                    severity_mapping = {
+                        'critical': SeverityLevel.CRITICAL,
+                        'high': SeverityLevel.HIGH,
+                        'medium': SeverityLevel.MEDIUM,
+                        'low': SeverityLevel.LOW,
+                        'info': SeverityLevel.INFO
+                    }
+
+                    for vuln_data in vulnerability_results:
+                        try:
+                            # Find the asset for this vulnerability
+                            vuln_host = vuln_data.get('host', '').replace('http://', '').replace('https://', '').split(':')[0]
+                            asset = Asset.query.filter_by(
+                                name=vuln_host,
+                                organization_id=organization_id
+                            ).first()
+
+                            if asset:
+                                # Map severity
+                                severity_str = vuln_data.get('severity', 'medium').lower()
+                                severity = severity_mapping.get(severity_str, SeverityLevel.MEDIUM)
+
+                                # Create vulnerability record
+                                vulnerability = Vulnerability(
+                                    title=vuln_data.get('template_name', 'Unknown Vulnerability'),
+                                    description=vuln_data.get('description', ''),
+                                    severity=severity,
+                                    asset_id=asset.id,
+                                    organization_id=organization_id,
+                                    discovered_at=datetime.now(),
+                                    cve_id=vuln_data.get('cve_id'),
+                                    is_resolved=False
+                                )
+                                db.session.add(vulnerability)
+
+                                # Update asset metadata with vulnerability info
+                                if asset.asset_metadata:
+                                    existing_metadata = asset.asset_metadata.copy()
+                                    if 'vulnerabilities' not in existing_metadata:
+                                        existing_metadata['vulnerabilities'] = []
+
+                                    vuln_metadata = {
+                                        'template_name': vuln_data.get('template_name', ''),
+                                        'severity': severity_str,
+                                        'description': vuln_data.get('description', ''),
+                                        'discovered_at': datetime.now().isoformat()
+                                    }
+                                    if vuln_data.get('cve_id'):
+                                        vuln_metadata['cve_id'] = vuln_data.get('cve_id')
+
+                                    existing_metadata['vulnerabilities'].append(vuln_metadata)
+                                    existing_metadata['scan_status'] = 'vuln_complete'
+                                    asset.asset_metadata = existing_metadata
+                                    vulnerabilities_stored_count += 1
+
+                        except Exception as e:
+                            logger.error(f"❌ Vulnerability storage failed for {vuln_data.get('host', 'unknown')}: {str(e)}")
+                            continue
+
+                    # Commit vulnerability updates
+                    try:
+                        db.session.commit()
+                        logger.info(f"📊 Progressive vulnerability scanning: Stored {vulnerabilities_stored_count} vulnerabilities")
+                    except Exception as e:
+                        logger.error(f"❌ Vulnerability commit failed: {str(e)}")
+                        db.session.rollback()
+
+                    # Send progressive update for vulnerability scanning
+                    self.update_state(
+                        state='PROGRESS',
+                        meta={
+                            'stage': 'vulnerability_scanning_complete',
+                            'domain': domain,
+                            'progress': 90,
+                            'message': f'Vulnerability scanning completed, found {len(vulnerability_results)} vulnerabilities...',
+                            'current_phase': 'Vulnerability scanning complete - Finalizing',
+                            'subdomains_found': len(subdomains),
+                            'alive_hosts_found': len(alive_hosts),
+                            'port_scan_results': len(port_scan_results),
+                            'vulnerabilities_found': len(vulnerability_results),
+                            'progressive_update': {
+                                'type': 'vulnerability_scanning_complete',
+                                'vulnerabilities_stored': vulnerabilities_stored_count,
+                                'vulnerabilities_found': len(vulnerability_results),
+                                'timestamp': datetime.now().isoformat()
+                            }
+                        }
+                    )
 
             except Exception as e:
                 logger.error(f"❌ Vulnerability scanning failed: {str(e)}")

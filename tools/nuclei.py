@@ -255,7 +255,76 @@ class NucleiScanner(BaseScanner):
         return {'error': 'Failed to get template statistics'}
     
     def update_templates(self) -> bool:
-        """Update Nuclei templates"""
-        cmd = [self.tool_path, '-update-templates']
-        result = self._run_command(cmd)
-        return result['success']
+        """Update Nuclei templates with multiple fallback methods"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Try multiple update methods
+        update_methods = [
+            [self.tool_path, '-update-templates', '-ut'],  # Latest method
+            [self.tool_path, '-update-templates'],          # Standard method
+            [self.tool_path, '-update']                     # Fallback method
+        ]
+
+        for i, cmd in enumerate(update_methods, 1):
+            try:
+                logger.info(f"🔄 Attempting Nuclei template update method {i}: {' '.join(cmd)}")
+                result = self._run_command(cmd)
+                if result['success']:
+                    logger.info(f"✅ Nuclei templates updated successfully with method {i}")
+                    return True
+                else:
+                    logger.warning(f"⚠️ Template update method {i} failed: {result.get('stderr', 'Unknown error')}")
+            except Exception as e:
+                logger.warning(f"⚠️ Template update method {i} exception: {str(e)}")
+                continue
+
+        logger.error("❌ All Nuclei template update methods failed")
+        return False
+
+    def verify_templates(self) -> Dict[str, Any]:
+        """Verify that templates are available and get basic stats"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            # Try to list templates
+            cmd = [self.tool_path, '-tl']
+            result = self._run_command(cmd)
+
+            if result['success']:
+                lines = result['stdout'].split('\n')
+                template_count = len([line for line in lines if line.strip() and not line.startswith('[')])
+                logger.info(f"✅ Nuclei templates verified: {template_count} templates available")
+                return {
+                    'success': True,
+                    'template_count': template_count,
+                    'sample_templates': lines[:10]
+                }
+            else:
+                logger.error(f"❌ Template verification failed: {result.get('stderr', 'Unknown error')}")
+                return {'success': False, 'error': result.get('stderr', 'Unknown error')}
+
+        except Exception as e:
+            logger.error(f"❌ Template verification exception: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
+    def ensure_templates(self) -> bool:
+        """Ensure templates are available, update if necessary"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # First verify if templates exist
+        verification = self.verify_templates()
+        if verification['success'] and verification.get('template_count', 0) > 0:
+            logger.info(f"✅ Templates already available: {verification['template_count']} templates")
+            return True
+
+        # Templates not available, try to update
+        logger.info("📥 Templates not found, attempting to download...")
+        if self.update_templates():
+            # Verify again after update
+            verification = self.verify_templates()
+            return verification['success'] and verification.get('template_count', 0) > 0
+
+        return False

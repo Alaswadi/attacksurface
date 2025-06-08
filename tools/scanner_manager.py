@@ -40,6 +40,8 @@ class ScannerManager:
         try:
             self.nuclei = NucleiScanner()
             logger.info("Nuclei initialized successfully")
+            # Ensure templates are available
+            self._ensure_nuclei_templates()
         except ToolNotFoundError:
             logger.warning("Nuclei not found - vulnerability scanning will be unavailable")
 
@@ -48,7 +50,19 @@ class ScannerManager:
             logger.info("Httpx initialized successfully")
         except ToolNotFoundError:
             logger.warning("Httpx not found - HTTP probing will be unavailable")
-    
+
+    def _ensure_nuclei_templates(self):
+        """Ensure Nuclei templates are available"""
+        if self.nuclei:
+            try:
+                logger.info("🔍 Ensuring Nuclei templates are available...")
+                if self.nuclei.ensure_templates():
+                    logger.info("✅ Nuclei templates verified and ready")
+                else:
+                    logger.warning("⚠️ Nuclei templates could not be verified")
+            except Exception as e:
+                logger.warning(f"⚠️ Nuclei template verification failed: {str(e)}")
+
     def get_available_tools(self) -> Dict[str, bool]:
         """Get status of available tools"""
         return {

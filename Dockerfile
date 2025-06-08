@@ -82,7 +82,15 @@ RUN chmod +x init_db.py && \
     echo '#!/bin/bash\n\
 echo "🚀 Starting Attack Surface Discovery..."\n\
 echo "🔧 Initializing security tools..."\n\
-nuclei -update-templates -silent || echo "⚠️  Nuclei template update failed"\n\
+echo "📥 Downloading Nuclei templates..."\n\
+nuclei -update-templates -ut || {\n\
+    echo "⚠️  Nuclei template update failed, trying alternative method..."\n\
+    nuclei -update || {\n\
+        echo "❌ All Nuclei update methods failed, continuing without templates"\n\
+    }\n\
+}\n\
+echo "🔍 Verifying Nuclei templates..."\n\
+nuclei -tl | head -10 || echo "⚠️  Template verification failed"\n\
 echo "⏳ Waiting for database..."\n\
 sleep 15\n\
 echo "🔄 Initializing database..."\n\
