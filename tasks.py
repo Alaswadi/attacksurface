@@ -2047,20 +2047,33 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                                 nuclei_targets.add(hostname)
 
                     # 2. Add additional targets from port scan results
-                    for port_data in port_scan_results:
-                        host = port_data.get('host', '')
-                        port = port_data.get('port', 0)
+                    if port_scan_results:
+                        logger.info(f"🔍 NUCLEI: Processing {len(port_scan_results)} port scan results")
+                        for port_data in port_scan_results:
+                            # Handle different port scan result formats
+                            if isinstance(port_data, dict):
+                                host = port_data.get('host', '')
+                                port = port_data.get('port', 0)
+                            elif isinstance(port_data, str):
+                                # Skip string entries for now - they might be summary info
+                                logger.debug(f"🔍 NUCLEI: Skipping string port data: {port_data}")
+                                continue
+                            else:
+                                logger.debug(f"🔍 NUCLEI: Unknown port data format: {type(port_data)}")
+                                continue
 
-                        if host and port:
-                            # Web service ports
-                            if port in [80, 8080, 8000, 3000, 9000]:
-                                nuclei_targets.add(f"http://{host}:{port}")
-                            elif port in [443, 8443, 9443]:
-                                nuclei_targets.add(f"https://{host}:{port}")
-                            # Management interfaces (try both HTTP and HTTPS)
-                            elif port in [8080, 8443, 9090, 9443, 8888, 8889]:
-                                nuclei_targets.add(f"http://{host}:{port}")
-                                nuclei_targets.add(f"https://{host}:{port}")
+                            if host and port:
+                                # Web service ports
+                                if port in [80, 8080, 8000, 3000, 9000]:
+                                    nuclei_targets.add(f"http://{host}:{port}")
+                                elif port in [443, 8443, 9443]:
+                                    nuclei_targets.add(f"https://{host}:{port}")
+                                # Management interfaces (try both HTTP and HTTPS)
+                                elif port in [8080, 8443, 9090, 9443, 8888, 8889]:
+                                    nuclei_targets.add(f"http://{host}:{port}")
+                                    nuclei_targets.add(f"https://{host}:{port}")
+                    else:
+                        logger.info("🔍 NUCLEI: No port scan results to process")
 
                     # 3. Convert to list and validate
                     nuclei_targets = list(nuclei_targets)
