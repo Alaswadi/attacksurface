@@ -18,27 +18,8 @@ celery = flask_app.celery
 
 logger = logging.getLogger(__name__)
 
-# Configure Celery for large-scale scanning
-celery.conf.update(
-    task_serializer='json',
-    accept_content=['json'],
-    result_serializer='json',
-    timezone='UTC',
-    enable_utc=True,
-    task_track_started=True,
-    task_time_limit=3600,  # 1 hour max per task
-    task_soft_time_limit=3300,  # 55 minutes soft limit
-    worker_prefetch_multiplier=1,  # Prevent worker overload
-    task_acks_late=True,  # Ensure task completion
-    worker_disable_rate_limits=False,
-    task_routes={
-        'tasks.subdomain_discovery_task': {'queue': 'discovery'},
-        'tasks.http_probe_task': {'queue': 'probing'},
-        'tasks.port_scan_task': {'queue': 'scanning'},
-        'tasks.vulnerability_scan_task': {'queue': 'vulnerability'},
-        'tasks.large_domain_scan_orchestrator': {'queue': 'orchestrator'}
-    }
-)
+# Celery configuration is now handled in config.py and app.py
+# This avoids configuration conflicts with newer Celery versions
 
 @celery.task(bind=True)
 def test_task(self):

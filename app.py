@@ -13,10 +13,26 @@ def make_celery(app):
     """Create Celery instance and configure it with Flask app context"""
     celery = Celery(
         app.import_name,
-        backend=app.config['CELERY_RESULT_BACKEND'],
-        broker=app.config['CELERY_BROKER_URL']
+        backend=app.config['result_backend'],
+        broker=app.config['broker_url']
     )
-    celery.conf.update(app.config)
+
+    # Update Celery configuration with new format
+    celery.conf.update(
+        broker_url=app.config['broker_url'],
+        result_backend=app.config['result_backend'],
+        task_serializer=app.config.get('task_serializer', 'json'),
+        accept_content=app.config.get('accept_content', ['json']),
+        result_serializer=app.config.get('result_serializer', 'json'),
+        timezone=app.config.get('timezone', 'UTC'),
+        enable_utc=app.config.get('enable_utc', True),
+        task_track_started=app.config.get('task_track_started', True),
+        task_time_limit=app.config.get('task_time_limit', 3600),
+        task_soft_time_limit=app.config.get('task_soft_time_limit', 3300),
+        worker_prefetch_multiplier=app.config.get('worker_prefetch_multiplier', 1),
+        task_acks_late=app.config.get('task_acks_late', True),
+        worker_disable_rate_limits=app.config.get('worker_disable_rate_limits', False)
+    )
 
     class ContextTask(celery.Task):
         """Make celery tasks work with Flask app context"""

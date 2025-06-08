@@ -15,9 +15,22 @@ class Config:
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     
-    # Redis for Celery
-    CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
-    CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND') or 'redis://localhost:6379/0'
+    # Celery Configuration (New Format)
+    broker_url = os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
+    result_backend = os.environ.get('CELERY_RESULT_BACKEND') or 'redis://localhost:6379/0'
+
+    # Additional Celery settings for large-scale scanning
+    task_serializer = 'json'
+    accept_content = ['json']
+    result_serializer = 'json'
+    timezone = 'UTC'
+    enable_utc = True
+    task_track_started = True
+    task_time_limit = 3600  # 1 hour max per task
+    task_soft_time_limit = 3300  # 55 minutes soft limit
+    worker_prefetch_multiplier = 1  # Prevent worker overload
+    task_acks_late = True  # Ensure task completion
+    worker_disable_rate_limits = False
     
     # Pagination
     POSTS_PER_PAGE = 25
