@@ -180,10 +180,20 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
 
                 # Extract alive hostnames and build HTTP data
                 for host in alive_hosts_data:
-                    hostname = host.get('host', '')
-                    if hostname:
-                        alive_hosts.append(hostname)
-                        http_data[hostname] = {
+                    # httpx returns the original hostname in 'input' field and resolved IP in 'host'
+                    original_hostname = host.get('input', host.get('url', ''))
+                    resolved_ip = host.get('host', '')
+
+                    # Clean the hostname from URL format if needed
+                    if '://' in original_hostname:
+                        original_hostname = original_hostname.split('://', 1)[1].split('/', 1)[0].split(':', 1)[0]
+
+                    # Use the original hostname as the key for consistency with asset storage
+                    if original_hostname:
+                        alive_hosts.append(resolved_ip)  # Keep IPs for port scanning
+
+                        # Store HTTP data using hostname as key (matches asset storage)
+                        http_data[original_hostname] = {
                             'url': host.get('url', ''),
                             'status_code': host.get('status_code', 0),
                             'title': host.get('title', ''),
@@ -192,8 +202,11 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                             'content_length': host.get('content_length', 0),
                             'response_time': host.get('response_time', ''),
                             'scheme': host.get('scheme', 'http'),
-                            'port': host.get('port', 80)
+                            'port': host.get('port', 80),
+                            'resolved_ip': resolved_ip  # Store the resolved IP for reference
                         }
+
+                        logger.debug(f"✅ HTTP probe data stored for {original_hostname}: status {host.get('status_code', 'N/A')}")
 
             except Exception as e:
                 logger.error(f"❌ HTTP probing failed: {str(e)}")
@@ -260,17 +273,29 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                 logger.info(f"🔍 Validated {len(valid_hosts)} hosts for port scanning (filtered from {len(alive_hosts)})")
 
                 if valid_hosts:
+                    # Create IP to hostname mapping for port results
+                    ip_to_hostname = {}
+                    for hostname, http_info in http_data.items():
+                        resolved_ip = http_info.get('resolved_ip', '')
+                        if resolved_ip:
+                            ip_to_hostname[resolved_ip] = hostname
+
                     # Perform batch port scanning for efficiency
                     try:
                         batch_results = nmap_scanner.scan(valid_hosts, **port_config)
                         if batch_results.get('open_ports'):
-                            # Group results by host
+                            # Group results by hostname (not IP)
                             for port_info in batch_results['open_ports']:
                                 host_ip = port_info.get('host', '')
                                 if host_ip:
-                                    if host_ip not in port_results:
-                                        port_results[host_ip] = []
-                                    port_results[host_ip].append(port_info)
+                                    # Map IP back to hostname for consistent storage
+                                    hostname = ip_to_hostname.get(host_ip, host_ip)
+
+                                    if hostname not in port_results:
+                                        port_results[hostname] = []
+                                    port_results[hostname].append(port_info)
+
+                                    logger.debug(f"✅ Port scan result for {hostname} ({host_ip}): port {port_info.get('port', 'N/A')}")
 
                         logger.info(f"✅ Batch port scan completed: {len(port_results)} hosts with open ports")
 
@@ -278,14 +303,16 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                         logger.warning(f"⚠️ Batch scanning failed, falling back to individual scans: {str(batch_error)}")
 
                         # Fallback to individual host scanning
-                        for host in valid_hosts:
+                        for host_ip in valid_hosts:
                             try:
-                                host_results = nmap_scanner.scan([host], **port_config)
+                                host_results = nmap_scanner.scan([host_ip], **port_config)
                                 if host_results.get('open_ports'):
-                                    port_results[host] = host_results['open_ports']
-                                    logger.debug(f"✅ Individual scan completed for {host}")
+                                    # Map IP back to hostname for consistent storage
+                                    hostname = ip_to_hostname.get(host_ip, host_ip)
+                                    port_results[hostname] = host_results['open_ports']
+                                    logger.debug(f"✅ Individual scan completed for {hostname} ({host_ip})")
                             except Exception as e:
-                                logger.warning(f"Port scan failed for {host}: {str(e)}")
+                                logger.warning(f"Port scan failed for {host_ip}: {str(e)}")
                                 continue
                 else:
                     logger.warning("⚠️ No valid hosts found for port scanning")
