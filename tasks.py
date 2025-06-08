@@ -114,6 +114,11 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
 
         # Store subdomains in database
         stored_count = 0
+
+        # Import database models
+        from models import Asset, AssetType
+        from app import db
+
         for subdomain in subdomains:
             try:
                 if isinstance(subdomain, dict):
@@ -156,6 +161,9 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                     )
                     db.session.add(asset)
                     stored_count += 1
+                    logger.debug(f"✅ Added new subdomain: {hostname}")
+                else:
+                    logger.debug(f"⚠️ Subdomain already exists: {hostname}")
 
             except Exception as e:
                 logger.warning(f"Failed to store subdomain {subdomain}: {str(e)}")
@@ -279,40 +287,73 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                 nmap_config = {
                     'quick': {
                         'ports': '80,443,22,21,25,53,110,143,993,995',
-                        'scan_type': 'syn',
                         'timing': 'T4'
                     },
                     'deep': {
                         'ports': '1-1000',
-                        'scan_type': 'syn',
                         'timing': 'T3',
-                        'service_detection': True
+                        'version_detection': True
                     },
                     'full': {
                         'ports': '1-65535',
-                        'scan_type': 'syn',
                         'timing': 'T3',
-                        'service_detection': True,
-                        'os_detection': True
+                        'version_detection': True
                     }
                 }
 
                 port_config = nmap_config.get(scan_type, nmap_config['deep'])
 
-                # Perform port scanning
+                # Filter and validate hostnames before scanning
+                valid_hosts = []
                 for host in alive_hosts:
+                    # Clean and validate hostname
+                    clean_host = str(host).strip()
+                    if clean_host and '.' in clean_host and not clean_host.startswith('.') and not clean_host.endswith('.'):
+                        # Basic hostname validation
+                        if len(clean_host) > 3 and not clean_host.isspace():
+                            valid_hosts.append(clean_host)
+                        else:
+                            logger.warning(f"⚠️ Skipping invalid hostname: '{clean_host}'")
+                    else:
+                        logger.warning(f"⚠️ Skipping malformed hostname: '{clean_host}'")
+
+                logger.info(f"🔍 Validated {len(valid_hosts)} hosts for port scanning (filtered from {len(alive_hosts)})")
+
+                if valid_hosts:
+                    # Perform batch port scanning for efficiency
                     try:
-                        host_results = nmap_scanner.scan(host, **port_config)
-                        if host_results.get('success', False):
-                            port_results[host] = host_results.get('results', {})
-                    except Exception as e:
-                        logger.warning(f"Port scan failed for {host}: {str(e)}")
-                        continue
+                        batch_results = nmap_scanner.scan(valid_hosts, **port_config)
+                        if batch_results.get('open_ports'):
+                            # Group results by host
+                            for port_info in batch_results['open_ports']:
+                                host_ip = port_info.get('host', '')
+                                if host_ip:
+                                    if host_ip not in port_results:
+                                        port_results[host_ip] = []
+                                    port_results[host_ip].append(port_info)
+
+                        logger.info(f"✅ Batch port scan completed: {len(port_results)} hosts with open ports")
+
+                    except Exception as batch_error:
+                        logger.warning(f"⚠️ Batch scanning failed, falling back to individual scans: {str(batch_error)}")
+
+                        # Fallback to individual host scanning
+                        for host in valid_hosts:
+                            try:
+                                host_results = nmap_scanner.scan([host], **port_config)
+                                if host_results.get('open_ports'):
+                                    port_results[host] = host_results['open_ports']
+                                    logger.debug(f"✅ Individual scan completed for {host}")
+                            except Exception as e:
+                                logger.warning(f"Port scan failed for {host}: {str(e)}")
+                                continue
+                else:
+                    logger.warning("⚠️ No valid hosts found for port scanning")
 
             except Exception as e:
                 logger.error(f"❌ Port scanning failed: {str(e)}")
 
-            logger.info(f"🔍 Port scanning completed for {len(alive_hosts)} hosts")
+            logger.info(f"🔍 Port scanning completed: {len(port_results)} hosts with open ports")
 
         logger.info(f"🎯 Scan workflow completed: {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts")
 
@@ -332,8 +373,7 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
 
         # Store main domain asset if it doesn't exist
         try:
-            from models import Asset, AssetType
-
+            # Import database models (already imported above, but ensuring availability)
             main_domain_asset = Asset.query.filter_by(
                 name=domain,
                 organization_id=organization_id
