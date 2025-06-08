@@ -2024,25 +2024,48 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
 
                     # Optimized target preparation for Nuclei scanning
                     nuclei_targets = set()
+                    domain_protocols = {}  # Track which protocols work for each domain
 
-                    # 1. Add URLs from alive hosts (httpx results)
+                    # 1. Add URLs from alive hosts (httpx results) - use actual working URLs
                     for host in alive_hosts:
                         if isinstance(host, str):
-                            # If it's just a hostname, create HTTP and HTTPS URLs
+                            # If it's just a hostname, we need to determine protocol
                             if not host.startswith(('http://', 'https://')):
-                                nuclei_targets.add(f"http://{host}")
+                                # Default to HTTPS first, then HTTP as fallback
+                                domain_protocols[host] = 'https'
                                 nuclei_targets.add(f"https://{host}")
                             else:
+                                # Extract domain and protocol from full URL
+                                if host.startswith('https://'):
+                                    domain = host.replace('https://', '').split('/')[0].split(':')[0]
+                                    domain_protocols[domain] = 'https'
+                                elif host.startswith('http://'):
+                                    domain = host.replace('http://', '').split('/')[0].split(':')[0]
+                                    domain_protocols[domain] = 'http'
                                 nuclei_targets.add(host)
                         elif isinstance(host, dict) and 'url' in host:
-                            # Use the validated URL from httpx
-                            nuclei_targets.add(host['url'])
+                            # Use the validated URL from httpx (this is the actual working URL)
+                            url = host['url']
+                            nuclei_targets.add(url)
+                            # Track the working protocol for this domain
+                            if url.startswith('https://'):
+                                domain = url.replace('https://', '').split('/')[0].split(':')[0]
+                                domain_protocols[domain] = 'https'
+                            elif url.startswith('http://'):
+                                domain = url.replace('http://', '').split('/')[0].split(':')[0]
+                                domain_protocols[domain] = 'http'
                         elif isinstance(host, dict) and 'host' in host:
-                            # Create URLs from host data
+                            # Use host data but prefer the working protocol
                             hostname = host['host']
                             if not hostname.startswith(('http://', 'https://')):
-                                nuclei_targets.add(f"http://{hostname}")
-                                nuclei_targets.add(f"https://{hostname}")
+                                # Check if we already know the working protocol for this domain
+                                if hostname in domain_protocols:
+                                    protocol = domain_protocols[hostname]
+                                    nuclei_targets.add(f"{protocol}://{hostname}")
+                                else:
+                                    # Default to HTTPS
+                                    domain_protocols[hostname] = 'https'
+                                    nuclei_targets.add(f"https://{hostname}")
                             else:
                                 nuclei_targets.add(hostname)
 
@@ -2063,15 +2086,21 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                                 continue
 
                             if host and port:
+                                # Check if we already have a preferred protocol for this domain
+                                preferred_protocol = domain_protocols.get(host, None)
+
                                 # Web service ports
                                 if port in [80, 8080, 8000, 3000, 9000]:
                                     nuclei_targets.add(f"http://{host}:{port}")
                                 elif port in [443, 8443, 9443]:
                                     nuclei_targets.add(f"https://{host}:{port}")
-                                # Management interfaces (try both HTTP and HTTPS)
+                                # Management interfaces - use preferred protocol if known
                                 elif port in [8080, 8443, 9090, 9443, 8888, 8889]:
-                                    nuclei_targets.add(f"http://{host}:{port}")
-                                    nuclei_targets.add(f"https://{host}:{port}")
+                                    if preferred_protocol:
+                                        nuclei_targets.add(f"{preferred_protocol}://{host}:{port}")
+                                    else:
+                                        # Default to HTTPS for management interfaces
+                                        nuclei_targets.add(f"https://{host}:{port}")
                     else:
                         logger.info("🔍 NUCLEI: No port scan results to process")
 
