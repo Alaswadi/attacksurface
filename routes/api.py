@@ -408,22 +408,28 @@ def scan_assets_subdomain():
                         httpx_results = scanning_service.scanner_manager.httpx_scan_only(hosts_to_probe)
                         alive_hosts = httpx_results.get('alive_hosts', [])
 
-                        # Process HTTP probe results
+                        # Process HTTP probe results and map them to original hostnames
                         for host_info in alive_hosts:
-                            host = host_info.get('host', host_info.get('url', ''))
-                            if '://' in host:
-                                host = host.split('://', 1)[1].split('/')[0]  # Extract hostname from URL
+                            url = host_info.get('url', '')
 
-                            http_probe_results[host] = {
-                                'status_code': host_info.get('status_code'),
-                                'title': host_info.get('title', ''),
-                                'technologies': host_info.get('tech', []),
-                                'content_length': host_info.get('content_length'),
-                                'webserver': host_info.get('webserver', ''),
-                                'last_http_probe': datetime.utcnow().isoformat(),
-                                'url': host_info.get('url', ''),
-                                'scheme': host_info.get('scheme', 'http')
-                            }
+                            # Extract hostname from URL (e.g., "http://scanme.nmap.com:80" -> "scanme.nmap.com")
+                            if '://' in url:
+                                hostname = url.split('://', 1)[1].split('/')[0].split(':')[0]
+                            else:
+                                hostname = host_info.get('host', '')
+
+                            # Store by hostname (not IP)
+                            if hostname:
+                                http_probe_results[hostname] = {
+                                    'status_code': host_info.get('status_code'),
+                                    'title': host_info.get('title', ''),
+                                    'technologies': host_info.get('tech', []),
+                                    'content_length': host_info.get('content_length'),
+                                    'webserver': host_info.get('webserver', ''),
+                                    'last_http_probe': datetime.utcnow().isoformat(),
+                                    'url': host_info.get('url', ''),
+                                    'scheme': host_info.get('scheme', 'http')
+                                }
 
                         logging.info(f"🌐 ASSETS: HTTP probing completed, {len(alive_hosts)} hosts are alive")
                         logging.info(f"🌐 ASSETS: HTTP probe results: {http_probe_results}")
