@@ -606,13 +606,15 @@ async function loadAssets() {
         }
         const data = await response.json();
         assetsData = data.assets || [];
-        
+        console.log('Assets loaded:', assetsData.length, 'assets');
+
         document.getElementById('loading-state').style.display = 'none';
         
         if (assetsData.length === 0) {
             document.getElementById('empty-state').classList.remove('hidden');
         } else {
-            renderAssets();
+            document.getElementById('empty-state').classList.add('hidden');
+            filterAssets(); // Apply current filters instead of renderAssets() directly
         }
     } catch (error) {
         console.error('Error loading assets:', error);
@@ -1072,11 +1074,14 @@ function showAllPortsModalFromElement(element, assetName) {
 let assetToDelete = null;
 
 function confirmDeleteAsset(assetId, assetName, assetType) {
+    console.log('confirmDeleteAsset called with:', { assetId, assetName, assetType });
+
     const modal = document.getElementById('delete-confirmation-modal');
     const message = document.getElementById('delete-confirmation-message');
     const warning = document.getElementById('delete-warning-message');
 
     assetToDelete = { id: assetId, name: assetName, type: assetType };
+    console.log('assetToDelete set to:', assetToDelete);
 
     message.textContent = `Are you sure you want to delete "${assetName}"?`;
 
@@ -1098,7 +1103,13 @@ function hideDeleteConfirmationModal() {
 }
 
 async function executeDelete() {
-    if (!assetToDelete) return;
+    console.log('executeDelete called, assetToDelete:', assetToDelete);
+
+    if (!assetToDelete) {
+        console.error('assetToDelete is null or undefined');
+        showError('No asset selected for deletion');
+        return;
+    }
 
     try {
         const response = await fetch(`/api/assets/${assetToDelete.id}`, {
@@ -1115,9 +1126,13 @@ async function executeDelete() {
         const result = await response.json();
 
         if (result.success) {
+            const deletedAssetName = assetToDelete.name;
             hideDeleteConfirmationModal();
-            showSuccess(`Asset "${assetToDelete.name}" deleted successfully`);
-            loadAssets(); // Refresh the assets list
+            showSuccess(`Asset "${deletedAssetName}" deleted successfully`);
+
+            // Refresh the assets list
+            console.log('Refreshing assets list after deletion');
+            await loadAssets();
         } else {
             throw new Error(result.error || 'Failed to delete asset');
         }
