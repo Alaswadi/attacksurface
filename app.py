@@ -62,7 +62,6 @@ def create_app(config_name=None):
     migrate = Migrate(app, db)
 
     # Initialize Redis checker with environment-aware URL
-    import os
     broker_url = (
         app.config.get('broker_url') or
         os.environ.get('CELERY_BROKER_URL') or
