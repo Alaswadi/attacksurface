@@ -1316,7 +1316,7 @@ function hideTechnologiesModal() {
 // ============================================================================
 
 function startProgressiveScanning() {
-    """Start progressive scanning with real-time updates"""
+    // Start progressive scanning with real-time updates
     console.log('🚀 Starting progressive scanning with real-time updates');
 
     // Show progressive scanning indicator
@@ -1328,7 +1328,7 @@ function startProgressiveScanning() {
 }
 
 function showProgressiveScanningIndicator() {
-    """Show visual indicator that progressive scanning is active"""
+    // Show visual indicator that progressive scanning is active
     const indicator = document.createElement('div');
     indicator.id = 'progressive-scanning-indicator';
     indicator.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
@@ -1345,7 +1345,7 @@ function showProgressiveScanningIndicator() {
 }
 
 function hideProgressiveScanningIndicator() {
-    """Hide progressive scanning indicator"""
+    // Hide progressive scanning indicator
     const indicator = document.getElementById('progressive-scanning-indicator');
     if (indicator) {
         indicator.remove();
@@ -1353,7 +1353,7 @@ function hideProgressiveScanningIndicator() {
 }
 
 function simulateProgressiveScanning() {
-    """Simulate progressive scanning updates for demonstration"""
+    // Simulate progressive scanning updates for demonstration
     progressiveScanActive = true;
     progressiveUpdateCount = 0;
 
@@ -1394,7 +1394,7 @@ function simulateProgressiveScanning() {
 }
 
 function addProgressiveSubdomains() {
-    """Add discovered subdomains immediately with scanning status"""
+    // Add discovered subdomains immediately with scanning status
     const newSubdomains = [
         {
             id: Date.now() + 1,
@@ -1450,7 +1450,7 @@ function addProgressiveSubdomains() {
 }
 
 function updateProgressiveHttpStatus() {
-    """Update assets with HTTP status codes and technologies progressively"""
+    // Update assets with HTTP status codes and technologies progressively
     const httpUpdates = [
         {
             name: 'www.example.com',
@@ -1500,7 +1500,7 @@ function updateProgressiveHttpStatus() {
 }
 
 function updateProgressivePortScanning() {
-    """Update assets with port scanning results progressively"""
+    // Update assets with port scanning results progressively
     const portUpdates = [
         {
             name: 'www.example.com',
@@ -1543,7 +1543,7 @@ function updateProgressivePortScanning() {
 }
 
 function completeProgressiveScanning() {
-    """Complete progressive scanning and mark all assets as completed"""
+    // Complete progressive scanning and mark all assets as completed
     // Mark all scanning assets as completed
     assetsData.forEach(asset => {
         if (asset.asset_metadata && asset.asset_metadata.scan_status) {
@@ -1566,7 +1566,7 @@ function completeProgressiveScanning() {
 }
 
 function updateProgressiveScanningIndicator(message) {
-    """Update the progressive scanning indicator message"""
+    // Update the progressive scanning indicator message
     const indicator = document.getElementById('progressive-scanning-indicator');
     if (indicator) {
         const span = indicator.querySelector('span');
@@ -1577,14 +1577,14 @@ function updateProgressiveScanningIndicator(message) {
 }
 
 function stopProgressiveScanning() {
-    """Stop progressive scanning"""
+    // Stop progressive scanning
     progressiveScanActive = false;
     hideProgressiveScanningIndicator();
     console.log('⏹️ Progressive scanning stopped by user');
 }
 
 function showProgressiveCompletionNotification() {
-    """Show completion notification"""
+    // Show completion notification
     const notification = document.createElement('div');
     notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
     notification.innerHTML = `

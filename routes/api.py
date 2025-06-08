@@ -1400,7 +1400,8 @@ def progressive_scan_updates_stream(task_id):
         """Generate Server-Sent Events for progressive scan updates"""
         try:
             # Send initial connection event
-            yield f"data: {json.dumps({'type': 'connected', 'task_id': task_id, 'timestamp': datetime.now().isoformat()})}\n\n"
+            connection_data = {'type': 'connected', 'task_id': task_id, 'timestamp': datetime.now().isoformat()}
+            yield f"data: {json.dumps(connection_data)}\n\n"
 
             # Monitor for progressive updates
             last_update_time = time.time()
@@ -1418,7 +1419,7 @@ def progressive_scan_updates_stream(task_id):
 
                         if progressive_update:
                             # Send progressive update to client
-                            yield f"data: {json.dumps({
+                            update_data = {
                                 'type': 'progressive_update',
                                 'task_id': task_id,
                                 'stage': task_meta.get('stage', 'unknown'),
@@ -1426,28 +1427,31 @@ def progressive_scan_updates_stream(task_id):
                                 'message': task_meta.get('message', ''),
                                 'update': progressive_update,
                                 'timestamp': datetime.now().isoformat()
-                            })}\n\n"
+                            }
+                            yield f"data: {json.dumps(update_data)}\n\n"
 
                             last_update_time = time.time()
 
                     elif task.state == 'SUCCESS':
                         # Send completion event
-                        yield f"data: {json.dumps({
+                        completion_data = {
                             'type': 'completed',
                             'task_id': task_id,
                             'result': task.result,
                             'timestamp': datetime.now().isoformat()
-                        })}\n\n"
+                        }
+                        yield f"data: {json.dumps(completion_data)}\n\n"
                         break
 
                     elif task.state == 'FAILURE':
                         # Send failure event
-                        yield f"data: {json.dumps({
+                        failure_data = {
                             'type': 'failed',
                             'task_id': task_id,
                             'error': str(task.info),
                             'timestamp': datetime.now().isoformat()
-                        })}\n\n"
+                        }
+                        yield f"data: {json.dumps(failure_data)}\n\n"
                         break
 
                     # Wait before next check
@@ -1455,30 +1459,33 @@ def progressive_scan_updates_stream(task_id):
 
                 except Exception as e:
                     logging.error(f"Error in progressive scan updates stream: {str(e)}")
-                    yield f"data: {json.dumps({
+                    error_data = {
                         'type': 'error',
                         'task_id': task_id,
                         'error': str(e),
                         'timestamp': datetime.now().isoformat()
-                    })}\n\n"
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
                     break
 
             # Send timeout event if no updates received
-            yield f"data: {json.dumps({
+            timeout_data = {
                 'type': 'timeout',
                 'task_id': task_id,
                 'message': 'No updates received within timeout period',
                 'timestamp': datetime.now().isoformat()
-            })}\n\n"
+            }
+            yield f"data: {json.dumps(timeout_data)}\n\n"
 
         except Exception as e:
             logging.error(f"Error in progressive scan updates stream: {str(e)}")
-            yield f"data: {json.dumps({
+            error_data = {
                 'type': 'error',
                 'task_id': task_id,
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
-            })}\n\n"
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
 
     return Response(
         event_stream(),
@@ -1512,7 +1519,7 @@ def start_large_scale_scan_progressive():
     try:
         # Check if Celery is available
         try:
-            from tasks import large_domain_scan_orchestrator
+            from tasks import progressive_large_domain_scan_orchestrator
             celery_available = True
         except ImportError:
             celery_available = False
@@ -1524,7 +1531,7 @@ def start_large_scale_scan_progressive():
             }), 503
 
         # Start the progressive large-scale scan
-        task = large_domain_scan_orchestrator.delay(
+        task = progressive_large_domain_scan_orchestrator.delay(
             domain=domain,
             organization_id=org.id,
             scan_type=scan_type
