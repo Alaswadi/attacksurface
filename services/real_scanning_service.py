@@ -18,6 +18,18 @@ class RealScanningService:
         self.scanner_manager = ScannerManager()
         self.available_tools = self.scanner_manager.get_available_tools()
         logger.info(f"Initialized scanning service with tools: {self.available_tools}")
+
+    def is_available(self) -> bool:
+        """Check if the scanning service is available"""
+        try:
+            return len(self.available_tools) > 0 and self.scanner_manager is not None
+        except Exception as e:
+            logger.error(f"Error checking scanning service availability: {str(e)}")
+            return False
+
+    def get_available_tools(self) -> List[str]:
+        """Get list of available scanning tools"""
+        return self.available_tools
     
     def scan_domain(self, domain: str, organization_id: int, scan_type: str = 'quick') -> Dict[str, Any]:
         """
