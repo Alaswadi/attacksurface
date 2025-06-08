@@ -426,6 +426,7 @@ def scan_assets_subdomain():
                             }
 
                         logging.info(f"🌐 ASSETS: HTTP probing completed, {len(alive_hosts)} hosts are alive")
+                        logging.info(f"🌐 ASSETS: HTTP probe results: {http_probe_results}")
                     except Exception as httpx_error:
                         logging.warning(f"🌐 ASSETS: HTTP probing failed: {str(httpx_error)}")
                         http_probe_results = {}
@@ -548,10 +549,13 @@ def scan_assets_subdomain():
 
             if not existing_asset:
                 # Create new subdomain asset with port and HTTP probe information
+                http_probe_data = http_probe_results.get(subdomain_name, {})
+                logging.info(f"🌐 ASSETS: Storing subdomain {subdomain_name} with HTTP probe data: {http_probe_data}")
+
                 asset_metadata = {
                     'ports': ports_info,
                     'scan_source': 'subfinder_httpx_nmap',
-                    'http_probe': http_probe_results.get(subdomain_name, {})
+                    'http_probe': http_probe_data
                 }
                 subdomain_asset = Asset(
                     name=subdomain_name,

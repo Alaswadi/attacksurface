@@ -612,6 +612,12 @@ async function loadAssets() {
         assetsData = data.assets || [];
         console.log('Assets loaded:', assetsData.length, 'assets');
 
+        // Debug: Show first subdomain asset
+        const firstSubdomain = assetsData.find(asset => asset.type === 'subdomain');
+        if (firstSubdomain) {
+            console.log('First subdomain asset:', firstSubdomain);
+        }
+
         document.getElementById('loading-state').style.display = 'none';
         
         if (assetsData.length === 0) {
