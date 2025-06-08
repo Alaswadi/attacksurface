@@ -2,10 +2,13 @@
 """
 Celery tasks for Attack Surface Discovery SaaS
 Background tasks for scanning, processing, and notifications
+Optimized for large-scale domain scanning with hundreds/thousands of subdomains
 """
 
 import logging
-from datetime import datetime, timedelta
+import json
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Any, Optional
 from app import create_app
 from models import db, Asset, Vulnerability, Alert, Organization, AssetType, SeverityLevel, AlertType
 
@@ -15,45 +18,640 @@ celery = flask_app.celery
 
 logger = logging.getLogger(__name__)
 
+# Configure Celery for large-scale scanning
+celery.conf.update(
+    task_serializer='json',
+    accept_content=['json'],
+    result_serializer='json',
+    timezone='UTC',
+    enable_utc=True,
+    task_track_started=True,
+    task_time_limit=3600,  # 1 hour max per task
+    task_soft_time_limit=3300,  # 55 minutes soft limit
+    worker_prefetch_multiplier=1,  # Prevent worker overload
+    task_acks_late=True,  # Ensure task completion
+    worker_disable_rate_limits=False,
+    task_routes={
+        'tasks.subdomain_discovery_task': {'queue': 'discovery'},
+        'tasks.http_probe_task': {'queue': 'probing'},
+        'tasks.port_scan_task': {'queue': 'scanning'},
+        'tasks.vulnerability_scan_task': {'queue': 'vulnerability'},
+        'tasks.large_domain_scan_orchestrator': {'queue': 'orchestrator'}
+    }
+)
+
 @celery.task(bind=True)
 def test_task(self):
     """Test task to verify Celery is working"""
     logger.info("Test task executed successfully")
     return "Test task completed"
 
-@celery.task(bind=True)
-def scan_domain_task(self, domain, organization_id, scan_type='quick'):
+# ============================================================================
+# LARGE-SCALE SCANNING ORCHESTRATOR
+# ============================================================================
+
+@celery.task(bind=True, name='tasks.large_domain_scan_orchestrator')
+def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan_type: str = 'deep'):
     """
-    Background task for domain scanning
-    
+    Orchestrator task for large-scale domain scanning
+    Manages the complete workflow: Subfinder → httpx → nmap + Nuclei
+
+    This task coordinates the entire scanning pipeline for domains that may have
+    hundreds or thousands of subdomains, ensuring efficient resource utilization
+    and progress tracking.
+
     Args:
-        domain (str): Domain to scan
+        domain (str): Target domain to scan
         organization_id (int): Organization ID
         scan_type (str): Type of scan (quick, deep, full)
-    
+
     Returns:
-        dict: Scan results
+        dict: Complete scan orchestration results
     """
     try:
-        logger.info(f"Starting {scan_type} scan for domain: {domain}")
-        
-        # Import scanning service
-        from services.real_scanning_service import RealScanningService
-        scanning_service = RealScanningService()
-        
-        # Perform the scan
-        results = scanning_service.scan_domain(domain, organization_id, scan_type)
-        
-        logger.info(f"Scan completed for {domain}: {results}")
-        return results
-        
+        # Update task state
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'initializing',
+                'domain': domain,
+                'progress': 0,
+                'message': f'Initializing large-scale scan for {domain}',
+                'start_time': datetime.now().isoformat()
+            }
+        )
+
+        logger.info(f"🚀 Starting large-scale {scan_type} scan orchestration for domain: {domain}")
+
+        # Stage 1: Subdomain Discovery
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'subdomain_discovery',
+                'domain': domain,
+                'progress': 10,
+                'message': f'Discovering subdomains for {domain}...',
+                'current_phase': 'Subfinder scanning'
+            }
+        )
+
+        # Launch subdomain discovery task
+        subdomain_task = subdomain_discovery_task.delay(domain, organization_id, scan_type)
+        subdomain_results = subdomain_task.get(timeout=600)  # 10 minute timeout
+
+        if not subdomain_results.get('success', False):
+            raise Exception(f"Subdomain discovery failed: {subdomain_results.get('error', 'Unknown error')}")
+
+        subdomains = subdomain_results.get('subdomains', [])
+        logger.info(f"📊 Discovered {len(subdomains)} subdomains for {domain}")
+
+        # Stage 2: HTTP Probing (Batch Processing)
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'http_probing',
+                'domain': domain,
+                'progress': 30,
+                'message': f'Probing {len(subdomains)} subdomains for live hosts...',
+                'current_phase': 'HTTP probing with httpx',
+                'subdomains_found': len(subdomains)
+            }
+        )
+
+        # Process subdomains in batches for large domains
+        batch_size = 50 if scan_type == 'quick' else 100
+        alive_hosts = []
+        http_results = {}
+
+        for i in range(0, len(subdomains), batch_size):
+            batch = subdomains[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(subdomains) + batch_size - 1) // batch_size
+
+            logger.info(f"🔍 Processing HTTP probe batch {batch_num}/{total_batches} ({len(batch)} subdomains)")
+
+            # Update progress
+            progress = 30 + (20 * (i / len(subdomains)))
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'stage': 'http_probing',
+                    'domain': domain,
+                    'progress': int(progress),
+                    'message': f'HTTP probing batch {batch_num}/{total_batches}...',
+                    'current_phase': f'Batch {batch_num}/{total_batches}',
+                    'subdomains_found': len(subdomains),
+                    'batch_size': len(batch)
+                }
+            )
+
+            # Launch HTTP probe task for this batch
+            probe_task = http_probe_task.delay(batch, scan_type)
+            probe_results = probe_task.get(timeout=300)  # 5 minute timeout per batch
+
+            if probe_results.get('success', False):
+                batch_alive = probe_results.get('alive_hosts', [])
+                batch_http_data = probe_results.get('http_data', {})
+
+                alive_hosts.extend(batch_alive)
+                http_results.update(batch_http_data)
+
+                logger.info(f"✅ Batch {batch_num}: {len(batch_alive)} alive hosts found")
+
+        logger.info(f"🌐 Total alive hosts found: {len(alive_hosts)}")
+
+        return {
+            'success': True,
+            'domain': domain,
+            'scan_type': scan_type,
+            'subdomains_found': len(subdomains),
+            'alive_hosts_found': len(alive_hosts),
+            'subdomains': subdomains,
+            'alive_hosts': alive_hosts,
+            'http_results': http_results,
+            'stage': 'http_probing_complete',
+            'progress': 50,
+            'message': f'HTTP probing complete. Found {len(alive_hosts)} alive hosts.'
+        }
+
     except Exception as e:
-        logger.error(f"Scan failed for {domain}: {str(e)}")
-        self.retry(countdown=60, max_retries=3)
+        logger.error(f"❌ Large-scale scan orchestration failed for {domain}: {str(e)}")
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'domain': domain,
+                'error': str(e),
+                'stage': 'failed',
+                'progress': 0
+            }
+        )
+        self.retry(countdown=300, max_retries=2)  # Retry after 5 minutes
         return {
             'success': False,
             'error': str(e),
             'domain': domain,
+            'scan_type': scan_type
+        }
+
+# ============================================================================
+# INDIVIDUAL SCANNING TASKS (Optimized for Large Domains)
+# ============================================================================
+
+@celery.task(bind=True, name='tasks.subdomain_discovery_task')
+def subdomain_discovery_task(self, domain: str, organization_id: int, scan_type: str = 'deep'):
+    """
+    Dedicated task for subdomain discovery using Subfinder
+    Optimized for large domains that may have hundreds/thousands of subdomains
+
+    Args:
+        domain (str): Target domain
+        organization_id (int): Organization ID
+        scan_type (str): Scan intensity (quick, deep, full)
+
+    Returns:
+        dict: Subdomain discovery results
+    """
+    try:
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'subfinder_scanning',
+                'domain': domain,
+                'progress': 0,
+                'message': f'Starting Subfinder scan for {domain}...'
+            }
+        )
+
+        logger.info(f"🔍 Starting Subfinder subdomain discovery for: {domain}")
+
+        # Import scanning service
+        from services.real_scanning_service import RealScanningService
+        scanning_service = RealScanningService()
+
+        # Configure Subfinder based on scan type
+        subfinder_config = {
+            'quick': {
+                'silent': True,
+                'max_time': 60,  # 1 minute for quick scans
+                'recursive': False
+            },
+            'deep': {
+                'silent': True,
+                'max_time': 300,  # 5 minutes for deep scans
+                'recursive': True
+            },
+            'full': {
+                'silent': True,
+                'max_time': 600,  # 10 minutes for full scans
+                'recursive': True,
+                'all_sources': True
+            }
+        }
+
+        config = subfinder_config.get(scan_type, subfinder_config['deep'])
+
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'subfinder_scanning',
+                'domain': domain,
+                'progress': 25,
+                'message': f'Running Subfinder with {scan_type} configuration...',
+                'config': config
+            }
+        )
+
+        # Perform subdomain discovery
+        scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain, **config)
+        subdomains = scan_results.get('subdomains', [])
+
+        logger.info(f"✅ Subfinder completed for {domain}: {len(subdomains)} subdomains discovered")
+
+        # Store subdomains in database
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'storing_subdomains',
+                'domain': domain,
+                'progress': 75,
+                'message': f'Storing {len(subdomains)} subdomains in database...',
+                'subdomains_found': len(subdomains)
+            }
+        )
+
+        # Store discovered subdomains as assets
+        stored_count = 0
+        for subdomain in subdomains:
+            try:
+                # Check if subdomain already exists
+                existing_asset = Asset.query.filter_by(
+                    name=subdomain,
+                    organization_id=organization_id
+                ).first()
+
+                if not existing_asset:
+                    asset = Asset(
+                        name=subdomain,
+                        asset_type=AssetType.SUBDOMAIN,
+                        organization_id=organization_id,
+                        discovered_at=datetime.now(),
+                        is_active=True,
+                        metadata=json.dumps({
+                            'discovery_method': 'subfinder',
+                            'parent_domain': domain,
+                            'scan_type': scan_type
+                        })
+                    )
+                    db.session.add(asset)
+                    stored_count += 1
+
+            except Exception as e:
+                logger.warning(f"Failed to store subdomain {subdomain}: {str(e)}")
+                continue
+
+        db.session.commit()
+        logger.info(f"📊 Stored {stored_count} new subdomains in database")
+
+        return {
+            'success': True,
+            'domain': domain,
+            'subdomains': subdomains,
+            'subdomains_count': len(subdomains),
+            'stored_count': stored_count,
+            'scan_type': scan_type,
+            'config_used': config,
+            'stage': 'complete'
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Subdomain discovery failed for {domain}: {str(e)}")
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'domain': domain,
+                'error': str(e),
+                'stage': 'failed'
+            }
+        )
+        self.retry(countdown=120, max_retries=2)
+        return {
+            'success': False,
+            'error': str(e),
+            'domain': domain,
+            'scan_type': scan_type
+        }
+
+@celery.task(bind=True, name='tasks.http_probe_task')
+def http_probe_task(self, subdomains: List[str], scan_type: str = 'deep'):
+    """
+    Dedicated task for HTTP probing using httpx
+    Processes subdomains in batches to handle large lists efficiently
+
+    Args:
+        subdomains (List[str]): List of subdomains to probe
+        scan_type (str): Scan intensity
+
+    Returns:
+        dict: HTTP probe results
+    """
+    try:
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'http_probing',
+                'subdomains_count': len(subdomains),
+                'progress': 0,
+                'message': f'Starting HTTP probing for {len(subdomains)} subdomains...'
+            }
+        )
+
+        logger.info(f"🌐 Starting HTTP probing for {len(subdomains)} subdomains")
+
+        # Import httpx scanner
+        from tools.httpx import HttpxScanner
+        httpx_scanner = HttpxScanner()
+
+        # Configure httpx based on scan type
+        httpx_config = {
+            'quick': {
+                'ports': [80, 443],
+                'timeout': 5,
+                'threads': 100,
+                'tech_detect': False,
+                'follow_redirects': False
+            },
+            'deep': {
+                'ports': [80, 443, 8080, 8443, 8000, 3000],
+                'timeout': 10,
+                'threads': 50,
+                'tech_detect': True,
+                'follow_redirects': True
+            },
+            'full': {
+                'ports': [80, 443, 8080, 8443, 8000, 3000, 9000, 9090],
+                'timeout': 15,
+                'threads': 30,
+                'tech_detect': True,
+                'follow_redirects': True
+            }
+        }
+
+        config = httpx_config.get(scan_type, httpx_config['deep'])
+
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'http_probing',
+                'subdomains_count': len(subdomains),
+                'progress': 25,
+                'message': f'Probing with httpx using {scan_type} configuration...',
+                'config': config
+            }
+        )
+
+        # Perform HTTP probing
+        probe_results = httpx_scanner.scan(subdomains, **config)
+        alive_hosts = probe_results.get('alive_hosts', [])
+
+        logger.info(f"✅ HTTP probing completed: {len(alive_hosts)} alive hosts found")
+
+        # Process results for storage
+        http_data = {}
+        for host in alive_hosts:
+            hostname = host.get('host', '')
+            if hostname:
+                http_data[hostname] = {
+                    'url': host.get('url', ''),
+                    'status_code': host.get('status_code', 0),
+                    'title': host.get('title', ''),
+                    'tech': host.get('tech', []),
+                    'webserver': host.get('webserver', ''),
+                    'content_length': host.get('content_length', 0),
+                    'response_time': host.get('response_time', ''),
+                    'scheme': host.get('scheme', 'http'),
+                    'port': host.get('port', 80)
+                }
+
+        return {
+            'success': True,
+            'alive_hosts': [host.get('host', '') for host in alive_hosts],
+            'alive_hosts_count': len(alive_hosts),
+            'http_data': http_data,
+            'scan_type': scan_type,
+            'config_used': config,
+            'raw_results': probe_results,
+            'stage': 'complete'
+        }
+
+    except Exception as e:
+        logger.error(f"❌ HTTP probing failed: {str(e)}")
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'stage': 'failed'
+            }
+        )
+        self.retry(countdown=60, max_retries=2)
+        return {
+            'success': False,
+            'error': str(e),
+            'scan_type': scan_type
+        }
+
+@celery.task(bind=True, name='tasks.port_scan_task')
+def port_scan_task(self, alive_hosts: List[str], scan_type: str = 'deep'):
+    """
+    Dedicated task for port scanning using Nmap
+    Optimized for scanning multiple alive hosts efficiently
+
+    Args:
+        alive_hosts (List[str]): List of alive hosts to scan
+        scan_type (str): Scan intensity
+
+    Returns:
+        dict: Port scan results
+    """
+    try:
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'port_scanning',
+                'hosts_count': len(alive_hosts),
+                'progress': 0,
+                'message': f'Starting port scanning for {len(alive_hosts)} hosts...'
+            }
+        )
+
+        logger.info(f"🔍 Starting port scanning for {len(alive_hosts)} alive hosts")
+
+        # Import nmap scanner
+        from tools.nmap import NmapScanner
+        nmap_scanner = NmapScanner()
+
+        # Configure nmap based on scan type
+        nmap_config = {
+            'quick': {
+                'top_ports': 10,  # Top 10 most critical ports
+                'timing': 'T5',   # Insane timing for speed
+                'version_detection': False
+            },
+            'deep': {
+                'top_ports': 20,  # Top 20 critical ports
+                'timing': 'T4',   # Aggressive timing
+                'version_detection': True
+            },
+            'full': {
+                'top_ports': 100,  # Top 100 ports
+                'timing': 'T3',    # Normal timing for accuracy
+                'version_detection': True,
+                'script_scan': True
+            }
+        }
+
+        config = nmap_config.get(scan_type, nmap_config['deep'])
+
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'port_scanning',
+                'hosts_count': len(alive_hosts),
+                'progress': 25,
+                'message': f'Running Nmap with {scan_type} configuration...',
+                'config': config
+            }
+        )
+
+        # Perform port scanning
+        port_results = nmap_scanner.scan(alive_hosts, **config)
+        open_ports = port_results.get('open_ports', [])
+
+        logger.info(f"✅ Port scanning completed: {len(open_ports)} open ports found")
+
+        return {
+            'success': True,
+            'open_ports': open_ports,
+            'open_ports_count': len(open_ports),
+            'scan_type': scan_type,
+            'config_used': config,
+            'raw_results': port_results,
+            'stage': 'complete'
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Port scanning failed: {str(e)}")
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'stage': 'failed'
+            }
+        )
+        self.retry(countdown=120, max_retries=2)
+        return {
+            'success': False,
+            'error': str(e),
+            'scan_type': scan_type
+        }
+
+@celery.task(bind=True, name='tasks.vulnerability_scan_task')
+def vulnerability_scan_task(self, alive_hosts: List[str], scan_type: str = 'deep'):
+    """
+    Dedicated task for vulnerability scanning using Nuclei
+    Optimized for scanning multiple hosts with appropriate templates
+
+    Args:
+        alive_hosts (List[str]): List of alive hosts to scan
+        scan_type (str): Scan intensity
+
+    Returns:
+        dict: Vulnerability scan results
+    """
+    try:
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'vulnerability_scanning',
+                'hosts_count': len(alive_hosts),
+                'progress': 0,
+                'message': f'Starting vulnerability scanning for {len(alive_hosts)} hosts...'
+            }
+        )
+
+        logger.info(f"🔍 Starting vulnerability scanning for {len(alive_hosts)} alive hosts")
+
+        # Import nuclei scanner
+        from tools.nuclei import NucleiScanner
+        nuclei_scanner = NucleiScanner()
+
+        # Configure nuclei based on scan type
+        nuclei_config = {
+            'quick': {
+                'templates': ['http/miscellaneous/'],
+                'rate_limit': 500,
+                'concurrency': 100,
+                'timeout': 60
+            },
+            'deep': {
+                'templates': ['http/', 'network/'],
+                'rate_limit': 100,
+                'concurrency': 25,
+                'timeout': 300
+            },
+            'full': {
+                'templates': ['http/', 'network/', 'ssl/', 'dns/'],
+                'rate_limit': 50,
+                'concurrency': 15,
+                'timeout': 600
+            }
+        }
+
+        config = nuclei_config.get(scan_type, nuclei_config['deep'])
+
+        # Update progress
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'vulnerability_scanning',
+                'hosts_count': len(alive_hosts),
+                'progress': 25,
+                'message': f'Running Nuclei with {scan_type} configuration...',
+                'config': config
+            }
+        )
+
+        # Perform vulnerability scanning
+        vuln_results = nuclei_scanner.scan(alive_hosts, **config)
+        vulnerabilities = vuln_results.get('vulnerabilities', [])
+
+        logger.info(f"✅ Vulnerability scanning completed: {len(vulnerabilities)} vulnerabilities found")
+
+        return {
+            'success': True,
+            'vulnerabilities': vulnerabilities,
+            'vulnerabilities_count': len(vulnerabilities),
+            'scan_type': scan_type,
+            'config_used': config,
+            'raw_results': vuln_results,
+            'stage': 'complete'
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Vulnerability scanning failed: {str(e)}")
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'error': str(e),
+                'stage': 'failed'
+            }
+        )
+        self.retry(countdown=120, max_retries=2)
+        return {
+            'success': False,
+            'error': str(e),
             'scan_type': scan_type
         }
 

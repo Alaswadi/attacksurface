@@ -10,6 +10,9 @@ import random
 import logging
 import socket
 
+# Celery tasks will be imported when needed to avoid circular imports
+CELERY_AVAILABLE = False
+
 # Import scanning service (same as real scanning routes)
 try:
     from services.real_scanning_service import RealScanningService
@@ -859,3 +862,172 @@ def generate_html_report(results):
     </html>
     """
     return html
+
+# ============================================================================
+# CELERY-POWERED LARGE-SCALE SCANNING ENDPOINTS
+# ============================================================================
+
+@api_bp.route('/scan/large-domain', methods=['POST'])
+@login_required
+def start_large_domain_scan():
+    """
+    Start a large-scale domain scan using Celery background tasks
+    Optimized for domains with hundreds/thousands of subdomains
+    """
+    try:
+        # Import Celery tasks here to avoid circular imports
+        try:
+            from tasks import large_domain_scan_orchestrator
+            celery_available = True
+        except ImportError as e:
+            celery_available = False
+            logging.warning(f"❌ API: Celery tasks not available: {str(e)}")
+
+        if not celery_available:
+            return jsonify({
+                'success': False,
+                'error': 'Celery background tasks not available. Large-scale scanning requires Celery workers.',
+                'fallback_endpoint': '/api/scan/assets/subdomain'
+            }), 503
+
+        data = request.get_json()
+        if not data or 'domain' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Domain is required'
+            }), 400
+
+        domain = data['domain'].strip()
+        scan_type = data.get('scan_type', 'deep')  # quick, deep, full
+
+        # Validate scan type
+        if scan_type not in ['quick', 'deep', 'full']:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid scan type. Must be: quick, deep, or full'
+            }), 400
+
+        # Get user's organization
+        org = current_user.organization
+        if not org:
+            return jsonify({
+                'success': False,
+                'error': 'User must belong to an organization'
+            }), 400
+
+        # Start the large-scale scan orchestrator task
+        task = large_domain_scan_orchestrator.delay(domain, org.id, scan_type)
+
+        logging.info(f"🚀 Started large-scale {scan_type} scan for {domain} (Task ID: {task.id})")
+
+        return jsonify({
+            'success': True,
+            'message': f'Large-scale {scan_type} scan started for {domain}',
+            'task_id': task.id,
+            'domain': domain,
+            'scan_type': scan_type,
+            'organization_id': org.id,
+            'status_endpoint': f'/api/scan/celery-status/{task.id}',
+            'estimated_time': {
+                'quick': '5-15 minutes',
+                'deep': '15-45 minutes',
+                'full': '30-90 minutes'
+            }.get(scan_type, '15-45 minutes'),
+            'features': [
+                'Background processing - dashboard remains responsive',
+                'Real-time progress updates',
+                'Automatic subdomain discovery with Subfinder',
+                'HTTP probing with httpx for live host detection',
+                'Port scanning with Nmap (alive hosts only)',
+                'Vulnerability scanning with Nuclei',
+                'Automatic database storage of all results'
+            ]
+        })
+
+    except Exception as e:
+        logging.error(f"Failed to start large-scale scan: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@api_bp.route('/scan/celery-status/<task_id>', methods=['GET'])
+@login_required
+def get_celery_scan_status(task_id):
+    """
+    Get real-time status of a Celery scanning task
+    Provides detailed progress information for large-scale scans
+    """
+    try:
+        # Import Celery here to avoid circular imports
+        try:
+            from celery.result import AsyncResult
+            celery_available = True
+        except ImportError:
+            celery_available = False
+
+        if not celery_available:
+            return jsonify({
+                'success': False,
+                'error': 'Celery not available'
+            }), 503
+
+        # Get task result
+        task = AsyncResult(task_id)
+
+        if task.state == 'PENDING':
+            response = {
+                'success': True,
+                'task_id': task_id,
+                'state': 'PENDING',
+                'status': 'Task is waiting to be processed...',
+                'progress': 0
+            }
+        elif task.state == 'PROGRESS':
+            response = {
+                'success': True,
+                'task_id': task_id,
+                'state': 'PROGRESS',
+                'progress': task.info.get('progress', 0),
+                'stage': task.info.get('stage', 'unknown'),
+                'message': task.info.get('message', 'Processing...'),
+                'domain': task.info.get('domain', ''),
+                'current_phase': task.info.get('current_phase', ''),
+                'subdomains_found': task.info.get('subdomains_found', 0),
+                'alive_hosts_found': task.info.get('alive_hosts_found', 0)
+            }
+        elif task.state == 'SUCCESS':
+            result = task.result
+            response = {
+                'success': True,
+                'task_id': task_id,
+                'state': 'SUCCESS',
+                'progress': 100,
+                'message': 'Scan completed successfully',
+                'result': result
+            }
+        elif task.state == 'FAILURE':
+            response = {
+                'success': False,
+                'task_id': task_id,
+                'state': 'FAILURE',
+                'error': str(task.info),
+                'progress': 0
+            }
+        else:
+            response = {
+                'success': True,
+                'task_id': task_id,
+                'state': task.state,
+                'status': 'Unknown task state',
+                'progress': 0
+            }
+
+        return jsonify(response)
+
+    except Exception as e:
+        logging.error(f"Failed to get task status: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

@@ -114,6 +114,12 @@ def create_app(config_name=None):
         """Real security scanning page"""
         return render_template('real_scanning.html')
 
+    @app.route('/large-scale-scanning')
+    @login_required
+    def large_scale_scanning():
+        """Large-scale scanning page with Celery background tasks"""
+        return render_template('large_scale_scanning.html')
+
     @app.route('/assets')
     @login_required
     def assets():
