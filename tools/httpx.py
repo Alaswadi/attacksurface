@@ -51,7 +51,6 @@ class HttpxScanner(BaseScanner):
             cmd.extend(['-status-code'])  # Include status codes
             cmd.extend(['-title'])        # Extract page titles
             cmd.extend(['-tech-detect'])  # Technology detection
-            cmd.extend(['-follow-redirects'])  # Follow redirects
             
             # Add ports if specified
             ports = kwargs.get('ports')
