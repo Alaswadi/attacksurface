@@ -1474,10 +1474,13 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 ).first()
 
                 if not existing_asset:
+                    # Determine asset type - main domain vs subdomain
+                    asset_type = AssetType.DOMAIN if hostname == domain else AssetType.SUBDOMAIN
+
                     # Create new asset with scanning status
                     asset = Asset(
                         name=hostname,
-                        asset_type=AssetType.SUBDOMAIN,
+                        asset_type=asset_type,
                         organization_id=organization_id,
                         discovered_at=datetime.now(),
                         is_active=True,
@@ -1581,11 +1584,21 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 alive_hosts = [host_data['host'] for host_data in alive_hosts_data if host_data.get('status_code')]
 
                 # Create a dictionary for easier access to HTTP probe data
+                # Map both hostnames and URLs to the data for better matching
                 http_probe_results = {}
                 for host_data in alive_hosts_data:
                     hostname = host_data.get('host', '')
+                    url = host_data.get('url', '')
+
                     if hostname:
                         http_probe_results[hostname] = host_data
+
+                    # Also extract hostname from URL for better matching
+                    if url:
+                        url_hostname_match = re.search(r'https?://([^:/]+)', url)
+                        if url_hostname_match:
+                            url_hostname = url_hostname_match.group(1)
+                            http_probe_results[url_hostname] = host_data
 
                 logger.info(f"🌐 HTTPX: HTTP probing completed, found {len(alive_hosts)} alive hosts from {len(alive_hosts_data)} responses")
 
@@ -1601,27 +1614,35 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
 
                 # Update assets with HTTP probe data progressively
                 http_updated_count = 0
+
+                # Get all progressive scanning assets for better matching
+                all_progressive_assets = Asset.query.filter_by(organization_id=organization_id).filter(
+                    Asset.asset_metadata.op('->>')('scan_source') == 'progressive_large_scale_orchestrator'
+                ).all()
+
                 for hostname, http_data in http_probe_results.items():
                     try:
-                        # Try to find asset by exact hostname match first
-                        existing_asset = Asset.query.filter_by(
-                            name=hostname,
-                            organization_id=organization_id
-                        ).first()
+                        existing_asset = None
+                        matched_hostname = hostname
 
-                        # If not found, try to find by URL hostname (httpx returns URLs)
+                        # Try direct hostname match first
+                        for asset in all_progressive_assets:
+                            if asset.name == hostname:
+                                existing_asset = asset
+                                matched_hostname = asset.name
+                                break
+
+                        # If not found and we have a URL, try to match by URL hostname
                         if not existing_asset and 'url' in http_data:
                             url = http_data['url']
-                            # Extract hostname from URL
-                            hostname_match = re.search(r'https?://([^:/]+)', url)
-                            if hostname_match:
-                                url_hostname = hostname_match.group(1)
-                                existing_asset = Asset.query.filter_by(
-                                    name=url_hostname,
-                                    organization_id=organization_id
-                                ).first()
-                                if existing_asset:
-                                    hostname = url_hostname  # Use the matched hostname
+                            url_hostname_match = re.search(r'https?://([^:/]+)', url)
+                            if url_hostname_match:
+                                url_hostname = url_hostname_match.group(1)
+                                for asset in all_progressive_assets:
+                                    if asset.name == url_hostname:
+                                        existing_asset = asset
+                                        matched_hostname = asset.name
+                                        break
 
                         if existing_asset:
                             existing_metadata = existing_asset.asset_metadata or {}
@@ -1631,7 +1652,7 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                             existing_metadata['last_http_probe'] = datetime.now().isoformat()
                             existing_asset.asset_metadata = existing_metadata
                             http_updated_count += 1
-                            logger.debug(f"✅ Updated {hostname} with HTTP data: {http_data.get('status_code', 'N/A')}")
+                            logger.debug(f"✅ Updated {matched_hostname} with HTTP data: {http_data.get('status_code', 'N/A')}")
                         else:
                             logger.warning(f"⚠️ Asset not found for HTTP update: {hostname}")
 
@@ -1716,10 +1737,26 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 logger.info(f"🔍 NMAP: Port scanning completed, found {len(open_ports_data)} open ports")
 
                 # Group port data by hostname for easier processing
+                # Also create a mapping from IP addresses back to original hostnames
+                ip_to_hostname_map = {}
+                for host_data in alive_hosts_data:
+                    hostname_from_url = None
+                    if 'url' in host_data:
+                        url_match = re.search(r'https?://([^:/]+)', host_data['url'])
+                        if url_match:
+                            hostname_from_url = url_match.group(1)
+
+                    host_ip = host_data.get('host', '')
+                    if host_ip and hostname_from_url:
+                        ip_to_hostname_map[host_ip] = hostname_from_url
+
                 port_scan_results = {}
                 for port_info in open_ports_data:
-                    hostname = port_info.get('host', '')
-                    if hostname:
+                    ip_address = port_info.get('host', '')
+                    if ip_address:
+                        # Try to map IP back to hostname
+                        hostname = ip_to_hostname_map.get(ip_address, ip_address)
+
                         if hostname not in port_scan_results:
                             port_scan_results[hostname] = []
                         port_scan_results[hostname].append(port_info)
@@ -1730,28 +1767,23 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
 
                 # Update assets with port scan data progressively
                 port_updated_count = 0
+
+                # Get all progressive scanning assets for better matching
+                all_progressive_assets = Asset.query.filter_by(organization_id=organization_id).filter(
+                    Asset.asset_metadata.op('->>')('scan_source') == 'progressive_large_scale_orchestrator'
+                ).all()
+
                 for hostname, port_data in port_scan_results.items():
                     try:
-                        # Try to find asset by hostname (nmap might return IP addresses)
-                        existing_asset = Asset.query.filter_by(
-                            name=hostname,
-                            organization_id=organization_id
-                        ).first()
+                        existing_asset = None
+                        matched_hostname = hostname
 
-                        # If hostname is an IP address, try to find asset by matching stored IP
-                        if not existing_asset:
-                            # Try to find any asset that might resolve to this IP
-                            all_assets = Asset.query.filter_by(organization_id=organization_id).filter(
-                                Asset.asset_metadata.op('->>')('scan_source') == 'progressive_large_scale_orchestrator'
-                            ).all()
-
-                            for asset in all_assets:
-                                # Check if this IP matches any stored discovery data
-                                metadata = asset.asset_metadata or {}
-                                if metadata.get('discovered_ip') == hostname:
-                                    existing_asset = asset
-                                    hostname = asset.name  # Use the asset name instead of IP
-                                    break
+                        # Try direct hostname match first
+                        for asset in all_progressive_assets:
+                            if asset.name == hostname:
+                                existing_asset = asset
+                                matched_hostname = asset.name
+                                break
 
                         if existing_asset:
                             existing_metadata = existing_asset.asset_metadata or {}
@@ -1761,7 +1793,7 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                             existing_metadata['last_port_scan'] = datetime.now().isoformat()
                             existing_asset.asset_metadata = existing_metadata
                             port_updated_count += 1
-                            logger.debug(f"✅ Updated {hostname} with {len(port_data)} ports")
+                            logger.debug(f"✅ Updated {matched_hostname} with {len(port_data)} ports")
                         else:
                             logger.warning(f"⚠️ Asset not found for port update: {hostname}")
 
