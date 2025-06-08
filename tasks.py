@@ -104,6 +104,220 @@ def validate_vulnerability_finding(vuln_data, confidence_threshold=70):
     return True
 
 @celery.task(bind=True)
+def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type='deep'):
+    """
+    Asynchronous comprehensive Nuclei vulnerability scan for main domain only
+    Runs without timeout constraints for thorough coverage
+    """
+    logger.info(f"🔍 NUCLEI ASYNC: Starting comprehensive vulnerability scan for main domain: {main_domain}")
+
+    try:
+        with flask_app.app_context():
+            # Import Nuclei scanner
+            from tools.nuclei import NucleiScanner
+            nuclei_scanner = NucleiScanner()
+
+            # Ensure templates are available
+            if not nuclei_scanner.ensure_templates():
+                logger.warning("⚠️ NUCLEI ASYNC: Templates not available, aborting scan")
+                return {'success': False, 'error': 'Templates not available'}
+
+            # Configure Nuclei for comprehensive main domain scanning
+            nuclei_config = {
+                'quick': {
+                    'templates': ['cves/', 'exposures/', 'default-logins/', 'takeovers/'],
+                    'rate_limit': 150,          # Conservative for thoroughness
+                    'concurrency': 25,          # Balanced for stability
+                    'bulk_size': 20,
+                    'scan_strategy': 'host-spray',
+                    'timeout': 15,              # Per-request timeout
+                    'severity': ['critical', 'high'],
+                    'retries': 2,
+                    'max_host_error': 30
+                },
+                'deep': {
+                    'templates': ['cves/', 'exposures/', 'vulnerabilities/', 'misconfiguration/', 'default-logins/', 'takeovers/', 'technologies/'],
+                    'rate_limit': 100,          # Thorough scanning
+                    'concurrency': 20,          # Conservative for reliability
+                    'bulk_size': 15,
+                    'scan_strategy': 'host-spray',
+                    'timeout': 20,              # Extended per-request timeout
+                    'severity': ['critical', 'high', 'medium'],
+                    'retries': 3,
+                    'max_host_error': 50
+                },
+                'comprehensive': {
+                    'templates': ['cves/', 'exposures/', 'vulnerabilities/', 'misconfiguration/', 'default-logins/', 'takeovers/', 'technologies/', 'workflows/'],
+                    'rate_limit': 75,           # Very thorough
+                    'concurrency': 15,          # Maximum stability
+                    'bulk_size': 10,
+                    'scan_strategy': 'host-spray',
+                    'timeout': 30,              # Extended timeout for complex checks
+                    'severity': ['critical', 'high', 'medium', 'low'],
+                    'retries': 3,
+                    'max_host_error': 100,
+                    'include_tags': ['oast'],
+                    'exclude_tags': ['dos', 'intrusive']
+                }
+            }
+
+            config = nuclei_config.get(scan_type, nuclei_config['deep'])
+
+            # Prepare main domain targets (HTTP and HTTPS)
+            main_domain_targets = [
+                f"http://{main_domain}",
+                f"https://{main_domain}"
+            ]
+
+            logger.info(f"🔍 NUCLEI ASYNC: Scanning main domain with config: {config}")
+            logger.info(f"🔍 NUCLEI ASYNC: Targets: {main_domain_targets}")
+
+            # Update task state
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'stage': 'nuclei_main_domain_scanning',
+                    'domain': main_domain,
+                    'message': f'Performing comprehensive vulnerability scan on {main_domain}...',
+                    'targets': main_domain_targets,
+                    'config': config
+                }
+            )
+
+            # Perform comprehensive vulnerability scanning (no timeout limit)
+            vuln_results = nuclei_scanner.scan(main_domain_targets, **config)
+            raw_vulnerabilities = vuln_results.get('vulnerabilities', [])
+
+            logger.info(f"🔍 NUCLEI ASYNC: Found {len(raw_vulnerabilities)} potential vulnerabilities")
+
+            # Validate and score vulnerabilities
+            vulnerability_results = []
+            validated_count = 0
+
+            for vuln_data in raw_vulnerabilities:
+                confidence = calculate_vulnerability_confidence(vuln_data)
+                vuln_data['confidence_score'] = confidence
+
+                if validate_vulnerability_finding(vuln_data, confidence_threshold=70):
+                    vulnerability_results.append(vuln_data)
+                    validated_count += 1
+
+            logger.info(f"🔍 NUCLEI ASYNC: Validated {validated_count}/{len(raw_vulnerabilities)} vulnerabilities")
+
+            # Store vulnerabilities in database
+            from models import Vulnerability, SeverityLevel, Asset
+
+            severity_mapping = {
+                'critical': SeverityLevel.CRITICAL,
+                'high': SeverityLevel.HIGH,
+                'medium': SeverityLevel.MEDIUM,
+                'low': SeverityLevel.LOW,
+                'info': SeverityLevel.INFO
+            }
+
+            vulnerabilities_stored = 0
+
+            # Find the main domain asset
+            main_domain_asset = Asset.query.filter_by(
+                name=main_domain,
+                organization_id=organization_id
+            ).first()
+
+            if main_domain_asset:
+                for vuln_data in vulnerability_results:
+                    try:
+                        # Map severity
+                        severity_str = vuln_data.get('severity', 'medium').lower()
+                        severity = severity_mapping.get(severity_str, SeverityLevel.MEDIUM)
+
+                        # Create vulnerability record
+                        vulnerability = Vulnerability(
+                            title=vuln_data.get('template_name', 'Unknown Vulnerability'),
+                            description=vuln_data.get('description', ''),
+                            severity=severity,
+                            asset_id=main_domain_asset.id,
+                            organization_id=organization_id,
+                            discovered_at=datetime.now(),
+                            cve_id=vuln_data.get('cve_id'),
+                            is_resolved=False
+                        )
+                        db.session.add(vulnerability)
+
+                        # Update asset metadata
+                        if main_domain_asset.asset_metadata:
+                            existing_metadata = main_domain_asset.asset_metadata.copy()
+                            if 'vulnerabilities' not in existing_metadata:
+                                existing_metadata['vulnerabilities'] = []
+
+                            vuln_metadata = {
+                                'template_name': vuln_data.get('template_name', ''),
+                                'severity': severity_str,
+                                'description': vuln_data.get('description', ''),
+                                'confidence_score': vuln_data.get('confidence_score', 0),
+                                'discovered_at': datetime.now().isoformat()
+                            }
+                            if vuln_data.get('cve_id'):
+                                vuln_metadata['cve_id'] = vuln_data.get('cve_id')
+
+                            existing_metadata['vulnerabilities'].append(vuln_metadata)
+                            existing_metadata['nuclei_scan_status'] = 'completed'
+                            existing_metadata['nuclei_scan_completed_at'] = datetime.now().isoformat()
+                            main_domain_asset.asset_metadata = existing_metadata
+                            vulnerabilities_stored += 1
+
+                    except Exception as e:
+                        logger.error(f"❌ NUCLEI ASYNC: Vulnerability storage failed: {str(e)}")
+                        continue
+
+                # Commit all vulnerability updates
+                try:
+                    db.session.commit()
+                    logger.info(f"📊 NUCLEI ASYNC: Stored {vulnerabilities_stored} vulnerabilities for {main_domain}")
+                except Exception as e:
+                    logger.error(f"❌ NUCLEI ASYNC: Database commit failed: {str(e)}")
+                    db.session.rollback()
+            else:
+                logger.warning(f"⚠️ NUCLEI ASYNC: Main domain asset not found: {main_domain}")
+
+            # Final success state
+            self.update_state(
+                state='SUCCESS',
+                meta={
+                    'stage': 'nuclei_completed',
+                    'domain': main_domain,
+                    'vulnerabilities_found': len(vulnerability_results),
+                    'vulnerabilities_stored': vulnerabilities_stored,
+                    'message': f'Comprehensive vulnerability scan completed for {main_domain}'
+                }
+            )
+
+            return {
+                'success': True,
+                'domain': main_domain,
+                'vulnerabilities_found': len(vulnerability_results),
+                'vulnerabilities_stored': vulnerabilities_stored,
+                'scan_type': scan_type,
+                'message': 'Comprehensive Nuclei scan completed successfully'
+            }
+
+    except Exception as e:
+        logger.error(f"❌ NUCLEI ASYNC: Comprehensive scan failed for {main_domain}: {str(e)}")
+        self.update_state(
+            state='FAILURE',
+            meta={
+                'domain': main_domain,
+                'error': str(e),
+                'stage': 'nuclei_failed'
+            }
+        )
+        return {
+            'success': False,
+            'domain': main_domain,
+            'error': str(e),
+            'message': 'Comprehensive Nuclei scan failed'
+        }
+
+@celery.task(bind=True)
 def test_task(self):
     """Test task to verify Celery is working"""
     logger.info("Test task executed successfully")
@@ -1935,381 +2149,141 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
         else:
             logger.warning(f"⚠️ Skipping port scanning - no alive hosts found (alive_hosts: {len(alive_hosts)})")
 
-        # PROGRESSIVE STAGE 4: Nuclei Vulnerability Scanning
+        # PROGRESSIVE STAGE 4: Launch Asynchronous Nuclei Scan for Main Domain Only
         vulnerability_results = []
         vulnerabilities_stored_count = 0
+        nuclei_task_id = None
 
-        if alive_hosts and len(alive_hosts) > 0:
-            try:
-                self.update_state(
-                    state='PROGRESS',
-                    meta={
-                        'stage': 'vulnerability_scanning',
-                        'domain': domain,
-                        'progress': 75,
-                        'message': f'Running vulnerability scanning on {len(alive_hosts)} alive hosts...',
-                        'current_phase': 'Nuclei vulnerability scanning',
-                        'subdomains_found': len(subdomains),
-                        'alive_hosts_found': len(alive_hosts),
-                        'progressive_update': {
-                            'type': 'vulnerability_scanning_started',
-                            'alive_hosts_count': len(alive_hosts),
-                            'timestamp': datetime.now().isoformat()
-                        }
+        # Launch comprehensive Nuclei scan for main domain only (asynchronous)
+        try:
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'stage': 'launching_nuclei_scan',
+                    'domain': domain,
+                    'progress': 75,
+                    'message': f'Launching comprehensive vulnerability scan for main domain: {domain}',
+                    'current_phase': 'Starting asynchronous Nuclei scan',
+                    'subdomains_found': len(subdomains),
+                    'alive_hosts_found': len(alive_hosts),
+                    'progressive_update': {
+                        'type': 'nuclei_scan_launched',
+                        'main_domain': domain,
+                        'timestamp': datetime.now().isoformat()
                     }
-                )
+                }
+            )
 
-                # Import Nuclei scanner and ensure templates are available
-                from tools.nuclei import NucleiScanner
-                nuclei_scanner = NucleiScanner()
+            # Launch asynchronous comprehensive Nuclei scan for main domain
+            nuclei_task = comprehensive_nuclei_scan_task.delay(domain, organization_id, scan_type)
+            nuclei_task_id = nuclei_task.id
 
-                # Ensure Nuclei templates are available
-                logger.info("🔍 NUCLEI: Checking template availability...")
-                templates_available = nuclei_scanner.ensure_templates()
+            logger.info(f"🚀 PROGRESSIVE: Launched asynchronous Nuclei scan for {domain} (Task ID: {nuclei_task_id})")
 
-                if not templates_available:
-                    logger.warning("⚠️ NUCLEI: Templates not available, skipping vulnerability scanning")
-                    vulnerability_results = []
-                else:
-                    logger.info("✅ NUCLEI: Templates verified and ready")
-
-                    # Configure Nuclei with optimized, reliable settings based on research
-                    nuclei_config = {
-                        'quick': {
-                            # Tier 1: High-confidence templates with minimal false positives
-                            'templates': ['cves/', 'exposures/', 'default-logins/', 'takeovers/'],
-                            'rate_limit': 200,          # Conservative for reliability
-                            'concurrency': 30,          # Balanced concurrency
-                            'bulk_size': 25,            # Smaller bulk for stability
-                            'scan_strategy': 'host-spray',
-                            'timeout': 8,               # Longer timeout for reliability
-                            'severity': ['critical', 'high'],
-                            'retries': 1,               # Retry failed requests
-                            'max_host_error': 20        # Skip problematic hosts
-                        },
-                        'deep': {
-                            # Tier 2: Comprehensive coverage with validation
-                            'templates': ['cves/', 'exposures/', 'vulnerabilities/', 'misconfiguration/', 'default-logins/', 'takeovers/', 'technologies/'],
-                            'rate_limit': 150,          # Moderate rate for stability
-                            'concurrency': 25,          # Conservative concurrency
-                            'bulk_size': 20,            # Smaller bulk for complex scans
-                            'scan_strategy': 'host-spray',
-                            'timeout': 12,              # Extended timeout
-                            'severity': ['critical', 'high', 'medium'],
-                            'retries': 2,               # More retries for deep scan
-                            'max_host_error': 30
-                        },
-                        'comprehensive': {
-                            # Tier 3: Full coverage with extensive validation
-                            'templates': ['cves/', 'exposures/', 'vulnerabilities/', 'misconfiguration/', 'default-logins/', 'takeovers/', 'technologies/', 'workflows/'],
-                            'rate_limit': 100,          # Conservative for comprehensive
-                            'concurrency': 20,          # Lower concurrency for stability
-                            'bulk_size': 15,            # Small bulk for complex templates
-                            'scan_strategy': 'host-spray',
-                            'timeout': 15,              # Extended timeout for complex checks
-                            'severity': ['critical', 'high', 'medium', 'low'],
-                            'retries': 3,
-                            'max_host_error': 50,
-                            'include_tags': ['oast'],   # Include out-of-band testing
-                            'exclude_tags': ['dos', 'intrusive']  # Exclude potentially harmful tests
-                        }
+            # Continue with immediate completion of other assets
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'stage': 'nuclei_launched_continuing',
+                    'domain': domain,
+                    'progress': 80,
+                    'message': f'Nuclei scan launched for {domain}, completing other assets...',
+                    'current_phase': 'Parallel processing - Nuclei running in background',
+                    'subdomains_found': len(subdomains),
+                    'alive_hosts_found': len(alive_hosts),
+                    'nuclei_task_id': nuclei_task_id,
+                    'progressive_update': {
+                        'type': 'parallel_processing_active',
+                        'nuclei_task_id': nuclei_task_id,
+                        'timestamp': datetime.now().isoformat()
                     }
+                }
+            )
 
-                    config = nuclei_config.get(scan_type, nuclei_config['deep'])
-                    logger.info(f"🔍 NUCLEI: Starting vulnerability scan with config: {config}")
+        except Exception as e:
+            logger.error(f"❌ Failed to launch Nuclei scan: {str(e)}")
+            logger.info("🔄 Continuing with asset completion without Nuclei scan")
 
-                    # Debug: Log what alive_hosts contains
-                    logger.info(f"🔍 NUCLEI: alive_hosts type: {type(alive_hosts)}")
-                    logger.info(f"🔍 NUCLEI: alive_hosts content: {alive_hosts[:5] if len(alive_hosts) > 5 else alive_hosts}")
-
-                    # Optimized target preparation for Nuclei scanning
-                    nuclei_targets = set()
-                    domain_protocols = {}  # Track which protocols work for each domain
-
-                    # 1. Add URLs from alive hosts (httpx results) - use actual working URLs
-                    for host in alive_hosts:
-                        if isinstance(host, str):
-                            # If it's just a hostname, we need to determine protocol
-                            if not host.startswith(('http://', 'https://')):
-                                # Default to HTTPS first, then HTTP as fallback
-                                domain_protocols[host] = 'https'
-                                nuclei_targets.add(f"https://{host}")
-                            else:
-                                # Extract domain and protocol from full URL
-                                if host.startswith('https://'):
-                                    domain = host.replace('https://', '').split('/')[0].split(':')[0]
-                                    domain_protocols[domain] = 'https'
-                                elif host.startswith('http://'):
-                                    domain = host.replace('http://', '').split('/')[0].split(':')[0]
-                                    domain_protocols[domain] = 'http'
-                                nuclei_targets.add(host)
-                        elif isinstance(host, dict) and 'url' in host:
-                            # Use the validated URL from httpx (this is the actual working URL)
-                            url = host['url']
-                            nuclei_targets.add(url)
-                            # Track the working protocol for this domain
-                            if url.startswith('https://'):
-                                domain = url.replace('https://', '').split('/')[0].split(':')[0]
-                                domain_protocols[domain] = 'https'
-                            elif url.startswith('http://'):
-                                domain = url.replace('http://', '').split('/')[0].split(':')[0]
-                                domain_protocols[domain] = 'http'
-                        elif isinstance(host, dict) and 'host' in host:
-                            # Use host data but prefer the working protocol
-                            hostname = host['host']
-                            if not hostname.startswith(('http://', 'https://')):
-                                # Check if we already know the working protocol for this domain
-                                if hostname in domain_protocols:
-                                    protocol = domain_protocols[hostname]
-                                    nuclei_targets.add(f"{protocol}://{hostname}")
-                                else:
-                                    # Default to HTTPS
-                                    domain_protocols[hostname] = 'https'
-                                    nuclei_targets.add(f"https://{hostname}")
-                            else:
-                                nuclei_targets.add(hostname)
-
-                    # 2. Add additional targets from port scan results
-                    if port_scan_results:
-                        logger.info(f"🔍 NUCLEI: Processing {len(port_scan_results)} port scan results")
-                        for port_data in port_scan_results:
-                            # Handle different port scan result formats
-                            if isinstance(port_data, dict):
-                                host = port_data.get('host', '')
-                                port = port_data.get('port', 0)
-                            elif isinstance(port_data, str):
-                                # Skip string entries for now - they might be summary info
-                                logger.debug(f"🔍 NUCLEI: Skipping string port data: {port_data}")
-                                continue
-                            else:
-                                logger.debug(f"🔍 NUCLEI: Unknown port data format: {type(port_data)}")
-                                continue
-
-                            if host and port:
-                                # Check if we already have a preferred protocol for this domain
-                                preferred_protocol = domain_protocols.get(host, None)
-
-                                # Web service ports
-                                if port in [80, 8080, 8000, 3000, 9000]:
-                                    nuclei_targets.add(f"http://{host}:{port}")
-                                elif port in [443, 8443, 9443]:
-                                    nuclei_targets.add(f"https://{host}:{port}")
-                                # Management interfaces - use preferred protocol if known
-                                elif port in [8080, 8443, 9090, 9443, 8888, 8889]:
-                                    if preferred_protocol:
-                                        nuclei_targets.add(f"{preferred_protocol}://{host}:{port}")
-                                    else:
-                                        # Default to HTTPS for management interfaces
-                                        nuclei_targets.add(f"https://{host}:{port}")
-                    else:
-                        logger.info("🔍 NUCLEI: No port scan results to process")
-
-                    # 3. Convert to list and validate
-                    nuclei_targets = list(nuclei_targets)
-
-                    # 4. Filter out invalid or problematic targets
-                    validated_targets = []
-                    for target in nuclei_targets:
-                        # Basic URL validation
-                        if target.startswith(('http://', 'https://')) and '.' in target:
-                            # Skip obviously internal IPs for external scans (optional)
-                            if not any(internal in target for internal in ['127.0.0.1', 'localhost', '192.168.', '10.', '172.16.']):
-                                validated_targets.append(target)
-
-                    nuclei_targets = validated_targets
-                    logger.info(f"🔍 NUCLEI: Prepared {len(nuclei_targets)} validated target URLs")
-                    logger.info(f"🔍 NUCLEI: Sample targets: {nuclei_targets[:5] if len(nuclei_targets) > 5 else nuclei_targets}")
-
-                    # Perform vulnerability scanning with enhanced error handling
-                    try:
-                        logger.info(f"🔍 NUCLEI: Starting scan of {len(nuclei_targets)} targets with {scan_type} configuration")
-                        vuln_results = nuclei_scanner.scan(nuclei_targets, **config)
-                        raw_vulnerabilities = vuln_results.get('vulnerabilities', [])
-                        logger.info(f"🔍 NUCLEI: Raw scan found {len(raw_vulnerabilities)} potential vulnerabilities")
-
-                        # Validate and score vulnerabilities
-                        vulnerability_results = []
-                        validated_count = 0
-
-                        for vuln_data in raw_vulnerabilities:
-                            # Calculate confidence score
-                            confidence = calculate_vulnerability_confidence(vuln_data)
-                            vuln_data['confidence_score'] = confidence
-
-                            # Validate vulnerability
-                            if validate_vulnerability_finding(vuln_data, confidence_threshold=70):
-                                vulnerability_results.append(vuln_data)
-                                validated_count += 1
-
-                        logger.info(f"🔍 NUCLEI: Validated {validated_count}/{len(raw_vulnerabilities)} vulnerabilities (filtered {len(raw_vulnerabilities) - validated_count} low-confidence findings)")
-
-                    except Exception as scan_error:
-                        if "timed out" in str(scan_error).lower():
-                            logger.warning(f"⚠️ NUCLEI: Scan timed out, continuing without vulnerability results")
-                            vulnerability_results = []
-                        else:
-                            logger.error(f"❌ NUCLEI: Scan failed with error: {str(scan_error)}")
-                            raise scan_error
-
-                    # Store vulnerabilities in database and update asset metadata
-                    from models import Vulnerability, SeverityLevel
-
-                    severity_mapping = {
-                        'critical': SeverityLevel.CRITICAL,
-                        'high': SeverityLevel.HIGH,
-                        'medium': SeverityLevel.MEDIUM,
-                        'low': SeverityLevel.LOW,
-                        'info': SeverityLevel.INFO
-                    }
-
-                    for vuln_data in vulnerability_results:
-                        try:
-                            # Find the asset for this vulnerability
-                            vuln_host = vuln_data.get('host', '').replace('http://', '').replace('https://', '').split(':')[0]
-                            asset = Asset.query.filter_by(
-                                name=vuln_host,
-                                organization_id=organization_id
-                            ).first()
-
-                            if asset:
-                                # Map severity
-                                severity_str = vuln_data.get('severity', 'medium').lower()
-                                severity = severity_mapping.get(severity_str, SeverityLevel.MEDIUM)
-
-                                # Create vulnerability record
-                                vulnerability = Vulnerability(
-                                    title=vuln_data.get('template_name', 'Unknown Vulnerability'),
-                                    description=vuln_data.get('description', ''),
-                                    severity=severity,
-                                    asset_id=asset.id,
-                                    organization_id=organization_id,
-                                    discovered_at=datetime.now(),
-                                    cve_id=vuln_data.get('cve_id'),
-                                    is_resolved=False
-                                )
-                                db.session.add(vulnerability)
-
-                                # Update asset metadata with vulnerability info
-                                if asset.asset_metadata:
-                                    existing_metadata = asset.asset_metadata.copy()
-                                    if 'vulnerabilities' not in existing_metadata:
-                                        existing_metadata['vulnerabilities'] = []
-
-                                    vuln_metadata = {
-                                        'template_name': vuln_data.get('template_name', ''),
-                                        'severity': severity_str,
-                                        'description': vuln_data.get('description', ''),
-                                        'discovered_at': datetime.now().isoformat()
-                                    }
-                                    if vuln_data.get('cve_id'):
-                                        vuln_metadata['cve_id'] = vuln_data.get('cve_id')
-
-                                    existing_metadata['vulnerabilities'].append(vuln_metadata)
-                                    existing_metadata['scan_status'] = 'vuln_complete'
-                                    asset.asset_metadata = existing_metadata
-                                    vulnerabilities_stored_count += 1
-
-                        except Exception as e:
-                            logger.error(f"❌ Vulnerability storage failed for {vuln_data.get('host', 'unknown')}: {str(e)}")
-                            continue
-
-                    # Commit vulnerability updates
-                    try:
-                        db.session.commit()
-                        logger.info(f"📊 Progressive vulnerability scanning: Stored {vulnerabilities_stored_count} vulnerabilities")
-                    except Exception as e:
-                        logger.error(f"❌ Vulnerability commit failed: {str(e)}")
-                        db.session.rollback()
-
-                    # Send progressive update for vulnerability scanning
-                    self.update_state(
-                        state='PROGRESS',
-                        meta={
-                            'stage': 'vulnerability_scanning_complete',
-                            'domain': domain,
-                            'progress': 90,
-                            'message': f'Vulnerability scanning completed, found {len(vulnerability_results)} vulnerabilities...',
-                            'current_phase': 'Vulnerability scanning complete - Finalizing',
-                            'subdomains_found': len(subdomains),
-                            'alive_hosts_found': len(alive_hosts),
-                            'port_scan_results': len(port_scan_results),
-                            'vulnerabilities_found': len(vulnerability_results),
-                            'progressive_update': {
-                                'type': 'vulnerability_scanning_complete',
-                                'vulnerabilities_stored': vulnerabilities_stored_count,
-                                'vulnerabilities_found': len(vulnerability_results),
-                                'timestamp': datetime.now().isoformat()
-                            }
-                        }
-                    )
-
-            except Exception as e:
-                logger.error(f"❌ Vulnerability scanning failed: {str(e)}")
-                logger.exception("Vulnerability scanning exception details:")
-        else:
-            logger.warning(f"⚠️ Skipping vulnerability scanning - no alive hosts found (alive_hosts: {len(alive_hosts)})")
-
-        # PROGRESSIVE STAGE 5: Final Completion
+        # PROGRESSIVE STAGE 5: Final Completion (Parallel Processing)
         self.update_state(
             state='PROGRESS',
             meta={
                 'stage': 'finalizing',
                 'domain': domain,
                 'progress': 95,
-                'message': f'Marking all assets as completed...',
-                'current_phase': 'Finalizing progressive scan',
+                'message': f'Completing asset discovery (Nuclei scan running in background)...',
+                'current_phase': 'Finalizing progressive scan - Parallel Nuclei processing',
                 'subdomains_found': len(subdomains),
                 'alive_hosts_found': len(alive_hosts),
-                'vulnerabilities_found': len(vulnerability_results),
+                'nuclei_task_id': nuclei_task_id,
+                'nuclei_status': 'running_async' if nuclei_task_id else 'not_launched',
                 'progressive_update': {
-                    'type': 'finalizing',
+                    'type': 'finalizing_with_parallel_nuclei',
+                    'nuclei_task_id': nuclei_task_id,
                     'timestamp': datetime.now().isoformat()
                 }
             }
         )
 
-        # Mark all progressive scanning assets as completed
+        # Mark non-main-domain assets as completed, leave main domain for Nuclei
         try:
-            completed_assets = Asset.query.filter_by(organization_id=organization_id).filter(
+            # Get all progressive scanning assets except the main domain
+            all_progressive_assets = Asset.query.filter_by(organization_id=organization_id).filter(
                 Asset.asset_metadata.op('->>')('scan_source') == 'progressive_large_scale_orchestrator'
             ).filter(
                 Asset.asset_metadata.op('->>')('scan_status').in_(['scanning', 'http_complete', 'port_complete'])
             ).all()
 
             completed_count = 0
-            for asset in completed_assets:
+            main_domain_asset_updated = False
+
+            for asset in all_progressive_assets:
                 if asset.asset_metadata:
                     existing_metadata = asset.asset_metadata.copy()
-                    existing_metadata['scan_status'] = 'completed'
-                    existing_metadata['scan_completed_at'] = datetime.now().isoformat()
+
+                    # Check if this is the main domain
+                    if asset.name == domain:
+                        # Mark main domain as awaiting Nuclei results
+                        existing_metadata['scan_status'] = 'awaiting_nuclei'
+                        existing_metadata['nuclei_task_id'] = nuclei_task_id
+                        existing_metadata['nuclei_launched_at'] = datetime.now().isoformat()
+                        main_domain_asset_updated = True
+                        logger.info(f"📊 Main domain {domain} marked as awaiting Nuclei results")
+                    else:
+                        # Mark other assets as completed
+                        existing_metadata['scan_status'] = 'completed'
+                        existing_metadata['scan_completed_at'] = datetime.now().isoformat()
+                        completed_count += 1
+
                     asset.asset_metadata = existing_metadata
                     asset.last_scanned = datetime.now()
-                    completed_count += 1
 
             db.session.commit()
-            logger.info(f"📊 Progressive completion: Marked {completed_count} assets as completed")
+            logger.info(f"📊 Progressive completion: Marked {completed_count} non-main-domain assets as completed")
+            if main_domain_asset_updated:
+                logger.info(f"📊 Main domain {domain} status updated to awaiting Nuclei scan")
 
         except Exception as e:
             logger.error(f"❌ Progressive completion failed: {str(e)}")
             db.session.rollback()
 
-        # Final success update
+        # Final success update - Progressive scan completed, Nuclei running async
         self.update_state(
             state='SUCCESS',
             meta={
-                'stage': 'completed',
+                'stage': 'completed_with_async_nuclei',
                 'domain': domain,
                 'progress': 100,
-                'message': f'Progressive scanning completed successfully!',
-                'current_phase': 'Completed',
+                'message': f'Progressive scanning completed! Nuclei scan running in background for {domain}',
+                'current_phase': 'Completed - Nuclei processing main domain asynchronously',
                 'subdomains_found': len(subdomains),
                 'alive_hosts_found': len(alive_hosts),
-                'vulnerabilities_found': len(vulnerability_results),
-                'vulnerabilities_stored': vulnerabilities_stored_count,
+                'nuclei_task_id': nuclei_task_id,
+                'nuclei_status': 'running_async' if nuclei_task_id else 'not_launched',
                 'progressive_update': {
-                    'type': 'scan_completed',
-                    'vulnerabilities_found': len(vulnerability_results),
-                    'vulnerabilities_stored': vulnerabilities_stored_count,
+                    'type': 'scan_completed_with_async_nuclei',
+                    'nuclei_task_id': nuclei_task_id,
+                    'main_domain': domain,
                     'timestamp': datetime.now().isoformat()
                 }
             }
@@ -2324,9 +2298,9 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
             'alive_hosts_found': len(alive_hosts),
             'http_probe_results': len(http_probe_results),
             'port_scan_results': len(port_scan_results),
-            'vulnerabilities_found': len(vulnerability_results),
-            'vulnerabilities_stored': vulnerabilities_stored_count,
-            'message': 'Progressive scanning orchestrator completed successfully with vulnerability scanning'
+            'nuclei_task_id': nuclei_task_id,
+            'nuclei_status': 'running_async' if nuclei_task_id else 'not_launched',
+            'message': 'Progressive scanning completed successfully with asynchronous Nuclei scan for main domain'
         }
 
     except Exception as e:

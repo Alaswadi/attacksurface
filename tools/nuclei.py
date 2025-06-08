@@ -12,7 +12,7 @@ class NucleiScanner(BaseScanner):
     
     def __init__(self, tool_path: Optional[str] = None):
         super().__init__('nuclei', tool_path)
-        self.timeout = 180  # 3 minutes for vulnerability scanning (reduced from 10 minutes)
+        self.timeout = None  # No timeout for comprehensive vulnerability scanning
     
     def scan(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """
