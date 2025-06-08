@@ -112,30 +112,44 @@ class RedisChecker:
             logger.error(f"Failed to get Redis info: {str(e)}")
             return None
 
-def check_redis_availability(redis_url='redis://localhost:6379/0'):
+def check_redis_availability(redis_url=None):
     """
     Quick function to check if Redis is available
-    
+    Uses environment variables for Docker compatibility
+
     Args:
-        redis_url (str): Redis connection URL
-        
+        redis_url (str): Redis connection URL (optional, uses env vars if not provided)
+
     Returns:
         tuple: (is_available, error_message)
     """
+    import os
+
+    # Use environment variable if available (Docker), otherwise default to localhost
+    if redis_url is None:
+        redis_url = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+
     checker = RedisChecker(redis_url)
     is_available = checker.check_connection()
     return is_available, checker.error_message
 
-def get_redis_status_message(redis_url='redis://localhost:6379/0'):
+def get_redis_status_message(redis_url=None):
     """
     Get a user-friendly status message about Redis availability
-    
+    Uses environment variables for Docker compatibility
+
     Args:
-        redis_url (str): Redis connection URL
-        
+        redis_url (str): Redis connection URL (optional, uses env vars if not provided)
+
     Returns:
         dict: Status message with recommendations
     """
+    import os
+
+    # Use environment variable if available (Docker), otherwise default to localhost
+    if redis_url is None:
+        redis_url = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+
     is_available, error_message = check_redis_availability(redis_url)
     
     if is_available:

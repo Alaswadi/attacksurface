@@ -5,6 +5,7 @@ from config import config
 from models import db, User, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, AlertType
 from forms import LoginForm, RegisterForm
 import os
+import logging
 from datetime import datetime, timedelta
 import random
 from celery import Celery
@@ -60,10 +61,17 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate = Migrate(app, db)
 
-    # Initialize Redis checker
-    broker_url = app.config.get('broker_url') or 'redis://localhost:6379/0'
+    # Initialize Redis checker with environment-aware URL
+    import os
+    broker_url = (
+        app.config.get('broker_url') or
+        os.environ.get('CELERY_BROKER_URL') or
+        'redis://localhost:6379/0'
+    )
     redis_available = initialize_redis_checker(broker_url)
     app.config['REDIS_AVAILABLE'] = redis_available
+
+    logging.info(f"🔍 Redis connection check using URL: {broker_url.replace(':password@', ':***@') if ':' in broker_url else broker_url}")
 
     # Initialize Celery
     celery = make_celery(app)
