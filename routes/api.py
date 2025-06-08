@@ -387,10 +387,50 @@ def scan_assets_subdomain():
             scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain)
             logging.info(f"🔍 ASSETS: Subfinder completed, found {len(scan_results.get('subdomains', []))} subdomains")
 
-            # Step 2: Port scanning with Nmap on discovered subdomains
+            # Step 2: HTTP probing with httpx on discovered subdomains
             subdomains_found = scan_results.get('subdomains', [])
             all_ports = {}
+            http_probe_results = {}
 
+            if subdomains_found:
+                # Extract subdomain hosts for HTTP probing
+                hosts_to_probe = [subdomain_data.get('host', '') if isinstance(subdomain_data, dict) else str(subdomain_data)
+                               for subdomain_data in subdomains_found]
+                hosts_to_probe = [host for host in hosts_to_probe if host]  # Remove empty hosts
+
+                # Add the main domain to HTTP probing
+                if domain not in hosts_to_probe:
+                    hosts_to_probe.append(domain)
+
+                if hosts_to_probe:
+                    logging.info(f"🌐 ASSETS: Starting HTTP probing with httpx for {len(hosts_to_probe)} hosts")
+                    try:
+                        httpx_results = scanning_service.scanner_manager.httpx_scan_only(hosts_to_probe)
+                        alive_hosts = httpx_results.get('alive_hosts', [])
+
+                        # Process HTTP probe results
+                        for host_info in alive_hosts:
+                            host = host_info.get('host', host_info.get('url', ''))
+                            if '://' in host:
+                                host = host.split('://', 1)[1].split('/')[0]  # Extract hostname from URL
+
+                            http_probe_results[host] = {
+                                'status_code': host_info.get('status_code'),
+                                'title': host_info.get('title', ''),
+                                'technologies': host_info.get('tech', []),
+                                'content_length': host_info.get('content_length'),
+                                'webserver': host_info.get('webserver', ''),
+                                'last_http_probe': datetime.utcnow().isoformat(),
+                                'url': host_info.get('url', ''),
+                                'scheme': host_info.get('scheme', 'http')
+                            }
+
+                        logging.info(f"🌐 ASSETS: HTTP probing completed, {len(alive_hosts)} hosts are alive")
+                    except Exception as httpx_error:
+                        logging.warning(f"🌐 ASSETS: HTTP probing failed: {str(httpx_error)}")
+                        http_probe_results = {}
+
+            # Step 3: Port scanning with Nmap on discovered subdomains
             if subdomains_found:
                 # Extract subdomain hosts for port scanning
                 hosts_to_scan = [subdomain_data.get('host', '') if isinstance(subdomain_data, dict) else str(subdomain_data)
@@ -463,7 +503,8 @@ def scan_assets_subdomain():
         if not main_domain_asset:
             asset_metadata = {
                 'ports': domain_ports,
-                'scan_source': 'subfinder_nmap'
+                'scan_source': 'subfinder_httpx_nmap',
+                'http_probe': http_probe_results.get(domain, {})
             }
             main_domain_asset = Asset(
                 name=domain,
@@ -475,10 +516,11 @@ def scan_assets_subdomain():
             )
             db.session.add(main_domain_asset)
         else:
-            # Update existing domain asset with port information
+            # Update existing domain asset with port and HTTP probe information
             existing_metadata = main_domain_asset.asset_metadata or {}
             existing_metadata['ports'] = domain_ports
-            existing_metadata['scan_source'] = 'subfinder_nmap'
+            existing_metadata['scan_source'] = 'subfinder_httpx_nmap'
+            existing_metadata['http_probe'] = http_probe_results.get(domain, {})
             main_domain_asset.asset_metadata = existing_metadata
             main_domain_asset.last_scanned = datetime.utcnow()
 
@@ -505,10 +547,11 @@ def scan_assets_subdomain():
             ).first()
 
             if not existing_asset:
-                # Create new subdomain asset with port information
+                # Create new subdomain asset with port and HTTP probe information
                 asset_metadata = {
                     'ports': ports_info,
-                    'scan_source': 'subfinder_nmap'
+                    'scan_source': 'subfinder_httpx_nmap',
+                    'http_probe': http_probe_results.get(subdomain_name, {})
                 }
                 subdomain_asset = Asset(
                     name=subdomain_name,
@@ -521,10 +564,11 @@ def scan_assets_subdomain():
                 db.session.add(subdomain_asset)
                 subdomains_added += 1
             else:
-                # Update existing asset with new port information and last scanned time
+                # Update existing asset with new port and HTTP probe information
                 existing_metadata = existing_asset.asset_metadata or {}
                 existing_metadata['ports'] = ports_info
-                existing_metadata['scan_source'] = 'subfinder_nmap'
+                existing_metadata['scan_source'] = 'subfinder_httpx_nmap'
+                existing_metadata['http_probe'] = http_probe_results.get(subdomain_name, {})
                 existing_asset.asset_metadata = existing_metadata
                 existing_asset.last_scanned = datetime.utcnow()
 
@@ -562,6 +606,14 @@ def simulate_subdomain_scan(domain, organization_id):
         for sub in selected_subdomains:
             subdomains_found.append(f"{sub}.{domain}")
 
+        # Simulate HTTP probe results for discovered subdomains
+        import random
+        sample_technologies = [
+            ['nginx', 'PHP'], ['Apache', 'WordPress'], ['Cloudflare', 'React'],
+            ['nginx', 'Node.js'], ['Apache'], ['Cloudflare'], ['nginx'], []
+        ]
+        sample_status_codes = [200, 200, 200, 301, 302, 403, 404, 500]  # Mostly successful responses
+
         # Store the main domain as an asset if it doesn't exist
         main_domain_asset = Asset.query.filter_by(
             name=domain,
@@ -592,6 +644,23 @@ def simulate_subdomain_scan(domain, organization_id):
             ).first()
 
             if not existing_asset:
+                # Create simulated HTTP probe data for this subdomain
+                status_code = random.choice(sample_status_codes)
+                technologies = random.choice(sample_technologies)
+
+                asset_metadata = {
+                    'scan_source': 'simulated_subfinder_httpx',
+                    'http_probe': {
+                        'status_code': status_code,
+                        'title': f'{subdomain} - Sample Page',
+                        'technologies': technologies,
+                        'webserver': random.choice(['nginx', 'Apache', 'Cloudflare']),
+                        'last_http_probe': datetime.utcnow().isoformat(),
+                        'url': f'https://{subdomain}',
+                        'scheme': 'https'
+                    }
+                }
+
                 # Create new subdomain asset
                 subdomain_asset = Asset(
                     name=subdomain,
@@ -599,7 +668,8 @@ def simulate_subdomain_scan(domain, organization_id):
                     description=f"Subdomain discovered via simulated Subfinder scan of {domain}",
                     organization_id=organization_id,
                     discovered_at=datetime.utcnow(),
-                    last_scanned=datetime.utcnow()
+                    last_scanned=datetime.utcnow(),
+                    asset_metadata=asset_metadata
                 )
                 db.session.add(subdomain_asset)
                 subdomains_added += 1

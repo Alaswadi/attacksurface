@@ -262,6 +262,25 @@ class ScannerManager:
 
         return self.nuclei.scan(targets, **kwargs)
 
+    def httpx_scan_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
+        """Perform HTTP probing only"""
+        logger.info(f"🌐 HTTPX: Starting HTTP probe on {len(targets)} targets")
+        logger.info(f"🌐 HTTPX: Targets: {', '.join(targets[:3])}{'...' if len(targets) > 3 else ''}")
+        logger.info(f"🌐 HTTPX: Parameters: {kwargs}")
+
+        if not self.httpx:
+            logger.error("🌐 HTTPX: Tool not available")
+            raise BaseScannerError("Httpx not available")
+
+        try:
+            logger.info("🌐 HTTPX: Executing HTTP probe...")
+            result = self.httpx.scan(targets, **kwargs)
+            logger.info(f"🌐 HTTPX: Probe completed, found {len(result.get('alive_hosts', []))} alive hosts")
+            return result
+        except Exception as e:
+            logger.error(f"🌐 HTTPX: Probe failed: {str(e)}")
+            raise
+
     def http_probe_only(self, targets: List[str], **kwargs) -> Dict[str, Any]:
         """Perform HTTP probing only"""
         logger.info(f"🌐 HTTPX: Starting HTTP probe on {len(targets)} targets")

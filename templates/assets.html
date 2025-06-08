@@ -221,7 +221,7 @@
                                     <i class="ri-arrow-up-down-line ml-1"></i>
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" data-sort="status">
-                                    Status
+                                    Status / HTTP
                                     <i class="ri-arrow-up-down-line ml-1"></i>
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -729,7 +729,7 @@ function renderAssets(assets = assetsData) {
         const typeIcon = getAssetTypeIcon(asset.type);
 
         // Get status badge
-        const statusBadge = getStatusBadge(asset.is_active);
+        const statusBadge = getStatusBadge(asset);
 
         // Get risk level badge
         const riskBadge = getRiskLevelBadge(asset.risk_level);
@@ -746,6 +746,7 @@ function renderAssets(assets = assetsData) {
                         <div class="ml-4">
                             <div class="text-sm font-medium text-gray-900">${asset.name}</div>
                             <div class="text-sm text-gray-500">${asset.description || 'No description'}</div>
+                            ${getTechnologiesBadges(asset)}
                         </div>
                     </div>
                 </td>
@@ -788,12 +789,69 @@ function getAssetTypeIcon(type) {
     return icons[type] || 'ri-computer-line';
 }
 
-function getStatusBadge(isActive) {
-    if (isActive) {
+function getStatusBadge(asset) {
+    // For subdomain assets, show HTTP status code if available
+    if (asset.type === 'subdomain' && asset.asset_metadata && asset.asset_metadata.http_probe && asset.asset_metadata.http_probe.status_code) {
+        const statusCode = asset.asset_metadata.http_probe.status_code;
+        const url = asset.asset_metadata.http_probe.url || '';
+
+        // Color coding based on HTTP status code ranges
+        let colorClass = 'bg-gray-100 text-gray-800';
+        if (statusCode >= 200 && statusCode < 300) {
+            colorClass = 'bg-green-100 text-green-800'; // 2xx Success
+        } else if (statusCode >= 300 && statusCode < 400) {
+            colorClass = 'bg-yellow-100 text-yellow-800'; // 3xx Redirection
+        } else if (statusCode >= 400 && statusCode < 500) {
+            colorClass = 'bg-red-100 text-red-800'; // 4xx Client Error
+        } else if (statusCode >= 500) {
+            colorClass = 'bg-red-100 text-red-800'; // 5xx Server Error
+        }
+
+        return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colorClass}" title="HTTP ${statusCode} - ${url}">
+                    ${statusCode}
+                </span>`;
+    }
+
+    // For other assets or when no HTTP probe data, show active/inactive status
+    if (asset.is_active) {
         return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>';
     } else {
         return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>';
     }
+}
+
+function getTechnologiesBadges(asset) {
+    // For subdomain assets, show detected technologies if available
+    if (asset.type === 'subdomain' && asset.asset_metadata && asset.asset_metadata.http_probe && asset.asset_metadata.http_probe.technologies) {
+        const technologies = asset.asset_metadata.http_probe.technologies;
+
+        if (Array.isArray(technologies) && technologies.length > 0) {
+            // Show first 3 technologies, then "+" indicator if more
+            const maxVisible = 3;
+            const visibleTech = technologies.slice(0, maxVisible);
+            const remainingCount = technologies.length - maxVisible;
+
+            let html = '<div class="flex flex-wrap gap-1 mt-1">';
+
+            visibleTech.forEach(tech => {
+                html += `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200" title="Detected technology: ${tech}">
+                            ${tech}
+                         </span>`;
+            });
+
+            if (remainingCount > 0) {
+                const allTechTitle = technologies.join(', ');
+                html += `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200" title="All technologies: ${allTechTitle}">
+                            +${remainingCount}
+                         </span>`;
+            }
+
+            html += '</div>';
+            return html;
+        }
+    }
+
+    return '';
 }
 
 function getRiskLevelBadge(riskLevel) {
@@ -953,12 +1011,15 @@ function showScanProgress() {
         progress += Math.random() * 10;
 
         // Update message based on progress
-        if (progress > 30 && phase === 1) {
-            progressMessage.textContent = 'Running Nmap to discover open ports...';
+        if (progress > 25 && phase === 1) {
+            progressMessage.textContent = 'Running httpx to probe HTTP services...';
             phase = 2;
-        } else if (progress > 70 && phase === 2) {
-            progressMessage.textContent = 'Storing discovered assets...';
+        } else if (progress > 50 && phase === 2) {
+            progressMessage.textContent = 'Running Nmap to discover open ports...';
             phase = 3;
+        } else if (progress > 75 && phase === 3) {
+            progressMessage.textContent = 'Storing discovered assets...';
+            phase = 4;
         }
 
         if (progress > 90) progress = 90;
