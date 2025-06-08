@@ -1506,13 +1506,269 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
             }
         )
 
+        # PROGRESSIVE STAGE 2: HTTP Probing with Progressive Updates
+        http_probe_results = {}
+        alive_hosts = []
+
+        if subdomains and len(subdomains) > 0:
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'stage': 'http_probing',
+                    'domain': domain,
+                    'progress': 40,
+                    'message': f'HTTP probing {len(subdomains)} discovered subdomains...',
+                    'current_phase': 'httpx HTTP probing',
+                    'subdomains_found': len(subdomains),
+                    'progressive_update': {
+                        'type': 'http_probing_started',
+                        'subdomain_count': len(subdomains),
+                        'timestamp': datetime.now().isoformat()
+                    }
+                }
+            )
+
+            # Prepare subdomain list for httpx
+            subdomain_list = []
+            for subdomain in subdomains:
+                if isinstance(subdomain, dict):
+                    hostname = subdomain.get('host', '')
+                else:
+                    hostname = str(subdomain)
+
+                if hostname:
+                    subdomain_list.append(hostname)
+
+            # Run httpx HTTP probing
+            try:
+                logger.info(f"🌐 HTTPX: Starting HTTP probing for {len(subdomain_list)} subdomains")
+                httpx_config = {
+                    'timeout': 30 if scan_type == 'quick' else 60,
+                    'follow_redirects': True,
+                    'tech_detect': True
+                }
+
+                http_results = scanning_service.scanner_manager.httpx.scan(subdomain_list, **httpx_config)
+                http_probe_results = http_results.get('results', {})
+                alive_hosts = [host for host, data in http_probe_results.items() if data.get('status_code')]
+
+                logger.info(f"🌐 HTTPX: HTTP probing completed, found {len(alive_hosts)} alive hosts")
+
+                # Update assets with HTTP probe data progressively
+                http_updated_count = 0
+                for hostname, http_data in http_probe_results.items():
+                    try:
+                        existing_asset = Asset.query.filter_by(
+                            name=hostname,
+                            organization_id=organization_id
+                        ).first()
+
+                        if existing_asset and existing_asset.asset_metadata:
+                            existing_metadata = existing_asset.asset_metadata.copy()
+                            existing_metadata['http_probe'] = http_data
+                            existing_metadata['scan_status'] = 'http_complete'
+                            existing_metadata['last_http_probe'] = datetime.now().isoformat()
+                            existing_asset.asset_metadata = existing_metadata
+                            http_updated_count += 1
+
+                    except Exception as e:
+                        logger.error(f"❌ HTTP probe update failed for {hostname}: {str(e)}")
+                        continue
+
+                # Commit HTTP probe updates
+                try:
+                    db.session.commit()
+                    logger.info(f"📊 Progressive HTTP probing: Updated {http_updated_count} assets with HTTP data")
+                except Exception as e:
+                    logger.error(f"❌ HTTP probe commit failed: {str(e)}")
+                    db.session.rollback()
+
+                # Send progressive update for HTTP probing
+                self.update_state(
+                    state='PROGRESS',
+                    meta={
+                        'stage': 'http_probing_complete',
+                        'domain': domain,
+                        'progress': 60,
+                        'message': f'HTTP probing completed, found {len(alive_hosts)} alive hosts, starting port scanning...',
+                        'current_phase': 'HTTP probing complete - Starting port scanning',
+                        'subdomains_found': len(subdomains),
+                        'alive_hosts_found': len(alive_hosts),
+                        'progressive_update': {
+                            'type': 'http_probing_complete',
+                            'alive_hosts': len(alive_hosts),
+                            'http_updated': http_updated_count,
+                            'timestamp': datetime.now().isoformat()
+                        }
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"❌ HTTP probing failed: {str(e)}")
+                # Continue with port scanning even if HTTP probing fails
+                alive_hosts = subdomain_list  # Use all subdomains for port scanning
+
+        # PROGRESSIVE STAGE 3: Port Scanning with Progressive Updates
+        port_scan_results = {}
+
+        if alive_hosts and len(alive_hosts) > 0:
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'stage': 'port_scanning',
+                    'domain': domain,
+                    'progress': 70,
+                    'message': f'Port scanning {len(alive_hosts)} alive hosts...',
+                    'current_phase': 'Nmap port scanning',
+                    'subdomains_found': len(subdomains),
+                    'alive_hosts_found': len(alive_hosts),
+                    'progressive_update': {
+                        'type': 'port_scanning_started',
+                        'alive_hosts_count': len(alive_hosts),
+                        'timestamp': datetime.now().isoformat()
+                    }
+                }
+            )
+
+            # Run Nmap port scanning on alive hosts
+            try:
+                logger.info(f"🔍 NMAP: Starting port scanning for {len(alive_hosts)} alive hosts")
+
+                # Configure Nmap for progressive scanning
+                nmap_config = {
+                    'top_ports': 100 if scan_type == 'quick' else 1000,
+                    'timeout': 300 if scan_type == 'quick' else 600,
+                    'service_detection': True
+                }
+
+                port_results = scanning_service.scanner_manager.nmap.scan(alive_hosts, **nmap_config)
+                port_scan_results = port_results.get('results', {})
+
+                logger.info(f"🔍 NMAP: Port scanning completed for {len(port_scan_results)} hosts")
+
+                # Update assets with port scan data progressively
+                port_updated_count = 0
+                for hostname, port_data in port_scan_results.items():
+                    try:
+                        existing_asset = Asset.query.filter_by(
+                            name=hostname,
+                            organization_id=organization_id
+                        ).first()
+
+                        if existing_asset and existing_asset.asset_metadata:
+                            existing_metadata = existing_asset.asset_metadata.copy()
+                            existing_metadata['ports'] = port_data.get('open_ports', [])
+                            existing_metadata['scan_status'] = 'port_complete'
+                            existing_metadata['last_port_scan'] = datetime.now().isoformat()
+                            existing_asset.asset_metadata = existing_metadata
+                            port_updated_count += 1
+
+                    except Exception as e:
+                        logger.error(f"❌ Port scan update failed for {hostname}: {str(e)}")
+                        continue
+
+                # Commit port scan updates
+                try:
+                    db.session.commit()
+                    logger.info(f"📊 Progressive port scanning: Updated {port_updated_count} assets with port data")
+                except Exception as e:
+                    logger.error(f"❌ Port scan commit failed: {str(e)}")
+                    db.session.rollback()
+
+                # Send progressive update for port scanning
+                self.update_state(
+                    state='PROGRESS',
+                    meta={
+                        'stage': 'port_scanning_complete',
+                        'domain': domain,
+                        'progress': 90,
+                        'message': f'Port scanning completed, finalizing results...',
+                        'current_phase': 'Port scanning complete - Finalizing',
+                        'subdomains_found': len(subdomains),
+                        'alive_hosts_found': len(alive_hosts),
+                        'port_scan_results': len(port_scan_results),
+                        'progressive_update': {
+                            'type': 'port_scanning_complete',
+                            'port_updated': port_updated_count,
+                            'timestamp': datetime.now().isoformat()
+                        }
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"❌ Port scanning failed: {str(e)}")
+
+        # PROGRESSIVE STAGE 4: Final Completion
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'finalizing',
+                'domain': domain,
+                'progress': 95,
+                'message': f'Marking all assets as completed...',
+                'current_phase': 'Finalizing progressive scan',
+                'subdomains_found': len(subdomains),
+                'alive_hosts_found': len(alive_hosts),
+                'progressive_update': {
+                    'type': 'finalizing',
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+        )
+
+        # Mark all progressive scanning assets as completed
+        try:
+            completed_assets = Asset.query.filter_by(organization_id=organization_id).filter(
+                Asset.asset_metadata.op('->>')('scan_source') == 'progressive_large_scale_orchestrator'
+            ).filter(
+                Asset.asset_metadata.op('->>')('scan_status').in_(['scanning', 'http_complete', 'port_complete'])
+            ).all()
+
+            completed_count = 0
+            for asset in completed_assets:
+                if asset.asset_metadata:
+                    existing_metadata = asset.asset_metadata.copy()
+                    existing_metadata['scan_status'] = 'completed'
+                    existing_metadata['scan_completed_at'] = datetime.now().isoformat()
+                    asset.asset_metadata = existing_metadata
+                    asset.last_scanned = datetime.now()
+                    completed_count += 1
+
+            db.session.commit()
+            logger.info(f"📊 Progressive completion: Marked {completed_count} assets as completed")
+
+        except Exception as e:
+            logger.error(f"❌ Progressive completion failed: {str(e)}")
+            db.session.rollback()
+
+        # Final success update
+        self.update_state(
+            state='SUCCESS',
+            meta={
+                'stage': 'completed',
+                'domain': domain,
+                'progress': 100,
+                'message': f'Progressive scanning completed successfully!',
+                'current_phase': 'Completed',
+                'subdomains_found': len(subdomains),
+                'alive_hosts_found': len(alive_hosts),
+                'progressive_update': {
+                    'type': 'scan_completed',
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+        )
+
         return {
             'success': True,
             'domain': domain,
             'scan_type': scan_type,
             'subdomains_found': len(subdomains),
             'progressive_stored': progressive_stored_count,
-            'message': 'Progressive scanning orchestrator started - subdomains stored'
+            'alive_hosts_found': len(alive_hosts),
+            'http_probe_results': len(http_probe_results),
+            'port_scan_results': len(port_scan_results),
+            'message': 'Progressive scanning orchestrator completed successfully'
         }
 
     except Exception as e:
