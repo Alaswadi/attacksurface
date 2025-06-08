@@ -83,22 +83,42 @@ class NucleiScanner(BaseScanner):
                     cmd.extend(['-exclude-tags', exclude_tags])
             
             # Add optimized performance options
-            rate_limit = kwargs.get('rate_limit', 400)
+            rate_limit = kwargs.get('rate_limit', 200)
             cmd.extend(['-rl', str(rate_limit)])  # Use -rl instead of -rate-limit
 
-            concurrency = kwargs.get('concurrency', 100)
+            concurrency = kwargs.get('concurrency', 30)
             cmd.extend(['-c', str(concurrency)])
 
             # Add bulk size for better performance
-            bulk_size = kwargs.get('bulk_size', 75)
+            bulk_size = kwargs.get('bulk_size', 25)
             cmd.extend(['-bs', str(bulk_size)])
 
             # Add scan strategy for multiple hosts
             scan_strategy = kwargs.get('scan_strategy', 'host-spray')
             cmd.extend(['-ss', scan_strategy])
 
-            timeout = kwargs.get('timeout', 5)
+            timeout = kwargs.get('timeout', 8)
             cmd.extend(['-timeout', str(timeout)])
+
+            # Add retry logic for reliability
+            retries = kwargs.get('retries', 1)
+            if retries > 0:
+                cmd.extend(['-retries', str(retries)])
+
+            # Add max host error threshold
+            max_host_error = kwargs.get('max_host_error', 30)
+            cmd.extend(['-mhe', str(max_host_error)])
+
+            # Add include/exclude tags if specified
+            include_tags = kwargs.get('include_tags', [])
+            if include_tags:
+                for tag in include_tags:
+                    cmd.extend(['-include-tags', tag])
+
+            exclude_tags = kwargs.get('exclude_tags', [])
+            if exclude_tags:
+                for tag in exclude_tags:
+                    cmd.extend(['-exclude-tags', tag])
             
             # Add silent mode
             if kwargs.get('silent', True):

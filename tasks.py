@@ -22,6 +22,87 @@ logger = logging.getLogger(__name__)
 # Celery configuration is now handled in config.py and app.py
 # This avoids configuration conflicts with newer Celery versions
 
+# Vulnerability validation functions
+def calculate_vulnerability_confidence(vuln_data):
+    """Calculate confidence score for vulnerability finding"""
+    score = 50  # Base score
+
+    # Template-based confidence
+    template_name = vuln_data.get('template_name', '').lower()
+    if 'cve-' in template_name:
+        score += 25  # CVE templates are highly reliable
+    elif 'default-login' in template_name:
+        score += 20  # Default logins are usually accurate
+    elif 'exposure' in template_name:
+        score += 15  # Exposures are generally reliable
+    elif 'takeover' in template_name:
+        score += 20  # Subdomain takeovers are critical
+    elif 'misconfiguration' in template_name:
+        score += 10  # Misconfigurations vary in reliability
+
+    # Severity-based confidence
+    severity = vuln_data.get('severity', '').lower()
+    if severity == 'critical':
+        score += 15
+    elif severity == 'high':
+        score += 10
+    elif severity == 'medium':
+        score += 5
+
+    # Response-based validation
+    response_code = vuln_data.get('response_code', 0)
+    if response_code in [200, 401, 403, 500]:
+        score += 10  # Valid HTTP responses indicate real findings
+    elif response_code in [404, 502, 503]:
+        score -= 10  # These often indicate false positives
+
+    # Template category confidence
+    template_path = vuln_data.get('template_path', '').lower()
+    if any(category in template_path for category in ['cves/', 'exposures/', 'default-logins/']):
+        score += 10
+    elif any(category in template_path for category in ['fuzzing/', 'helpers/']):
+        score -= 15  # These categories have higher false positive rates
+
+    return min(max(score, 0), 100)  # Clamp between 0-100
+
+def validate_vulnerability_finding(vuln_data, confidence_threshold=70):
+    """Validate vulnerability finding to reduce false positives"""
+
+    # 1. Minimum confidence threshold
+    confidence = vuln_data.get('confidence_score', 0)
+    if confidence < confidence_threshold:
+        return False
+
+    # 2. Check for common false positive patterns in description
+    description = vuln_data.get('description', '').lower()
+    false_positive_patterns = [
+        'possible', 'potential', 'might be', 'could be',
+        'generic', 'default page', 'common', 'may indicate',
+        'appears to be', 'seems to', 'likely'
+    ]
+    if any(pattern in description for pattern in false_positive_patterns):
+        # Lower threshold for uncertain language
+        if confidence < 85:
+            return False
+
+    # 3. Validate response content length
+    response = vuln_data.get('response', '')
+    if len(response) < 30:  # Too short to be meaningful
+        return False
+
+    # 4. Check for template reliability
+    template_name = vuln_data.get('template_name', '').lower()
+    unreliable_templates = ['generic', 'test', 'sample', 'demo']
+    if any(pattern in template_name for pattern in unreliable_templates):
+        return False
+
+    # 5. Severity validation
+    severity = vuln_data.get('severity', '').lower()
+    if severity in ['info', 'unknown'] and confidence < 80:
+        return False  # Higher bar for informational findings
+
+    return True
+
 @celery.task(bind=True)
 def test_task(self):
     """Test task to verify Celery is working"""
@@ -1892,34 +1973,45 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 else:
                     logger.info("✅ NUCLEI: Templates verified and ready")
 
-                    # Configure Nuclei with optimized performance settings
+                    # Configure Nuclei with optimized, reliable settings based on research
                     nuclei_config = {
                         'quick': {
-                            'templates': ['cves', 'exposures'],
-                            'rate_limit': 400,  # High rate limit for quick scan
-                            'concurrency': 100,  # High concurrency
-                            'bulk_size': 75,  # Optimized bulk size
-                            'scan_strategy': 'host-spray',  # Spray mode for multiple hosts
-                            'timeout': 5,
-                            'severity': ['critical', 'high']
+                            # Tier 1: High-confidence templates with minimal false positives
+                            'templates': ['cves/', 'exposures/', 'default-logins/', 'takeovers/'],
+                            'rate_limit': 200,          # Conservative for reliability
+                            'concurrency': 30,          # Balanced concurrency
+                            'bulk_size': 25,            # Smaller bulk for stability
+                            'scan_strategy': 'host-spray',
+                            'timeout': 8,               # Longer timeout for reliability
+                            'severity': ['critical', 'high'],
+                            'retries': 1,               # Retry failed requests
+                            'max_host_error': 20        # Skip problematic hosts
                         },
                         'deep': {
-                            'templates': ['cves', 'exposures', 'vulnerabilities'],
-                            'rate_limit': 400,  # Consistent high performance
-                            'concurrency': 100,
-                            'bulk_size': 75,
+                            # Tier 2: Comprehensive coverage with validation
+                            'templates': ['cves/', 'exposures/', 'vulnerabilities/', 'misconfiguration/', 'default-logins/', 'takeovers/', 'technologies/'],
+                            'rate_limit': 150,          # Moderate rate for stability
+                            'concurrency': 25,          # Conservative concurrency
+                            'bulk_size': 20,            # Smaller bulk for complex scans
                             'scan_strategy': 'host-spray',
-                            'timeout': 10,
-                            'severity': ['critical', 'high', 'medium']
+                            'timeout': 12,              # Extended timeout
+                            'severity': ['critical', 'high', 'medium'],
+                            'retries': 2,               # More retries for deep scan
+                            'max_host_error': 30
                         },
                         'comprehensive': {
-                            'templates': ['cves', 'exposures', 'vulnerabilities', 'misconfiguration'],
-                            'rate_limit': 400,  # Maintain high performance even for comprehensive
-                            'concurrency': 100,
-                            'bulk_size': 75,
+                            # Tier 3: Full coverage with extensive validation
+                            'templates': ['cves/', 'exposures/', 'vulnerabilities/', 'misconfiguration/', 'default-logins/', 'takeovers/', 'technologies/', 'workflows/'],
+                            'rate_limit': 100,          # Conservative for comprehensive
+                            'concurrency': 20,          # Lower concurrency for stability
+                            'bulk_size': 15,            # Small bulk for complex templates
                             'scan_strategy': 'host-spray',
-                            'timeout': 15,
-                            'severity': ['critical', 'high', 'medium', 'low']
+                            'timeout': 15,              # Extended timeout for complex checks
+                            'severity': ['critical', 'high', 'medium', 'low'],
+                            'retries': 3,
+                            'max_host_error': 50,
+                            'include_tags': ['oast'],   # Include out-of-band testing
+                            'exclude_tags': ['dos', 'intrusive']  # Exclude potentially harmful tests
                         }
                     }
 
@@ -1930,42 +2022,91 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                     logger.info(f"🔍 NUCLEI: alive_hosts type: {type(alive_hosts)}")
                     logger.info(f"🔍 NUCLEI: alive_hosts content: {alive_hosts[:5] if len(alive_hosts) > 5 else alive_hosts}")
 
-                    # Convert alive_hosts to proper URLs for Nuclei
-                    nuclei_targets = []
+                    # Optimized target preparation for Nuclei scanning
+                    nuclei_targets = set()
+
+                    # 1. Add URLs from alive hosts (httpx results)
                     for host in alive_hosts:
                         if isinstance(host, str):
                             # If it's just a hostname, create HTTP and HTTPS URLs
                             if not host.startswith(('http://', 'https://')):
-                                nuclei_targets.append(f"http://{host}")
-                                nuclei_targets.append(f"https://{host}")
+                                nuclei_targets.add(f"http://{host}")
+                                nuclei_targets.add(f"https://{host}")
                             else:
-                                nuclei_targets.append(host)
+                                nuclei_targets.add(host)
                         elif isinstance(host, dict) and 'url' in host:
-                            # If it's a dict with URL, use the URL
-                            nuclei_targets.append(host['url'])
+                            # Use the validated URL from httpx
+                            nuclei_targets.add(host['url'])
                         elif isinstance(host, dict) and 'host' in host:
-                            # If it's a dict with host, create URLs
+                            # Create URLs from host data
                             hostname = host['host']
                             if not hostname.startswith(('http://', 'https://')):
-                                nuclei_targets.append(f"http://{hostname}")
-                                nuclei_targets.append(f"https://{hostname}")
+                                nuclei_targets.add(f"http://{hostname}")
+                                nuclei_targets.add(f"https://{hostname}")
                             else:
-                                nuclei_targets.append(hostname)
+                                nuclei_targets.add(hostname)
 
-                    # Remove duplicates
-                    nuclei_targets = list(set(nuclei_targets))
-                    logger.info(f"🔍 NUCLEI: Converted to {len(nuclei_targets)} target URLs: {nuclei_targets[:5] if len(nuclei_targets) > 5 else nuclei_targets}")
+                    # 2. Add additional targets from port scan results
+                    for port_data in port_scan_results:
+                        host = port_data.get('host', '')
+                        port = port_data.get('port', 0)
 
-                    # Perform vulnerability scanning with timeout handling
+                        if host and port:
+                            # Web service ports
+                            if port in [80, 8080, 8000, 3000, 9000]:
+                                nuclei_targets.add(f"http://{host}:{port}")
+                            elif port in [443, 8443, 9443]:
+                                nuclei_targets.add(f"https://{host}:{port}")
+                            # Management interfaces (try both HTTP and HTTPS)
+                            elif port in [8080, 8443, 9090, 9443, 8888, 8889]:
+                                nuclei_targets.add(f"http://{host}:{port}")
+                                nuclei_targets.add(f"https://{host}:{port}")
+
+                    # 3. Convert to list and validate
+                    nuclei_targets = list(nuclei_targets)
+
+                    # 4. Filter out invalid or problematic targets
+                    validated_targets = []
+                    for target in nuclei_targets:
+                        # Basic URL validation
+                        if target.startswith(('http://', 'https://')) and '.' in target:
+                            # Skip obviously internal IPs for external scans (optional)
+                            if not any(internal in target for internal in ['127.0.0.1', 'localhost', '192.168.', '10.', '172.16.']):
+                                validated_targets.append(target)
+
+                    nuclei_targets = validated_targets
+                    logger.info(f"🔍 NUCLEI: Prepared {len(nuclei_targets)} validated target URLs")
+                    logger.info(f"🔍 NUCLEI: Sample targets: {nuclei_targets[:5] if len(nuclei_targets) > 5 else nuclei_targets}")
+
+                    # Perform vulnerability scanning with enhanced error handling
                     try:
+                        logger.info(f"🔍 NUCLEI: Starting scan of {len(nuclei_targets)} targets with {scan_type} configuration")
                         vuln_results = nuclei_scanner.scan(nuclei_targets, **config)
-                        vulnerability_results = vuln_results.get('vulnerabilities', [])
-                        logger.info(f"🔍 NUCLEI: Found {len(vulnerability_results)} vulnerabilities")
+                        raw_vulnerabilities = vuln_results.get('vulnerabilities', [])
+                        logger.info(f"🔍 NUCLEI: Raw scan found {len(raw_vulnerabilities)} potential vulnerabilities")
+
+                        # Validate and score vulnerabilities
+                        vulnerability_results = []
+                        validated_count = 0
+
+                        for vuln_data in raw_vulnerabilities:
+                            # Calculate confidence score
+                            confidence = calculate_vulnerability_confidence(vuln_data)
+                            vuln_data['confidence_score'] = confidence
+
+                            # Validate vulnerability
+                            if validate_vulnerability_finding(vuln_data, confidence_threshold=70):
+                                vulnerability_results.append(vuln_data)
+                                validated_count += 1
+
+                        logger.info(f"🔍 NUCLEI: Validated {validated_count}/{len(raw_vulnerabilities)} vulnerabilities (filtered {len(raw_vulnerabilities) - validated_count} low-confidence findings)")
+
                     except Exception as scan_error:
                         if "timed out" in str(scan_error).lower():
                             logger.warning(f"⚠️ NUCLEI: Scan timed out, continuing without vulnerability results")
                             vulnerability_results = []
                         else:
+                            logger.error(f"❌ NUCLEI: Scan failed with error: {str(scan_error)}")
                             raise scan_error
 
                     # Store vulnerabilities in database and update asset metadata
