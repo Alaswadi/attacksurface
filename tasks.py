@@ -163,14 +163,12 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
 
             config = nuclei_config.get(scan_type, nuclei_config['deep'])
 
-            # Prepare main domain targets (HTTP and HTTPS)
-            main_domain_targets = [
-                f"http://{main_domain}",
-                f"https://{main_domain}"
-            ]
+            # Prepare main domain target (strip any protocol, let Nuclei handle protocol detection)
+            clean_domain = main_domain.replace('http://', '').replace('https://', '').split('/')[0]
+            main_domain_targets = [clean_domain]
 
             logger.info(f"🔍 NUCLEI ASYNC: Scanning main domain with config: {config}")
-            logger.info(f"🔍 NUCLEI ASYNC: Targets: {main_domain_targets}")
+            logger.info(f"🔍 NUCLEI ASYNC: Clean domain target: {main_domain_targets}")
 
             # Update task state
             self.update_state(
@@ -217,9 +215,9 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
 
             vulnerabilities_stored = 0
 
-            # Find the main domain asset
+            # Find the main domain asset (use clean domain)
             main_domain_asset = Asset.query.filter_by(
-                name=main_domain,
+                name=clean_domain,
                 organization_id=organization_id
             ).first()
 
@@ -2241,14 +2239,15 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 if asset.asset_metadata:
                     existing_metadata = asset.asset_metadata.copy()
 
-                    # Check if this is the main domain
-                    if asset.name == domain:
+                    # Check if this is the main domain (strip protocol for comparison)
+                    clean_main_domain = domain.replace('http://', '').replace('https://', '').split('/')[0]
+                    if asset.name == clean_main_domain:
                         # Mark main domain as awaiting Nuclei results
                         existing_metadata['scan_status'] = 'awaiting_nuclei'
                         existing_metadata['nuclei_task_id'] = nuclei_task_id
                         existing_metadata['nuclei_launched_at'] = datetime.now().isoformat()
                         main_domain_asset_updated = True
-                        logger.info(f"📊 Main domain {domain} marked as awaiting Nuclei results")
+                        logger.info(f"📊 Main domain {clean_main_domain} marked as awaiting Nuclei results")
                     else:
                         # Mark other assets as completed
                         existing_metadata['scan_status'] = 'completed'
@@ -2261,7 +2260,7 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
             db.session.commit()
             logger.info(f"📊 Progressive completion: Marked {completed_count} non-main-domain assets as completed")
             if main_domain_asset_updated:
-                logger.info(f"📊 Main domain {domain} status updated to awaiting Nuclei scan")
+                logger.info(f"📊 Main domain {clean_main_domain} status updated to awaiting Nuclei scan")
 
         except Exception as e:
             logger.error(f"❌ Progressive completion failed: {str(e)}")
