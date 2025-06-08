@@ -1389,7 +1389,30 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
         scan_results = scanning_service.scanner_manager.subdomain_scan_only(domain, **subfinder_config)
         subdomains = scan_results.get('subdomains', [])
 
-        logger.info(f"🔍 SUBFINDER: Scan completed, found {len(subdomains)} subdomains")
+        # Add the main domain to the subdomain list if not already present
+        main_domain_found = False
+        for subdomain in subdomains:
+            if isinstance(subdomain, dict):
+                hostname = subdomain.get('host', '')
+            else:
+                hostname = str(subdomain)
+
+            if hostname == domain:
+                main_domain_found = True
+                break
+
+        if not main_domain_found:
+            # Add main domain to the list
+            main_domain_entry = {
+                'host': domain,
+                'source': 'main_domain',
+                'ip': '',
+                'timestamp': datetime.now().isoformat()
+            }
+            subdomains.append(main_domain_entry)
+            logger.info(f"📋 Added main domain {domain} to subdomain list")
+
+        logger.info(f"🔍 SUBFINDER: Scan completed, found {len(subdomains)} subdomains (including main domain)")
 
         # IMMEDIATE STORAGE: Store subdomains with "scanning" status
         self.update_state(
@@ -1510,6 +1533,8 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
         http_probe_results = {}
         alive_hosts = []
 
+        logger.info(f"🌐 Starting HTTP probing stage with {len(subdomains)} subdomains")
+
         if subdomains and len(subdomains) > 0:
             self.update_state(
                 state='PROGRESS',
@@ -1539,6 +1564,8 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 if hostname:
                     subdomain_list.append(hostname)
 
+            logger.info(f"🌐 Prepared {len(subdomain_list)} hosts for HTTP probing: {subdomain_list[:5]}{'...' if len(subdomain_list) > 5 else ''}")
+
             # Run httpx HTTP probing
             try:
                 logger.info(f"🌐 HTTPX: Starting HTTP probing for {len(subdomain_list)} subdomains")
@@ -1548,11 +1575,18 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                     'tech_detect': True
                 }
 
-                http_results = scanning_service.scanner_manager.httpx.scan(subdomain_list, **httpx_config)
-                http_probe_results = http_results.get('results', {})
-                alive_hosts = [host for host, data in http_probe_results.items() if data.get('status_code')]
+                http_results = scanning_service.scanner_manager.http_probe_only(subdomain_list, **httpx_config)
+                alive_hosts_data = http_results.get('alive_hosts', [])
+                alive_hosts = [host_data['host'] for host_data in alive_hosts_data if host_data.get('status_code')]
 
-                logger.info(f"🌐 HTTPX: HTTP probing completed, found {len(alive_hosts)} alive hosts")
+                # Create a dictionary for easier access to HTTP probe data
+                http_probe_results = {}
+                for host_data in alive_hosts_data:
+                    hostname = host_data.get('host', '')
+                    if hostname:
+                        http_probe_results[hostname] = host_data
+
+                logger.info(f"🌐 HTTPX: HTTP probing completed, found {len(alive_hosts)} alive hosts from {len(alive_hosts_data)} responses")
 
                 # Update assets with HTTP probe data progressively
                 http_updated_count = 0
@@ -1605,11 +1639,16 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
 
             except Exception as e:
                 logger.error(f"❌ HTTP probing failed: {str(e)}")
+                logger.exception("HTTP probing exception details:")
                 # Continue with port scanning even if HTTP probing fails
                 alive_hosts = subdomain_list  # Use all subdomains for port scanning
+        else:
+            logger.warning(f"⚠️ Skipping HTTP probing - no subdomains found (subdomains: {len(subdomains)})")
 
         # PROGRESSIVE STAGE 3: Port Scanning with Progressive Updates
         port_scan_results = {}
+
+        logger.info(f"🔍 Starting port scanning stage with {len(alive_hosts)} alive hosts")
 
         if alive_hosts and len(alive_hosts) > 0:
             self.update_state(
@@ -1641,10 +1680,19 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                     'service_detection': True
                 }
 
-                port_results = scanning_service.scanner_manager.nmap.scan(alive_hosts, **nmap_config)
-                port_scan_results = port_results.get('results', {})
+                port_results = scanning_service.scanner_manager.port_scan_only(alive_hosts, **nmap_config)
+                open_ports_data = port_results.get('open_ports', [])
 
-                logger.info(f"🔍 NMAP: Port scanning completed for {len(port_scan_results)} hosts")
+                logger.info(f"🔍 NMAP: Port scanning completed, found {len(open_ports_data)} open ports")
+
+                # Group port data by hostname for easier processing
+                port_scan_results = {}
+                for port_info in open_ports_data:
+                    hostname = port_info.get('host', '')
+                    if hostname:
+                        if hostname not in port_scan_results:
+                            port_scan_results[hostname] = []
+                        port_scan_results[hostname].append(port_info)
 
                 # Update assets with port scan data progressively
                 port_updated_count = 0
@@ -1657,7 +1705,7 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
 
                         if existing_asset and existing_asset.asset_metadata:
                             existing_metadata = existing_asset.asset_metadata.copy()
-                            existing_metadata['ports'] = port_data.get('open_ports', [])
+                            existing_metadata['ports'] = port_data  # port_data is already a list of port info
                             existing_metadata['scan_status'] = 'port_complete'
                             existing_metadata['last_port_scan'] = datetime.now().isoformat()
                             existing_asset.asset_metadata = existing_metadata
@@ -1697,6 +1745,9 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
 
             except Exception as e:
                 logger.error(f"❌ Port scanning failed: {str(e)}")
+                logger.exception("Port scanning exception details:")
+        else:
+            logger.warning(f"⚠️ Skipping port scanning - no alive hosts found (alive_hosts: {len(alive_hosts)})")
 
         # PROGRESSIVE STAGE 4: Final Completion
         self.update_state(
