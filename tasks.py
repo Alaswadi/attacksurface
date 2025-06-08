@@ -1835,7 +1835,167 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
         else:
             logger.warning(f"⚠️ Skipping port scanning - no alive hosts found (alive_hosts: {len(alive_hosts)})")
 
-        # PROGRESSIVE STAGE 4: Final Completion
+        # PROGRESSIVE STAGE 4: Nuclei Vulnerability Scanning
+        vulnerability_results = []
+        vulnerabilities_stored_count = 0
+
+        if alive_hosts and len(alive_hosts) > 0:
+            try:
+                self.update_state(
+                    state='PROGRESS',
+                    meta={
+                        'stage': 'vulnerability_scanning',
+                        'domain': domain,
+                        'progress': 75,
+                        'message': f'Running vulnerability scanning on {len(alive_hosts)} alive hosts...',
+                        'current_phase': 'Nuclei vulnerability scanning',
+                        'subdomains_found': len(subdomains),
+                        'alive_hosts_found': len(alive_hosts),
+                        'progressive_update': {
+                            'type': 'vulnerability_scanning_started',
+                            'alive_hosts_count': len(alive_hosts),
+                            'timestamp': datetime.now().isoformat()
+                        }
+                    }
+                )
+
+                # Import Nuclei scanner
+                from tools.nuclei import NucleiScanner
+                nuclei_scanner = NucleiScanner()
+
+                # Configure Nuclei based on scan type
+                nuclei_config = {
+                    'quick': {
+                        'templates': ['http/miscellaneous/', 'http/exposures/'],
+                        'rate_limit': 500,
+                        'concurrency': 100,
+                        'timeout': 60,
+                        'severity': ['critical', 'high']
+                    },
+                    'deep': {
+                        'templates': ['http/', 'network/', 'ssl/'],
+                        'rate_limit': 100,
+                        'concurrency': 25,
+                        'timeout': 300,
+                        'severity': ['critical', 'high', 'medium']
+                    },
+                    'comprehensive': {
+                        'templates': ['http/', 'network/', 'ssl/', 'dns/', 'file/'],
+                        'rate_limit': 50,
+                        'concurrency': 15,
+                        'timeout': 600,
+                        'severity': ['critical', 'high', 'medium', 'low']
+                    }
+                }
+
+                config = nuclei_config.get(scan_type, nuclei_config['deep'])
+                logger.info(f"🔍 NUCLEI: Starting vulnerability scan with config: {config}")
+
+                # Perform vulnerability scanning
+                vuln_results = nuclei_scanner.scan(alive_hosts, **config)
+                vulnerability_results = vuln_results.get('vulnerabilities', [])
+
+                logger.info(f"🔍 NUCLEI: Found {len(vulnerability_results)} vulnerabilities")
+
+                # Store vulnerabilities in database and update asset metadata
+                from models import Vulnerability, SeverityLevel
+
+                severity_mapping = {
+                    'critical': SeverityLevel.CRITICAL,
+                    'high': SeverityLevel.HIGH,
+                    'medium': SeverityLevel.MEDIUM,
+                    'low': SeverityLevel.LOW,
+                    'info': SeverityLevel.INFO
+                }
+
+                for vuln_data in vulnerability_results:
+                    try:
+                        # Find the asset for this vulnerability
+                        vuln_host = vuln_data.get('host', '').replace('http://', '').replace('https://', '').split(':')[0]
+                        asset = Asset.query.filter_by(
+                            name=vuln_host,
+                            organization_id=organization_id
+                        ).first()
+
+                        if asset:
+                            # Map severity
+                            severity_str = vuln_data.get('severity', 'medium').lower()
+                            severity = severity_mapping.get(severity_str, SeverityLevel.MEDIUM)
+
+                            # Create vulnerability record
+                            vulnerability = Vulnerability(
+                                title=vuln_data.get('template_name', 'Unknown Vulnerability'),
+                                description=vuln_data.get('description', ''),
+                                severity=severity,
+                                asset_id=asset.id,
+                                organization_id=organization_id,
+                                discovered_at=datetime.now(),
+                                cve_id=vuln_data.get('cve_id'),
+                                is_resolved=False
+                            )
+                            db.session.add(vulnerability)
+
+                            # Update asset metadata with vulnerability info
+                            if asset.asset_metadata:
+                                existing_metadata = asset.asset_metadata.copy()
+                                if 'vulnerabilities' not in existing_metadata:
+                                    existing_metadata['vulnerabilities'] = []
+
+                                vuln_metadata = {
+                                    'template_name': vuln_data.get('template_name', ''),
+                                    'severity': severity_str,
+                                    'description': vuln_data.get('description', ''),
+                                    'discovered_at': datetime.now().isoformat()
+                                }
+                                if vuln_data.get('cve_id'):
+                                    vuln_metadata['cve_id'] = vuln_data.get('cve_id')
+
+                                existing_metadata['vulnerabilities'].append(vuln_metadata)
+                                existing_metadata['scan_status'] = 'vuln_complete'
+                                asset.asset_metadata = existing_metadata
+                                vulnerabilities_stored_count += 1
+
+                    except Exception as e:
+                        logger.error(f"❌ Vulnerability storage failed for {vuln_data.get('host', 'unknown')}: {str(e)}")
+                        continue
+
+                # Commit vulnerability updates
+                try:
+                    db.session.commit()
+                    logger.info(f"📊 Progressive vulnerability scanning: Stored {vulnerabilities_stored_count} vulnerabilities")
+                except Exception as e:
+                    logger.error(f"❌ Vulnerability commit failed: {str(e)}")
+                    db.session.rollback()
+
+                # Send progressive update for vulnerability scanning
+                self.update_state(
+                    state='PROGRESS',
+                    meta={
+                        'stage': 'vulnerability_scanning_complete',
+                        'domain': domain,
+                        'progress': 90,
+                        'message': f'Vulnerability scanning completed, found {len(vulnerability_results)} vulnerabilities...',
+                        'current_phase': 'Vulnerability scanning complete - Finalizing',
+                        'subdomains_found': len(subdomains),
+                        'alive_hosts_found': len(alive_hosts),
+                        'port_scan_results': len(port_scan_results),
+                        'vulnerabilities_found': len(vulnerability_results),
+                        'progressive_update': {
+                            'type': 'vulnerability_scanning_complete',
+                            'vulnerabilities_stored': vulnerabilities_stored_count,
+                            'vulnerabilities_found': len(vulnerability_results),
+                            'timestamp': datetime.now().isoformat()
+                        }
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"❌ Vulnerability scanning failed: {str(e)}")
+                logger.exception("Vulnerability scanning exception details:")
+        else:
+            logger.warning(f"⚠️ Skipping vulnerability scanning - no alive hosts found (alive_hosts: {len(alive_hosts)})")
+
+        # PROGRESSIVE STAGE 5: Final Completion
         self.update_state(
             state='PROGRESS',
             meta={
@@ -1846,6 +2006,7 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 'current_phase': 'Finalizing progressive scan',
                 'subdomains_found': len(subdomains),
                 'alive_hosts_found': len(alive_hosts),
+                'vulnerabilities_found': len(vulnerability_results),
                 'progressive_update': {
                     'type': 'finalizing',
                     'timestamp': datetime.now().isoformat()
@@ -1889,8 +2050,12 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 'current_phase': 'Completed',
                 'subdomains_found': len(subdomains),
                 'alive_hosts_found': len(alive_hosts),
+                'vulnerabilities_found': len(vulnerability_results),
+                'vulnerabilities_stored': vulnerabilities_stored_count,
                 'progressive_update': {
                     'type': 'scan_completed',
+                    'vulnerabilities_found': len(vulnerability_results),
+                    'vulnerabilities_stored': vulnerabilities_stored_count,
                     'timestamp': datetime.now().isoformat()
                 }
             }
@@ -1905,7 +2070,9 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
             'alive_hosts_found': len(alive_hosts),
             'http_probe_results': len(http_probe_results),
             'port_scan_results': len(port_scan_results),
-            'message': 'Progressive scanning orchestrator completed successfully'
+            'vulnerabilities_found': len(vulnerability_results),
+            'vulnerabilities_stored': vulnerabilities_stored_count,
+            'message': 'Progressive scanning orchestrator completed successfully with vulnerability scanning'
         }
 
     except Exception as e:
