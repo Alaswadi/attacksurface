@@ -50,8 +50,8 @@ class NucleiScanner(BaseScanner):
             # Build command
             cmd = [self.tool_path, '-list', targets_file]
             
-            # Add JSON output
-            cmd.extend(['-json'])
+            # Add JSON Lines output
+            cmd.extend(['-jsonl'])
             
             # Add template specification
             templates = kwargs.get('templates')

@@ -1581,7 +1581,26 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
 
                 http_results = scanning_service.scanner_manager.http_probe_only(subdomain_list, **httpx_config)
                 alive_hosts_data = http_results.get('alive_hosts', [])
-                alive_hosts = [host_data['host'] for host_data in alive_hosts_data if host_data.get('status_code')]
+
+                # Extract hostnames from URLs instead of using IP addresses
+                alive_hosts = []
+                for host_data in alive_hosts_data:
+                    if host_data.get('status_code'):
+                        url = host_data.get('url', '')
+                        if url:
+                            # Extract hostname from URL
+                            url_match = re.search(r'https?://([^:/]+)', url)
+                            if url_match:
+                                hostname = url_match.group(1)
+                                alive_hosts.append(hostname)
+                        else:
+                            # Fallback to host field if no URL
+                            host = host_data.get('host', '')
+                            if host:
+                                alive_hosts.append(host)
+
+                # Remove duplicates while preserving order
+                alive_hosts = list(dict.fromkeys(alive_hosts))
 
                 # Create a dictionary for easier access to HTTP probe data
                 # Map both hostnames and URLs to the data for better matching
