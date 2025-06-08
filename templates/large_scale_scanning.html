@@ -57,24 +57,29 @@
 
             <!-- Scan Features -->
             <div class="mt-6">
-                <h3 class="text-sm font-medium text-gray-300 mb-3">Scan Features:</h3>
+                <h3 class="text-sm font-medium text-gray-300 mb-3">Progressive Scan Features:</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-400">
-                    <div><i class="fas fa-check text-green-400 mr-2"></i>Background processing</div>
-                    <div><i class="fas fa-check text-green-400 mr-2"></i>Real-time progress updates</div>
-                    <div><i class="fas fa-check text-green-400 mr-2"></i>Subfinder subdomain discovery</div>
-                    <div><i class="fas fa-check text-green-400 mr-2"></i>httpx HTTP probing</div>
-                    <div><i class="fas fa-check text-green-400 mr-2"></i>Nmap port scanning</div>
-                    <div><i class="fas fa-check text-green-400 mr-2"></i>Nuclei vulnerability scanning</div>
+                    <div><i class="fas fa-check text-green-400 mr-2"></i>Real-time progressive updates</div>
+                    <div><i class="fas fa-check text-green-400 mr-2"></i>Immediate subdomain population</div>
+                    <div><i class="fas fa-check text-green-400 mr-2"></i>Live HTTP status updates</div>
+                    <div><i class="fas fa-check text-green-400 mr-2"></i>Progressive port discovery</div>
+                    <div><i class="fas fa-check text-green-400 mr-2"></i>Server-Sent Events streaming</div>
+                    <div><i class="fas fa-check text-green-400 mr-2"></i>Assets page auto-population</div>
                 </div>
             </div>
 
             <!-- Start Scan Button -->
-            <div class="mt-6">
-                <button id="startScan" 
+            <div class="mt-6 flex gap-4">
+                <button id="startScan"
                         class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md transition duration-200">
-                    <i class="fas fa-play mr-2"></i>
-                    Start Large-Scale Scan
+                    <i class="fas fa-rocket mr-2"></i>
+                    Start Progressive Scan
                 </button>
+                <a href="/assets"
+                   class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-md transition duration-200 inline-flex items-center">
+                    <i class="fas fa-eye mr-2"></i>
+                    View Assets Page
+                </a>
             </div>
         </div>
 
@@ -96,8 +101,8 @@
                 </div>
             </div>
 
-            <!-- Current Stage -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <!-- Progressive Scanning Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                 <div class="bg-gray-700 p-3 rounded">
                     <div class="text-gray-400">Current Stage</div>
                     <div id="currentStage" class="text-white font-medium">-</div>
@@ -107,8 +112,12 @@
                     <div id="subdomainsFound" class="text-green-400 font-medium">0</div>
                 </div>
                 <div class="bg-gray-700 p-3 rounded">
-                    <div class="text-gray-400">Alive Hosts</div>
-                    <div id="aliveHosts" class="text-blue-400 font-medium">0</div>
+                    <div class="text-gray-400">Assets Stored</div>
+                    <div id="assetsStored" class="text-blue-400 font-medium">0</div>
+                </div>
+                <div class="bg-gray-700 p-3 rounded">
+                    <div class="text-gray-400">Progressive Updates</div>
+                    <div id="progressiveUpdates" class="text-purple-400 font-medium">0</div>
                 </div>
             </div>
 
@@ -123,10 +132,22 @@
         <div id="resultsSection" class="bg-gray-800 rounded-lg p-6 hidden">
             <h2 class="text-xl font-semibold mb-4 text-blue-300">
                 <i class="fas fa-chart-bar mr-2"></i>
-                Scan Results
+                Progressive Scan Results
             </h2>
             <div id="scanResults" class="text-gray-300">
                 <!-- Results will be populated here -->
+            </div>
+
+            <!-- View Assets Button -->
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                <a href="/assets"
+                   class="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-md transition duration-200 inline-flex items-center">
+                    <i class="fas fa-external-link-alt mr-2"></i>
+                    View All Assets in Assets Page
+                </a>
+                <p class="text-sm text-gray-400 mt-2">
+                    See the discovered assets with real-time status updates, HTTP codes, technologies, and port information.
+                </p>
             </div>
         </div>
 
@@ -142,11 +163,12 @@
 
     <script>
         let currentTaskId = null;
-        let progressInterval = null;
+        let progressEventSource = null;
+        let progressiveUpdateCount = 0;
 
-        document.getElementById('startScan').addEventListener('click', startLargeScan);
+        document.getElementById('startScan').addEventListener('click', startProgressiveScan);
 
-        async function startLargeScan() {
+        async function startProgressiveScan() {
             const domain = document.getElementById('domain').value.trim();
             const scanType = document.getElementById('scanType').value;
 
@@ -158,16 +180,18 @@
             // Hide previous results/errors
             document.getElementById('resultsSection').classList.add('hidden');
             document.getElementById('errorSection').classList.add('hidden');
-            
+
             // Show progress section
             document.getElementById('progressSection').classList.remove('hidden');
-            
+
             // Reset progress
-            updateProgress(0, 'Initializing scan...', 'initializing');
+            updateProgress(0, 'Initializing progressive scan...', 'initializing');
             document.getElementById('scanDomain').textContent = domain;
+            progressiveUpdateCount = 0;
 
             try {
-                const response = await fetch('/api/scan/large-domain', {
+                // Start progressive scanning
+                const response = await fetch('/api/large-scale-scan-progressive', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -182,95 +206,165 @@
 
                 if (data.success) {
                     currentTaskId = data.task_id;
-                    currentMode = data.mode || 'celery';
                     document.getElementById('taskId').textContent = currentTaskId;
 
-                    // Show mode-specific information
-                    if (data.mode === 'fallback') {
-                        showFallbackNotice(data);
-                    }
-
-                    // Start monitoring progress
-                    startProgressMonitoring();
+                    // Start Server-Sent Events for real-time updates
+                    startProgressiveUpdates(data.progressive_updates_url);
                 } else {
-                    showError(data.error || 'Failed to start scan');
+                    showError(data.error || 'Failed to start progressive scan');
                 }
             } catch (error) {
                 showError('Network error: ' + error.message);
             }
         }
 
-        let currentMode = 'celery'; // Track current scanning mode
-
-        function startProgressMonitoring() {
-            if (progressInterval) {
-                clearInterval(progressInterval);
+        function startProgressiveUpdates(updatesUrl) {
+            // Close existing EventSource if any
+            if (progressEventSource) {
+                progressEventSource.close();
             }
 
-            progressInterval = setInterval(async () => {
+            console.log('🚀 Starting Server-Sent Events for progressive updates:', updatesUrl);
+
+            // Create new EventSource for real-time updates
+            progressEventSource = new EventSource(updatesUrl);
+
+            progressEventSource.onopen = function(event) {
+                console.log('✅ Progressive updates connection opened');
+                updateProgress(5, 'Connected to progressive updates stream...', 'connected');
+            };
+
+            progressEventSource.onmessage = function(event) {
                 try {
-                    // Use appropriate endpoint based on mode
-                    const endpoint = currentMode === 'fallback'
-                        ? `/api/scan/fallback-status/${currentTaskId}`
-                        : `/api/scan/celery-status/${currentTaskId}`;
+                    const data = JSON.parse(event.data);
+                    console.log('📊 Progressive update received:', data);
 
-                    const response = await fetch(endpoint);
-                    const data = await response.json();
+                    progressiveUpdateCount++;
+                    document.getElementById('progressiveUpdates').textContent = progressiveUpdateCount;
 
-                    if (data.success) {
-                        if (data.state === 'PROGRESS') {
-                            updateProgress(
-                                data.progress,
-                                data.message,
-                                data.stage,
-                                data.subdomains_found,
-                                data.alive_hosts_found
-                            );
-                        } else if (data.state === 'SUCCESS') {
-                            clearInterval(progressInterval);
-                            updateProgress(100, 'Scan completed successfully!', 'completed');
-                            showResults(data.result);
-                        } else if (data.state === 'FAILURE') {
-                            clearInterval(progressInterval);
-                            showError(data.error || 'Scan failed');
-                        }
-                    }
+                    handleProgressiveUpdate(data);
                 } catch (error) {
-                    console.error('Error checking progress:', error);
+                    console.error('Error parsing progressive update:', error);
                 }
-            }, 3000); // Check every 3 seconds
+            };
+
+            progressEventSource.onerror = function(event) {
+                console.error('❌ Progressive updates connection error:', event);
+
+                if (progressEventSource.readyState === EventSource.CLOSED) {
+                    console.log('🔌 Progressive updates connection closed');
+                } else {
+                    showError('Lost connection to progressive updates. Retrying...');
+                }
+            };
         }
 
-        function updateProgress(percent, message, stage, subdomains = 0, aliveHosts = 0) {
+        function handleProgressiveUpdate(data) {
+            const updateType = data.type;
+
+            switch (updateType) {
+                case 'connected':
+                    updateProgress(10, 'Progressive scanning initialized...', 'connected');
+                    break;
+
+                case 'progressive_update':
+                    const stage = data.stage || 'unknown';
+                    const progress = data.progress || 0;
+                    const message = data.message || 'Processing...';
+                    const update = data.update || {};
+
+                    updateProgress(progress, message, stage);
+
+                    // Handle specific progressive updates
+                    if (update.type === 'subdomains_discovered') {
+                        const count = update.count || 0;
+                        document.getElementById('subdomainsFound').textContent = count;
+                        updateProgress(progress, `Discovered ${count} subdomains, storing in database...`, 'subdomain_discovery');
+                    } else if (update.type === 'subdomains_stored') {
+                        const storedCount = update.stored_count || 0;
+                        document.getElementById('assetsStored').textContent = storedCount;
+                        updateProgress(progress, `Stored ${storedCount} assets, starting HTTP probing...`, 'progressive_storage');
+                    }
+                    break;
+
+                case 'completed':
+                    updateProgress(100, 'Progressive scan completed successfully!', 'completed');
+                    showProgressiveResults(data.result);
+                    closeProgressiveUpdates();
+                    break;
+
+                case 'failed':
+                    showError(`Progressive scan failed: ${data.error}`);
+                    closeProgressiveUpdates();
+                    break;
+
+                case 'timeout':
+                    showError('Progressive scan timed out. Please check the Assets page for partial results.');
+                    closeProgressiveUpdates();
+                    break;
+
+                default:
+                    console.log('Unknown progressive update type:', updateType);
+            }
+        }
+
+        function closeProgressiveUpdates() {
+            if (progressEventSource) {
+                progressEventSource.close();
+                progressEventSource = null;
+                console.log('🔌 Closed progressive updates connection');
+            }
+        }
+
+        function updateProgress(percent, message, stage) {
             document.getElementById('progressBar').style.width = percent + '%';
             document.getElementById('progressPercent').textContent = percent + '%';
             document.getElementById('progressLabel').textContent = message;
             document.getElementById('currentStage').textContent = stage || '-';
-            document.getElementById('subdomainsFound').textContent = subdomains || 0;
-            document.getElementById('aliveHosts').textContent = aliveHosts || 0;
         }
 
-        function showResults(results) {
+        function showProgressiveResults(results) {
             const resultsDiv = document.getElementById('scanResults');
+            const subdomainsFound = document.getElementById('subdomainsFound').textContent || '0';
+            const assetsStored = document.getElementById('assetsStored').textContent || '0';
+            const progressiveUpdates = document.getElementById('progressiveUpdates').textContent || '0';
+
             resultsDiv.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div class="bg-gray-700 p-4 rounded">
-                        <div class="text-2xl font-bold text-green-400">${results.subdomains_found || 0}</div>
+                        <div class="text-2xl font-bold text-green-400">${subdomainsFound}</div>
                         <div class="text-gray-400">Subdomains Discovered</div>
                     </div>
                     <div class="bg-gray-700 p-4 rounded">
-                        <div class="text-2xl font-bold text-blue-400">${results.alive_hosts_found || 0}</div>
-                        <div class="text-gray-400">Alive Hosts</div>
+                        <div class="text-2xl font-bold text-blue-400">${assetsStored}</div>
+                        <div class="text-gray-400">Assets Stored</div>
                     </div>
                     <div class="bg-gray-700 p-4 rounded">
-                        <div class="text-2xl font-bold text-yellow-400">${results.scan_type || 'N/A'}</div>
+                        <div class="text-2xl font-bold text-purple-400">${progressiveUpdates}</div>
+                        <div class="text-gray-400">Progressive Updates</div>
+                    </div>
+                    <div class="bg-gray-700 p-4 rounded">
+                        <div class="text-2xl font-bold text-yellow-400">${results?.scan_type || 'Progressive'}</div>
                         <div class="text-gray-400">Scan Type</div>
                     </div>
                 </div>
+                <div class="bg-green-900 border border-green-700 rounded-lg p-4 mb-4">
+                    <h3 class="text-lg font-semibold text-green-300 mb-2">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        Progressive Scan Completed Successfully!
+                    </h3>
+                    <div class="text-green-200 text-sm space-y-2">
+                        <p>✅ <strong>Real-time data population:</strong> Assets appeared immediately after subdomain discovery</p>
+                        <p>🌐 <strong>Progressive HTTP status:</strong> Status codes and technologies populated as discovered</p>
+                        <p>🔍 <strong>Progressive port scanning:</strong> Port information appeared as scanning completed</p>
+                        <p>📊 <strong>Server-Sent Events:</strong> Real-time updates without page refresh</p>
+                        <p>🎯 <strong>Complete workflow:</strong> From discovery to detailed analysis in real-time</p>
+                    </div>
+                </div>
                 <div class="text-sm text-gray-400">
-                    <p>✅ Scan completed successfully</p>
-                    <p>📊 Results have been stored in the database</p>
-                    <p>🔍 Check the Assets page to view discovered subdomains</p>
+                    <p><i class="fas fa-database mr-2"></i>All discovered assets have been stored in the database with progressive metadata</p>
+                    <p><i class="fas fa-chart-line mr-2"></i>Progressive scanning provided immediate feedback and real-time updates</p>
+                    <p><i class="fas fa-external-link-alt mr-2"></i>Visit the Assets page to see the complete attack surface with status badges, technologies, and ports</p>
                 </div>
             `;
             document.getElementById('resultsSection').classList.remove('hidden');

@@ -101,10 +101,10 @@
                     <i class="ri-add-line mr-2"></i>Add Asset
                 </button>
 
-                <!-- Progressive Scanning Button -->
-                <button onclick="startProgressiveScanning()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                    <i class="ri-radar-line mr-2"></i>Progressive Scan Demo
-                </button>
+                <!-- Progressive Scanning Link -->
+                <a href="/large-scale-scanning" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
+                    <i class="ri-radar-line mr-2"></i>Start Progressive Scan
+                </a>
 
                 <!-- User Menu -->
                 <div class="relative">
@@ -118,6 +118,22 @@
                 </div>
             </div>
         </header>
+
+        <!-- Progressive Scanning Notification -->
+        <div id="progressive-scanning-notification" class="bg-blue-50 border-l-4 border-blue-400 p-4 mx-6 mt-4 hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+                    <div>
+                        <h3 class="text-blue-800 font-semibold">Progressive Scanning Active</h3>
+                        <p class="text-blue-700 text-sm">Assets are being populated in real-time as scanning progresses. New subdomains, HTTP status codes, and port information will appear automatically.</p>
+                    </div>
+                </div>
+                <button onclick="hideProgressiveNotification()" class="text-blue-600 hover:text-blue-800">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+        </div>
 
         <!-- Assets Content -->
         <div class="flex-1 overflow-y-auto p-6">
@@ -1312,299 +1328,67 @@ function hideTechnologiesModal() {
 }
 
 // ============================================================================
-// PROGRESSIVE SCANNING WITH REAL-TIME UPDATES
+// PROGRESSIVE SCANNING NOTIFICATION MANAGEMENT
 // ============================================================================
 
-function startProgressiveScanning() {
-    // Start progressive scanning with real-time updates
-    console.log('🚀 Starting progressive scanning with real-time updates');
-
-    // Show progressive scanning indicator
-    showProgressiveScanningIndicator();
-
-    // For demo purposes, simulate progressive updates
-    // In production, this would connect to the actual progressive scanning endpoint
-    simulateProgressiveScanning();
-}
-
-function showProgressiveScanningIndicator() {
-    // Show visual indicator that progressive scanning is active
-    const indicator = document.createElement('div');
-    indicator.id = 'progressive-scanning-indicator';
-    indicator.className = 'fixed top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-    indicator.innerHTML = `
-        <div class="flex items-center space-x-2">
-            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span>Progressive scanning active...</span>
-            <button onclick="stopProgressiveScanning()" class="ml-2 text-white hover:text-gray-200">
-                <i class="ri-close-line"></i>
-            </button>
-        </div>
-    `;
-    document.body.appendChild(indicator);
-}
-
-function hideProgressiveScanningIndicator() {
-    // Hide progressive scanning indicator
-    const indicator = document.getElementById('progressive-scanning-indicator');
-    if (indicator) {
-        indicator.remove();
+function showProgressiveNotification() {
+    // Show progressive scanning notification banner
+    const notification = document.getElementById('progressive-scanning-notification');
+    if (notification) {
+        notification.classList.remove('hidden');
     }
 }
 
-function simulateProgressiveScanning() {
-    // Simulate progressive scanning updates for demonstration
-    progressiveScanActive = true;
-    progressiveUpdateCount = 0;
+function hideProgressiveNotification() {
+    // Hide progressive scanning notification banner
+    const notification = document.getElementById('progressive-scanning-notification');
+    if (notification) {
+        notification.classList.add('hidden');
+    }
+}
 
-    // Stage 1: Subdomain Discovery (immediate population)
-    setTimeout(() => {
-        if (!progressiveScanActive) return;
+// ============================================================================
+// REAL-TIME ASSET UPDATES FOR PROGRESSIVE SCANNING
+// ============================================================================
 
-        console.log('📊 Stage 1: Subdomain Discovery - Adding subdomains');
-        addProgressiveSubdomains();
-        updateProgressiveScanningIndicator('Subdomains discovered, starting HTTP probing...');
+// Check for progressive scanning activity and auto-refresh assets
+function checkForProgressiveScanning() {
+    // Check if there are any assets with scanning status
+    const scanningAssets = assetsData.filter(asset =>
+        asset.asset_metadata && asset.asset_metadata.scan_status === 'scanning'
+    );
 
-        // Stage 2: HTTP Status Population (progressive updates)
+    if (scanningAssets.length > 0) {
+        showProgressiveNotification();
+        // Auto-refresh assets every 5 seconds during progressive scanning
         setTimeout(() => {
-            if (!progressiveScanActive) return;
-
-            console.log('🌐 Stage 2: HTTP Status Population - Updating HTTP status');
-            updateProgressiveHttpStatus();
-            updateProgressiveScanningIndicator('HTTP probing complete, starting port scanning...');
-
-            // Stage 3: Port Scanning Population (progressive updates)
-            setTimeout(() => {
-                if (!progressiveScanActive) return;
-
-                console.log('🔍 Stage 3: Port Scanning - Adding port information');
-                updateProgressivePortScanning();
-                updateProgressiveScanningIndicator('Port scanning complete, finalizing...');
-
-                // Stage 4: Completion
-                setTimeout(() => {
-                    if (!progressiveScanActive) return;
-
-                    console.log('✅ Progressive scanning completed');
-                    completeProgressiveScanning();
-                }, 2000);
-            }, 3000);
-        }, 4000);
-    }, 2000);
-}
-
-function addProgressiveSubdomains() {
-    // Add discovered subdomains immediately with scanning status
-    const newSubdomains = [
-        {
-            id: Date.now() + 1,
-            name: 'www.example.com',
-            type: 'subdomain',
-            description: 'No description',
-            is_active: true,
-            last_scan: 'Never',
-            risk_level: 'none',
-            asset_metadata: {
-                scan_status: 'scanning',
-                http_probe: {},
-                ports: []
-            }
-        },
-        {
-            id: Date.now() + 2,
-            name: 'api.example.com',
-            type: 'subdomain',
-            description: 'No description',
-            is_active: true,
-            last_scan: 'Never',
-            risk_level: 'none',
-            asset_metadata: {
-                scan_status: 'scanning',
-                http_probe: {},
-                ports: []
-            }
-        },
-        {
-            id: Date.now() + 3,
-            name: 'mail.example.com',
-            type: 'subdomain',
-            description: 'No description',
-            is_active: true,
-            last_scan: 'Never',
-            risk_level: 'none',
-            asset_metadata: {
-                scan_status: 'scanning',
-                http_probe: {},
-                ports: []
-            }
-        }
-    ];
-
-    // Add new subdomains to assets data
-    assetsData.push(...newSubdomains);
-
-    // Re-render assets to show new subdomains with "Scanning..." status
-    filterAssets();
-
-    console.log(`✅ Added ${newSubdomains.length} subdomains with scanning status`);
-}
-
-function updateProgressiveHttpStatus() {
-    // Update assets with HTTP status codes and technologies progressively
-    const httpUpdates = [
-        {
-            name: 'www.example.com',
-            http_probe: {
-                status_code: 200,
-                title: 'Example Domain',
-                tech: ['Apache', 'PHP'],
-                webserver: 'Apache',
-                url: 'https://www.example.com'
-            }
-        },
-        {
-            name: 'api.example.com',
-            http_probe: {
-                status_code: 200,
-                title: 'API Gateway',
-                tech: ['Nginx', 'Node.js', 'Express'],
-                webserver: 'Nginx',
-                url: 'https://api.example.com'
-            }
-        },
-        {
-            name: 'mail.example.com',
-            http_probe: {
-                status_code: 404,
-                title: 'Not Found',
-                tech: ['Apache'],
-                webserver: 'Apache',
-                url: 'https://mail.example.com'
-            }
-        }
-    ];
-
-    // Update assets with HTTP probe data
-    httpUpdates.forEach(update => {
-        const asset = assetsData.find(a => a.name === update.name);
-        if (asset) {
-            asset.asset_metadata.http_probe = update.http_probe;
-            asset.asset_metadata.scan_status = 'http_complete';
-        }
-    });
-
-    // Re-render assets to show HTTP status codes and technologies
-    filterAssets();
-
-    console.log(`✅ Updated ${httpUpdates.length} assets with HTTP probe data`);
-}
-
-function updateProgressivePortScanning() {
-    // Update assets with port scanning results progressively
-    const portUpdates = [
-        {
-            name: 'www.example.com',
-            ports: [
-                { port: '80', service: 'http', protocol: 'tcp', state: 'open' },
-                { port: '443', service: 'https', protocol: 'tcp', state: 'open' }
-            ]
-        },
-        {
-            name: 'api.example.com',
-            ports: [
-                { port: '80', service: 'http', protocol: 'tcp', state: 'open' },
-                { port: '443', service: 'https', protocol: 'tcp', state: 'open' },
-                { port: '8080', service: 'http-alt', protocol: 'tcp', state: 'open' }
-            ]
-        },
-        {
-            name: 'mail.example.com',
-            ports: [
-                { port: '25', service: 'smtp', protocol: 'tcp', state: 'open' },
-                { port: '587', service: 'submission', protocol: 'tcp', state: 'open' },
-                { port: '993', service: 'imaps', protocol: 'tcp', state: 'open' }
-            ]
-        }
-    ];
-
-    // Update assets with port scan data
-    portUpdates.forEach(update => {
-        const asset = assetsData.find(a => a.name === update.name);
-        if (asset) {
-            asset.asset_metadata.ports = update.ports;
-            asset.asset_metadata.scan_status = 'port_complete';
-        }
-    });
-
-    // Re-render assets to show port information
-    filterAssets();
-
-    console.log(`✅ Updated ${portUpdates.length} assets with port scan data`);
-}
-
-function completeProgressiveScanning() {
-    // Complete progressive scanning and mark all assets as completed
-    // Mark all scanning assets as completed
-    assetsData.forEach(asset => {
-        if (asset.asset_metadata && asset.asset_metadata.scan_status) {
-            asset.asset_metadata.scan_status = 'completed';
-            asset.last_scan = new Date().toLocaleDateString();
-        }
-    });
-
-    // Final re-render
-    filterAssets();
-
-    // Hide scanning indicator
-    hideProgressiveScanningIndicator();
-
-    // Show completion notification
-    showProgressiveCompletionNotification();
-
-    progressiveScanActive = false;
-    console.log('🎉 Progressive scanning completed successfully');
-}
-
-function updateProgressiveScanningIndicator(message) {
-    // Update the progressive scanning indicator message
-    const indicator = document.getElementById('progressive-scanning-indicator');
-    if (indicator) {
-        const span = indicator.querySelector('span');
-        if (span) {
-            span.textContent = message;
-        }
+            loadAssets();
+            checkForProgressiveScanning();
+        }, 5000);
+    } else {
+        hideProgressiveNotification();
     }
 }
 
-function stopProgressiveScanning() {
-    // Stop progressive scanning
-    progressiveScanActive = false;
-    hideProgressiveScanningIndicator();
-    console.log('⏹️ Progressive scanning stopped by user');
+// Enhanced loadAssets function to detect progressive scanning
+function loadAssetsWithProgressiveDetection() {
+    loadAssets().then(() => {
+        checkForProgressiveScanning();
+    });
 }
 
-function showProgressiveCompletionNotification() {
-    // Show completion notification
-    const notification = document.createElement('div');
-    notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50';
-    notification.innerHTML = `
-        <div class="flex items-center space-x-2">
-            <i class="ri-check-circle-line"></i>
-            <span>Progressive scanning completed successfully!</span>
-            <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
-                <i class="ri-close-line"></i>
-            </button>
-        </div>
-    `;
-    document.body.appendChild(notification);
+// Auto-refresh assets when page becomes visible (for real-time updates)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        loadAssetsWithProgressiveDetection();
+    }
+});
 
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
-        }
-    }, 5000);
-}
+// Check for progressive scanning on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial check after assets are loaded
+    setTimeout(checkForProgressiveScanning, 2000);
+});
 
 // Delete Confirmation Modal Functions
 let assetToDelete = null;
