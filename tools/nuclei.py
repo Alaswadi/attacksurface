@@ -82,13 +82,21 @@ class NucleiScanner(BaseScanner):
                 else:
                     cmd.extend(['-exclude-tags', exclude_tags])
             
-            # Add performance options
-            rate_limit = kwargs.get('rate_limit', 150)
-            cmd.extend(['-rate-limit', str(rate_limit)])
-            
-            concurrency = kwargs.get('concurrency', 25)
+            # Add optimized performance options
+            rate_limit = kwargs.get('rate_limit', 400)
+            cmd.extend(['-rl', str(rate_limit)])  # Use -rl instead of -rate-limit
+
+            concurrency = kwargs.get('concurrency', 100)
             cmd.extend(['-c', str(concurrency)])
-            
+
+            # Add bulk size for better performance
+            bulk_size = kwargs.get('bulk_size', 75)
+            cmd.extend(['-bs', str(bulk_size)])
+
+            # Add scan strategy for multiple hosts
+            scan_strategy = kwargs.get('scan_strategy', 'host-spray')
+            cmd.extend(['-ss', scan_strategy])
+
             timeout = kwargs.get('timeout', 5)
             cmd.extend(['-timeout', str(timeout)])
             

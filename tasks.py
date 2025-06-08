@@ -1882,27 +1882,33 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
                 from tools.nuclei import NucleiScanner
                 nuclei_scanner = NucleiScanner()
 
-                # Configure Nuclei based on scan type - use specific fast templates
+                # Configure Nuclei with optimized performance settings
                 nuclei_config = {
                     'quick': {
-                        'templates': ['cves', 'exposures'],  # Use specific template categories without trailing slash
-                        'rate_limit': 500,
-                        'concurrency': 50,
-                        'timeout': 5,  # Reduced timeout per request
+                        'templates': ['cves', 'exposures'],
+                        'rate_limit': 400,  # High rate limit for quick scan
+                        'concurrency': 100,  # High concurrency
+                        'bulk_size': 75,  # Optimized bulk size
+                        'scan_strategy': 'host-spray',  # Spray mode for multiple hosts
+                        'timeout': 5,
                         'severity': ['critical', 'high']
                     },
                     'deep': {
-                        'templates': ['cves', 'exposures', 'vulnerabilities'],  # More templates but still focused
-                        'rate_limit': 200,
-                        'concurrency': 30,
-                        'timeout': 10,  # Reduced timeout per request
+                        'templates': ['cves', 'exposures', 'vulnerabilities'],
+                        'rate_limit': 400,  # Consistent high performance
+                        'concurrency': 100,
+                        'bulk_size': 75,
+                        'scan_strategy': 'host-spray',
+                        'timeout': 10,
                         'severity': ['critical', 'high', 'medium']
                     },
                     'comprehensive': {
-                        'templates': ['cves', 'exposures', 'vulnerabilities', 'misconfiguration'],  # Comprehensive but not all
-                        'rate_limit': 100,
-                        'concurrency': 20,
-                        'timeout': 15,  # Reduced timeout per request
+                        'templates': ['cves', 'exposures', 'vulnerabilities', 'misconfiguration'],
+                        'rate_limit': 400,  # Maintain high performance even for comprehensive
+                        'concurrency': 100,
+                        'bulk_size': 75,
+                        'scan_strategy': 'host-spray',
+                        'timeout': 15,
                         'severity': ['critical', 'high', 'medium', 'low']
                     }
                 }
