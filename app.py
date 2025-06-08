@@ -11,16 +11,20 @@ from celery import Celery
 
 def make_celery(app):
     """Create Celery instance and configure it with Flask app context"""
+    # Get broker and backend URLs with fallbacks
+    broker_url = app.config.get('broker_url') or app.config.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
+    result_backend = app.config.get('result_backend') or app.config.get('CELERY_RESULT_BACKEND') or 'redis://localhost:6379/0'
+
     celery = Celery(
         app.import_name,
-        backend=app.config['result_backend'],
-        broker=app.config['broker_url']
+        backend=result_backend,
+        broker=broker_url
     )
 
     # Update Celery configuration with new format
     celery.conf.update(
-        broker_url=app.config['broker_url'],
-        result_backend=app.config['result_backend'],
+        broker_url=broker_url,
+        result_backend=result_backend,
         task_serializer=app.config.get('task_serializer', 'json'),
         accept_content=app.config.get('accept_content', ['json']),
         result_serializer=app.config.get('result_serializer', 'json'),

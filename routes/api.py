@@ -908,12 +908,12 @@ def start_large_domain_scan():
             }), 400
 
         # Get user's organization
-        org = current_user.organization
+        org = Organization.query.filter_by(user_id=current_user.id).first()
         if not org:
-            return jsonify({
-                'success': False,
-                'error': 'User must belong to an organization'
-            }), 400
+            # Create default organization for user
+            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
+            db.session.add(org)
+            db.session.commit()
 
         # Start the large-scale scan orchestrator task
         task = large_domain_scan_orchestrator.delay(domain, org.id, scan_type)
