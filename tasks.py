@@ -141,6 +141,82 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
 
         logger.info(f"🌐 Total alive hosts found: {len(alive_hosts)}")
 
+        # Stage 3: Final Processing and Storage
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'finalizing',
+                'domain': domain,
+                'progress': 90,
+                'message': 'Finalizing scan results and storing data...',
+                'current_phase': 'Data storage and cleanup',
+                'subdomains_found': len(subdomains),
+                'alive_hosts_found': len(alive_hosts)
+            }
+        )
+
+        # Store main domain asset if it doesn't exist
+        try:
+            from models import Asset, AssetType
+
+            main_domain_asset = Asset.query.filter_by(
+                name=domain,
+                organization_id=organization_id
+            ).first()
+
+            if not main_domain_asset:
+                main_domain_asset = Asset(
+                    name=domain,
+                    asset_type=AssetType.DOMAIN,
+                    description=f"Main domain discovered during large-scale scan",
+                    organization_id=organization_id,
+                    discovered_at=datetime.now(),
+                    last_scanned=datetime.now(),
+                    asset_metadata={
+                        'scan_source': 'large_scale_orchestrator',
+                        'scan_type': scan_type,
+                        'subdomains_found': len(subdomains),
+                        'alive_hosts_found': len(alive_hosts)
+                    }
+                )
+                db.session.add(main_domain_asset)
+            else:
+                # Update existing asset
+                main_domain_asset.last_scanned = datetime.now()
+                existing_metadata = main_domain_asset.asset_metadata or {}
+                existing_metadata.update({
+                    'scan_source': 'large_scale_orchestrator',
+                    'scan_type': scan_type,
+                    'subdomains_found': len(subdomains),
+                    'alive_hosts_found': len(alive_hosts),
+                    'last_large_scale_scan': datetime.now().isoformat()
+                })
+                main_domain_asset.asset_metadata = existing_metadata
+
+            db.session.commit()
+            logger.info(f"📊 Updated main domain asset for {domain}")
+
+        except Exception as storage_error:
+            logger.warning(f"⚠️ Failed to update main domain asset: {str(storage_error)}")
+            db.session.rollback()
+
+        # Final completion
+        self.update_state(
+            state='SUCCESS',
+            meta={
+                'stage': 'completed',
+                'domain': domain,
+                'progress': 100,
+                'message': f'Large-scale scan completed successfully! Found {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts.',
+                'current_phase': 'Completed',
+                'subdomains_found': len(subdomains),
+                'alive_hosts_found': len(alive_hosts),
+                'completed_at': datetime.now().isoformat()
+            }
+        )
+
+        logger.info(f"🎉 Large-scale scan orchestration completed for {domain}")
+
         return {
             'success': True,
             'domain': domain,
@@ -150,9 +226,10 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
             'subdomains': subdomains,
             'alive_hosts': alive_hosts,
             'http_results': http_results,
-            'stage': 'http_probing_complete',
-            'progress': 50,
-            'message': f'HTTP probing complete. Found {len(alive_hosts)} alive hosts.'
+            'stage': 'completed',
+            'progress': 100,
+            'message': f'Large-scale scan completed successfully! Found {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts.',
+            'completed_at': datetime.now().isoformat()
         }
 
     except Exception as e:
@@ -294,27 +371,53 @@ def subdomain_discovery_task(self, domain: str, organization_id: int, scan_type:
         stored_count = 0
         for subdomain in subdomains:
             try:
+                # Extract hostname from subdomain data
+                if isinstance(subdomain, dict):
+                    hostname = subdomain.get('host', '')
+                    source = subdomain.get('source', 'subfinder')
+                    ip = subdomain.get('ip', '')
+                    timestamp = subdomain.get('timestamp', '')
+                else:
+                    # Handle string format (fallback)
+                    hostname = str(subdomain)
+                    source = 'subfinder'
+                    ip = ''
+                    timestamp = ''
+
+                if not hostname:
+                    logger.warning(f"Skipping subdomain with empty hostname: {subdomain}")
+                    continue
+
                 # Check if subdomain already exists
                 existing_asset = Asset.query.filter_by(
-                    name=subdomain,
+                    name=hostname,
                     organization_id=organization_id
                 ).first()
 
                 if not existing_asset:
+                    # Create asset metadata with discovery details
+                    asset_metadata = {
+                        'discovery_method': 'subfinder',
+                        'parent_domain': domain,
+                        'scan_type': scan_type,
+                        'source': source,
+                        'discovered_ip': ip,
+                        'discovery_timestamp': timestamp or datetime.now().isoformat()
+                    }
+
                     asset = Asset(
-                        name=subdomain,
+                        name=hostname,
                         asset_type=AssetType.SUBDOMAIN,
                         organization_id=organization_id,
                         discovered_at=datetime.now(),
                         is_active=True,
-                        metadata=json.dumps({
-                            'discovery_method': 'subfinder',
-                            'parent_domain': domain,
-                            'scan_type': scan_type
-                        })
+                        asset_metadata=asset_metadata
                     )
                     db.session.add(asset)
                     stored_count += 1
+                    logger.debug(f"✅ Added new subdomain: {hostname}")
+                else:
+                    logger.debug(f"⚠️ Subdomain already exists: {hostname}")
 
             except Exception as e:
                 logger.warning(f"Failed to store subdomain {subdomain}: {str(e)}")

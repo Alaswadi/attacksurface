@@ -1061,11 +1061,24 @@ def get_celery_scan_status(task_id):
                 'result': result
             }
         elif task.state == 'FAILURE':
+            # Handle task failure with proper error extraction
+            error_info = task.info
+            if isinstance(error_info, dict):
+                error_message = error_info.get('error', str(error_info))
+                stage = error_info.get('stage', 'failed')
+                failed_at = error_info.get('failed_at', '')
+            else:
+                error_message = str(error_info) if error_info else 'Unknown error'
+                stage = 'failed'
+                failed_at = ''
+
             response = {
                 'success': False,
                 'task_id': task_id,
                 'state': 'FAILURE',
-                'error': str(task.info),
+                'error': error_message,
+                'stage': stage,
+                'failed_at': failed_at,
                 'progress': 0
             }
         else:
