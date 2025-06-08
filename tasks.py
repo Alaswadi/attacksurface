@@ -142,13 +142,34 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                 ).first()
 
                 if not existing_asset:
+                    # Get HTTP probe data for this hostname
+                    http_probe_data = http_data.get(hostname, {})
+
+                    # Get port scan data for this hostname
+                    port_scan_data = port_results.get(hostname, [])
+
+                    # Format port data for frontend display
+                    ports_formatted = []
+                    if isinstance(port_scan_data, list):
+                        for port_info in port_scan_data:
+                            if isinstance(port_info, dict):
+                                ports_formatted.append({
+                                    'port': port_info.get('port', ''),
+                                    'service': port_info.get('service', ''),
+                                    'protocol': port_info.get('protocol', 'tcp'),
+                                    'state': port_info.get('state', 'open')
+                                })
+
                     asset_metadata = {
                         'discovery_method': 'subfinder',
                         'parent_domain': domain,
                         'scan_type': scan_type,
                         'source': source,
                         'discovered_ip': ip,
-                        'discovery_timestamp': timestamp or datetime.now().isoformat()
+                        'discovery_timestamp': timestamp or datetime.now().isoformat(),
+                        'http_probe': http_probe_data,  # ✅ Store HTTP probe data
+                        'ports': ports_formatted,       # ✅ Store port scan data
+                        'scan_source': 'large_scale_orchestrator'
                     }
 
                     asset = Asset(
@@ -161,9 +182,36 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                     )
                     db.session.add(asset)
                     stored_count += 1
-                    logger.debug(f"✅ Added new subdomain: {hostname}")
+                    logger.debug(f"✅ Added new subdomain: {hostname} with HTTP status: {http_probe_data.get('status_code', 'N/A')} and {len(ports_formatted)} ports")
                 else:
-                    logger.debug(f"⚠️ Subdomain already exists: {hostname}")
+                    # Update existing asset with new HTTP and port data
+                    http_probe_data = http_data.get(hostname, {})
+                    port_scan_data = port_results.get(hostname, [])
+
+                    # Format port data for frontend display
+                    ports_formatted = []
+                    if isinstance(port_scan_data, list):
+                        for port_info in port_scan_data:
+                            if isinstance(port_info, dict):
+                                ports_formatted.append({
+                                    'port': port_info.get('port', ''),
+                                    'service': port_info.get('service', ''),
+                                    'protocol': port_info.get('protocol', 'tcp'),
+                                    'state': port_info.get('state', 'open')
+                                })
+
+                    # Update existing metadata
+                    existing_metadata = existing_asset.asset_metadata or {}
+                    existing_metadata.update({
+                        'http_probe': http_probe_data,  # ✅ Update HTTP probe data
+                        'ports': ports_formatted,       # ✅ Update port scan data
+                        'last_large_scale_scan': datetime.now().isoformat(),
+                        'scan_source': 'large_scale_orchestrator'
+                    })
+                    existing_asset.asset_metadata = existing_metadata
+                    existing_asset.last_scanned = datetime.now()
+
+                    logger.debug(f"✅ Updated existing subdomain: {hostname} with HTTP status: {http_probe_data.get('status_code', 'N/A')} and {len(ports_formatted)} ports")
 
             except Exception as e:
                 logger.warning(f"Failed to store subdomain {subdomain}: {str(e)}")
@@ -379,6 +427,24 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                 organization_id=organization_id
             ).first()
 
+            # Get HTTP probe data for the main domain
+            domain_http_data = http_data.get(domain, {})
+
+            # Get port scan data for the main domain
+            domain_port_data = port_results.get(domain, [])
+
+            # Format port data for frontend display
+            domain_ports_formatted = []
+            if isinstance(domain_port_data, list):
+                for port_info in domain_port_data:
+                    if isinstance(port_info, dict):
+                        domain_ports_formatted.append({
+                            'port': port_info.get('port', ''),
+                            'service': port_info.get('service', ''),
+                            'protocol': port_info.get('protocol', 'tcp'),
+                            'state': port_info.get('state', 'open')
+                        })
+
             if not main_domain_asset:
                 main_domain_asset = Asset(
                     name=domain,
@@ -391,10 +457,13 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                         'scan_source': 'large_scale_orchestrator',
                         'scan_type': scan_type,
                         'subdomains_found': len(subdomains),
-                        'alive_hosts_found': len(alive_hosts)
+                        'alive_hosts_found': len(alive_hosts),
+                        'http_probe': domain_http_data,      # ✅ Store HTTP probe data
+                        'ports': domain_ports_formatted      # ✅ Store port scan data
                     }
                 )
                 db.session.add(main_domain_asset)
+                logger.debug(f"✅ Added main domain: {domain} with HTTP status: {domain_http_data.get('status_code', 'N/A')} and {len(domain_ports_formatted)} ports")
             else:
                 # Update existing asset
                 main_domain_asset.last_scanned = datetime.now()
@@ -404,9 +473,12 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                     'scan_type': scan_type,
                     'subdomains_found': len(subdomains),
                     'alive_hosts_found': len(alive_hosts),
-                    'last_large_scale_scan': datetime.now().isoformat()
+                    'last_large_scale_scan': datetime.now().isoformat(),
+                    'http_probe': domain_http_data,      # ✅ Update HTTP probe data
+                    'ports': domain_ports_formatted      # ✅ Update port scan data
                 })
                 main_domain_asset.asset_metadata = existing_metadata
+                logger.debug(f"✅ Updated main domain: {domain} with HTTP status: {domain_http_data.get('status_code', 'N/A')} and {len(domain_ports_formatted)} ports")
 
             db.session.commit()
             logger.info(f"📊 Updated main domain asset for {domain}")
