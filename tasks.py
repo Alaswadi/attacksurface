@@ -112,7 +112,205 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
 
         logger.info(f"📊 Discovered {len(subdomains)} subdomains for {domain}")
 
-        # Store subdomains in database
+        # Stage 2: HTTP Probing (BEFORE storing subdomains)
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'http_probing',
+                'domain': domain,
+                'progress': 40,
+                'message': f'Probing {len(subdomains)} subdomains for live hosts...',
+                'current_phase': 'HTTP probing with httpx',
+                'subdomains_found': len(subdomains)
+            }
+        )
+
+        logger.info(f"🌐 Starting HTTP probing for {len(subdomains)} subdomains")
+
+        # Extract hostnames for HTTP probing
+        hostnames = []
+        for subdomain in subdomains:
+            if isinstance(subdomain, dict):
+                hostname = subdomain.get('host', '')
+            else:
+                hostname = str(subdomain)
+            if hostname:
+                hostnames.append(hostname)
+
+        # Execute HTTP probing
+        alive_hosts = []
+        http_data = {}
+
+        if hostnames:
+            try:
+                # Import httpx scanner
+                from tools.httpx import HttpxScanner
+                httpx_scanner = HttpxScanner()
+
+                # Configure httpx based on scan type
+                httpx_config = {
+                    'quick': {
+                        'ports': [80, 443],
+                        'timeout': 5,
+                        'threads': 100,
+                        'tech_detect': False,
+                        'follow_redirects': False
+                    },
+                    'deep': {
+                        'ports': [80, 443, 8080, 8443, 8000, 3000],
+                        'timeout': 10,
+                        'threads': 50,
+                        'tech_detect': True,
+                        'follow_redirects': True
+                    },
+                    'full': {
+                        'ports': [80, 443, 8080, 8443, 8000, 3000, 9000, 9090],
+                        'timeout': 15,
+                        'threads': 30,
+                        'tech_detect': True,
+                        'follow_redirects': True
+                    }
+                }
+
+                http_config = httpx_config.get(scan_type, httpx_config['deep'])
+
+                # Perform HTTP probing
+                probe_results = httpx_scanner.scan(hostnames, **http_config)
+                alive_hosts_data = probe_results.get('alive_hosts', [])
+
+                # Extract alive hostnames and build HTTP data
+                for host in alive_hosts_data:
+                    hostname = host.get('host', '')
+                    if hostname:
+                        alive_hosts.append(hostname)
+                        http_data[hostname] = {
+                            'url': host.get('url', ''),
+                            'status_code': host.get('status_code', 0),
+                            'title': host.get('title', ''),
+                            'tech': host.get('tech', []),
+                            'webserver': host.get('webserver', ''),
+                            'content_length': host.get('content_length', 0),
+                            'response_time': host.get('response_time', ''),
+                            'scheme': host.get('scheme', 'http'),
+                            'port': host.get('port', 80)
+                        }
+
+            except Exception as e:
+                logger.error(f"❌ HTTP probing failed: {str(e)}")
+
+        logger.info(f"🌐 HTTP probing completed: {len(alive_hosts)} alive hosts found")
+
+        # Stage 3: Port Scanning (BEFORE storing subdomains)
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'port_scanning',
+                'domain': domain,
+                'progress': 70,
+                'message': f'Port scanning {len(alive_hosts)} alive hosts...',
+                'current_phase': 'Nmap port scanning',
+                'subdomains_found': len(subdomains),
+                'alive_hosts_found': len(alive_hosts)
+            }
+        )
+
+        port_results = {}
+        if alive_hosts:
+            logger.info(f"🔍 Starting port scanning for {len(alive_hosts)} alive hosts")
+
+            try:
+                # Import nmap scanner
+                from tools.nmap import NmapScanner
+                nmap_scanner = NmapScanner()
+
+                # Configure nmap based on scan type
+                nmap_config = {
+                    'quick': {
+                        'ports': '80,443,22,21,25,53,110,143,993,995',
+                        'timing': 'T4'
+                    },
+                    'deep': {
+                        'ports': '1-1000',
+                        'timing': 'T3',
+                        'version_detection': True
+                    },
+                    'full': {
+                        'ports': '1-65535',
+                        'timing': 'T3',
+                        'version_detection': True
+                    }
+                }
+
+                port_config = nmap_config.get(scan_type, nmap_config['deep'])
+
+                # Filter and validate hostnames before scanning
+                valid_hosts = []
+                for host in alive_hosts:
+                    # Clean and validate hostname
+                    clean_host = str(host).strip()
+                    if clean_host and '.' in clean_host and not clean_host.startswith('.') and not clean_host.endswith('.'):
+                        # Basic hostname validation
+                        if len(clean_host) > 3 and not clean_host.isspace():
+                            valid_hosts.append(clean_host)
+                        else:
+                            logger.warning(f"⚠️ Skipping invalid hostname: '{clean_host}'")
+                    else:
+                        logger.warning(f"⚠️ Skipping malformed hostname: '{clean_host}'")
+
+                logger.info(f"🔍 Validated {len(valid_hosts)} hosts for port scanning (filtered from {len(alive_hosts)})")
+
+                if valid_hosts:
+                    # Perform batch port scanning for efficiency
+                    try:
+                        batch_results = nmap_scanner.scan(valid_hosts, **port_config)
+                        if batch_results.get('open_ports'):
+                            # Group results by host
+                            for port_info in batch_results['open_ports']:
+                                host_ip = port_info.get('host', '')
+                                if host_ip:
+                                    if host_ip not in port_results:
+                                        port_results[host_ip] = []
+                                    port_results[host_ip].append(port_info)
+
+                        logger.info(f"✅ Batch port scan completed: {len(port_results)} hosts with open ports")
+
+                    except Exception as batch_error:
+                        logger.warning(f"⚠️ Batch scanning failed, falling back to individual scans: {str(batch_error)}")
+
+                        # Fallback to individual host scanning
+                        for host in valid_hosts:
+                            try:
+                                host_results = nmap_scanner.scan([host], **port_config)
+                                if host_results.get('open_ports'):
+                                    port_results[host] = host_results['open_ports']
+                                    logger.debug(f"✅ Individual scan completed for {host}")
+                            except Exception as e:
+                                logger.warning(f"Port scan failed for {host}: {str(e)}")
+                                continue
+                else:
+                    logger.warning("⚠️ No valid hosts found for port scanning")
+
+            except Exception as e:
+                logger.error(f"❌ Port scanning failed: {str(e)}")
+
+            logger.info(f"🔍 Port scanning completed: {len(port_results)} hosts with open ports")
+
+        logger.info(f"🎯 Scan workflow completed: {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts")
+
+        # Stage 4: Store subdomains in database (WITH HTTP and port data)
+        self.update_state(
+            state='PROGRESS',
+            meta={
+                'stage': 'database_storage',
+                'domain': domain,
+                'progress': 90,
+                'message': f'Storing {len(subdomains)} subdomains with metadata in database...',
+                'current_phase': 'Database storage with HTTP and port data',
+                'subdomains_found': len(subdomains),
+                'alive_hosts_found': len(alive_hosts)
+            }
+        )
+
         stored_count = 0
 
         # Import database models
@@ -220,192 +418,7 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
         db.session.commit()
         logger.info(f"📊 Stored {stored_count} new subdomains in database")
 
-        # Stage 2: HTTP Probing
-        self.update_state(
-            state='PROGRESS',
-            meta={
-                'stage': 'http_probing',
-                'domain': domain,
-                'progress': 40,
-                'message': f'Probing {len(subdomains)} subdomains for live hosts...',
-                'current_phase': 'HTTP probing with httpx',
-                'subdomains_found': len(subdomains)
-            }
-        )
-
-        logger.info(f"🌐 Starting HTTP probing for {len(subdomains)} subdomains")
-
-        # Extract hostnames for HTTP probing
-        hostnames = []
-        for subdomain in subdomains:
-            if isinstance(subdomain, dict):
-                hostname = subdomain.get('host', '')
-            else:
-                hostname = str(subdomain)
-            if hostname:
-                hostnames.append(hostname)
-
-        # Execute HTTP probing
-        alive_hosts = []
-        http_data = {}
-
-        if hostnames:
-            try:
-                # Import httpx scanner
-                from tools.httpx import HttpxScanner
-                httpx_scanner = HttpxScanner()
-
-                # Configure httpx based on scan type
-                httpx_config = {
-                    'quick': {
-                        'ports': [80, 443],
-                        'timeout': 5,
-                        'threads': 100,
-                        'tech_detect': False,
-                        'follow_redirects': False
-                    },
-                    'deep': {
-                        'ports': [80, 443, 8080, 8443, 8000, 3000],
-                        'timeout': 10,
-                        'threads': 50,
-                        'tech_detect': True,
-                        'follow_redirects': True
-                    },
-                    'full': {
-                        'ports': [80, 443, 8080, 8443, 8000, 3000, 9000, 9090],
-                        'timeout': 15,
-                        'threads': 30,
-                        'tech_detect': True,
-                        'follow_redirects': True
-                    }
-                }
-
-                http_config = httpx_config.get(scan_type, httpx_config['deep'])
-
-                # Perform HTTP probing
-                probe_results = httpx_scanner.scan(hostnames, **http_config)
-                alive_hosts_data = probe_results.get('alive_hosts', [])
-
-                # Extract alive hostnames and build HTTP data
-                for host in alive_hosts_data:
-                    hostname = host.get('host', '')
-                    if hostname:
-                        alive_hosts.append(hostname)
-                        http_data[hostname] = {
-                            'url': host.get('url', ''),
-                            'status_code': host.get('status_code', 0),
-                            'title': host.get('title', ''),
-                            'tech': host.get('tech', []),
-                            'webserver': host.get('webserver', ''),
-                            'content_length': host.get('content_length', 0),
-                            'response_time': host.get('response_time', ''),
-                            'scheme': host.get('scheme', 'http'),
-                            'port': host.get('port', 80)
-                        }
-
-            except Exception as e:
-                logger.error(f"❌ HTTP probing failed: {str(e)}")
-
-        logger.info(f"🌐 HTTP probing completed: {len(alive_hosts)} alive hosts found")
-
-        # Stage 3: Port Scanning (for alive hosts only)
-        self.update_state(
-            state='PROGRESS',
-            meta={
-                'stage': 'port_scanning',
-                'domain': domain,
-                'progress': 70,
-                'message': f'Port scanning {len(alive_hosts)} alive hosts...',
-                'current_phase': 'Nmap port scanning',
-                'subdomains_found': len(subdomains),
-                'alive_hosts_found': len(alive_hosts)
-            }
-        )
-
-        port_results = {}
-        if alive_hosts:
-            logger.info(f"🔍 Starting port scanning for {len(alive_hosts)} alive hosts")
-
-            try:
-                # Import nmap scanner
-                from tools.nmap import NmapScanner
-                nmap_scanner = NmapScanner()
-
-                # Configure nmap based on scan type
-                nmap_config = {
-                    'quick': {
-                        'ports': '80,443,22,21,25,53,110,143,993,995',
-                        'timing': 'T4'
-                    },
-                    'deep': {
-                        'ports': '1-1000',
-                        'timing': 'T3',
-                        'version_detection': True
-                    },
-                    'full': {
-                        'ports': '1-65535',
-                        'timing': 'T3',
-                        'version_detection': True
-                    }
-                }
-
-                port_config = nmap_config.get(scan_type, nmap_config['deep'])
-
-                # Filter and validate hostnames before scanning
-                valid_hosts = []
-                for host in alive_hosts:
-                    # Clean and validate hostname
-                    clean_host = str(host).strip()
-                    if clean_host and '.' in clean_host and not clean_host.startswith('.') and not clean_host.endswith('.'):
-                        # Basic hostname validation
-                        if len(clean_host) > 3 and not clean_host.isspace():
-                            valid_hosts.append(clean_host)
-                        else:
-                            logger.warning(f"⚠️ Skipping invalid hostname: '{clean_host}'")
-                    else:
-                        logger.warning(f"⚠️ Skipping malformed hostname: '{clean_host}'")
-
-                logger.info(f"🔍 Validated {len(valid_hosts)} hosts for port scanning (filtered from {len(alive_hosts)})")
-
-                if valid_hosts:
-                    # Perform batch port scanning for efficiency
-                    try:
-                        batch_results = nmap_scanner.scan(valid_hosts, **port_config)
-                        if batch_results.get('open_ports'):
-                            # Group results by host
-                            for port_info in batch_results['open_ports']:
-                                host_ip = port_info.get('host', '')
-                                if host_ip:
-                                    if host_ip not in port_results:
-                                        port_results[host_ip] = []
-                                    port_results[host_ip].append(port_info)
-
-                        logger.info(f"✅ Batch port scan completed: {len(port_results)} hosts with open ports")
-
-                    except Exception as batch_error:
-                        logger.warning(f"⚠️ Batch scanning failed, falling back to individual scans: {str(batch_error)}")
-
-                        # Fallback to individual host scanning
-                        for host in valid_hosts:
-                            try:
-                                host_results = nmap_scanner.scan([host], **port_config)
-                                if host_results.get('open_ports'):
-                                    port_results[host] = host_results['open_ports']
-                                    logger.debug(f"✅ Individual scan completed for {host}")
-                            except Exception as e:
-                                logger.warning(f"Port scan failed for {host}: {str(e)}")
-                                continue
-                else:
-                    logger.warning("⚠️ No valid hosts found for port scanning")
-
-            except Exception as e:
-                logger.error(f"❌ Port scanning failed: {str(e)}")
-
-            logger.info(f"🔍 Port scanning completed: {len(port_results)} hosts with open ports")
-
-        logger.info(f"🎯 Scan workflow completed: {len(subdomains)} subdomains, {len(alive_hosts)} alive hosts")
-
-        # Stage 3: Final Processing and Storage
+        # Stage 5: Final Processing and Storage
         self.update_state(
             state='PROGRESS',
             meta={
