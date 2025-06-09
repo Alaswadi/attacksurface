@@ -147,11 +147,11 @@ def create_app(config_name=None):
                              alerts=alerts,
                              chart_data=chart_data)
 
-    @app.route('/real-scanning')
+    @app.route('/technologies')
     @login_required
-    def real_scanning():
-        """Real security scanning page"""
-        return render_template('real_scanning.html')
+    def technologies():
+        """Technologies discovery and analysis page"""
+        return render_template('technologies.html')
 
     @app.route('/large-scale-scanning')
     @login_required
@@ -291,9 +291,9 @@ def create_app(config_name=None):
     from routes.api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')
 
-    # Real scanning routes
-    from routes.real_scanning import real_scanning_bp
-    app.register_blueprint(real_scanning_bp)
+    # Technologies routes
+    from routes.technologies import technologies_bp
+    app.register_blueprint(technologies_bp)
     
     return app
 

@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+
+{% block title %}Technologies - Attack Surface Monitoring{% endblock %}
+
+{% block content %}
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-gray-700 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+        <!-- Logo Section -->
+        <div class="flex items-center justify-center py-4 mb-4">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <i class="ri-shield-keyhole-line ri-lg text-blue-400"></i>
+            </div>
+            <span id="logo-text" class="ml-3 text-lg font-semibold text-blue-400 opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
+        </div>
+
+        <!-- Navigation Items -->
+        <nav class="flex-1 px-2">
+            <!-- Dashboard -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/dashboard'" title="Dashboard">
+                <div class="flex items-center">
+                    <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Assets -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/assets'" title="Assets">
+                <div class="flex items-center">
+                    <i class="ri-computer-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/vulnerabilities'" title="Vulnerabilities">
+                <div class="flex items-center">
+                    <i class="ri-shield-check-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
+                </div>
+            </div>
+
+            <!-- Technologies (Active) -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer transition-colors bg-gray-600 relative" title="Technologies">
+                <div class="flex items-center">
+                    <i class="ri-stack-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
+                    <span class="nav-text ml-auto bg-blue-500 text-white text-xs rounded-full px-2 py-1 opacity-0 transition-opacity duration-300">NEW</span>
+                </div>
+            </div>
+
+            <!-- Large Scale Scanning -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/large-scale-scanning'" title="Large Scale Scanning">
+                <div class="flex items-center">
+                    <i class="ri-radar-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Scans</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Toggle Button -->
+        <div class="p-2">
+            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center" title="Toggle Sidebar">
+                <i class="ri-menu-line ri-lg min-w-[24px]"></i>
+                <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <div class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Technology Discovery</h1>
+                    <p class="text-gray-600 mt-1">Analyze discovered technologies across your attack surface</p>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <button id="refresh-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                        <i class="ri-refresh-line mr-2"></i>
+                        Refresh Data
+                    </button>
+                    
+                    <div class="relative">
+                        <button class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100" onclick="toggleUserMenu()">
+                            <i class="ri-user-line text-gray-600"></i>
+                        </button>
+                        <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
+                            <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-auto p-6">
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="mt-4 text-gray-600">Loading technology data...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="error-state" class="hidden text-center py-12">
+                <div class="text-red-500 mb-4">
+                    <i class="ri-error-warning-line ri-3x"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Error Loading Technologies</h3>
+                <p id="error-message" class="text-gray-600 mb-4"></p>
+                <button onclick="loadTechnologies()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Try Again
+                </button>
+            </div>
+
+            <!-- Main Content -->
+            <div id="main-content" class="hidden">
+                <!-- Summary Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-blue-100">
+                                <i class="ri-stack-line ri-xl text-blue-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Total Technologies</p>
+                                <p id="total-technologies" class="text-2xl font-bold text-gray-900">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-green-100">
+                                <i class="ri-computer-line ri-xl text-green-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Assets with Tech</p>
+                                <p id="assets-with-tech" class="text-2xl font-bold text-gray-900">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-purple-100">
+                                <i class="ri-server-line ri-xl text-purple-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Web Servers</p>
+                                <p id="web-servers-count" class="text-2xl font-bold text-gray-900">0</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-orange-100">
+                                <i class="ri-code-line ri-xl text-orange-600"></i>
+                            </div>
+                            <div class="ml-4">
+                                <p class="text-sm font-medium text-gray-600">Frameworks</p>
+                                <p id="frameworks-count" class="text-2xl font-bold text-gray-900">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="bg-white rounded-lg shadow mb-6">
+                    <div class="p-6 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Filter Technologies</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Technology Name</label>
+                                <input type="text" id="tech-name-filter" placeholder="e.g., Apache, React, WordPress" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                                <select id="category-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">All Categories</option>
+                                    <option value="Web Server">Web Servers</option>
+                                    <option value="JavaScript Framework">JavaScript Frameworks</option>
+                                    <option value="Backend Framework">Backend Frameworks</option>
+                                    <option value="CMS">Content Management Systems</option>
+                                    <option value="Programming Language">Programming Languages</option>
+                                    <option value="Database">Databases</option>
+                                    <option value="CDN/Security">CDN & Security</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="flex items-end">
+                                <button id="apply-filters-btn" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                    Apply Filters
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Technologies Grid -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="p-6 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Discovered Technologies</h3>
+                        <p class="text-gray-600 mt-1">Click on any technology to view detailed asset information</p>
+                    </div>
+                    <div id="technologies-grid" class="p-6">
+                        <!-- Technologies will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Technology Details Modal -->
+<div id="tech-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="modal-title" class="text-lg font-semibold text-gray-900"></h3>
+            <button onclick="closeTechModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="ri-close-line ri-xl"></i>
+            </button>
+        </div>
+        <div id="modal-content">
+            <!-- Modal content will be populated here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let sidebarExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+let technologiesData = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSidebar();
+    loadTechnologies();
+    
+    // Add event listeners
+    document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+    document.getElementById('refresh-btn').addEventListener('click', loadTechnologies);
+    document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
+    
+    // Add enter key support for filter input
+    document.getElementById('tech-name-filter').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            applyFilters();
+        }
+    });
+});
+
+// Sidebar functionality
+function initializeSidebar() {
+    if (sidebarExpanded) {
+        expandSidebar();
+    } else {
+        collapseSidebar();
+    }
+}
+
+function expandSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleIcon = document.querySelector('#sidebar-toggle i');
+    const toggleText = document.getElementById('toggle-text');
+
+    sidebar.classList.remove('w-16');
+    sidebar.classList.add('w-64');
+
+    setTimeout(() => {
+        logoText.classList.remove('opacity-0');
+        logoText.classList.add('opacity-100');
+        navTexts.forEach(text => {
+            text.classList.remove('opacity-0');
+            text.classList.add('opacity-100');
+        });
+    }, 150);
+
+    toggleIcon.classList.remove('ri-menu-line');
+    toggleIcon.classList.add('ri-menu-fold-line');
+    toggleText.textContent = 'Collapse';
+
+    sidebarExpanded = true;
+    localStorage.setItem('sidebarExpanded', 'true');
+}
+
+function collapseSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleIcon = document.querySelector('#sidebar-toggle i');
+    const toggleText = document.getElementById('toggle-text');
+
+    logoText.classList.remove('opacity-100');
+    logoText.classList.add('opacity-0');
+    navTexts.forEach(text => {
+        text.classList.remove('opacity-100');
+        text.classList.add('opacity-0');
+    });
+
+    setTimeout(() => {
+        sidebar.classList.remove('w-64');
+        sidebar.classList.add('w-16');
+    }, 150);
+
+    toggleIcon.classList.remove('ri-menu-fold-line');
+    toggleIcon.classList.add('ri-menu-line');
+    toggleText.textContent = 'Expand';
+
+    sidebarExpanded = false;
+    localStorage.setItem('sidebarExpanded', 'false');
+}
+
+function toggleSidebar() {
+    if (sidebarExpanded) {
+        collapseSidebar();
+    } else {
+        expandSidebar();
+    }
+}
+
+function toggleUserMenu() {
+    const menu = document.getElementById('userMenu');
+    menu.classList.toggle('hidden');
+}
+
+// Close user menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('userMenu');
+    const button = event.target.closest('button');
+    if (!button || !button.onclick) {
+        menu.classList.add('hidden');
+    }
+});
+
+// Technologies functionality
+async function loadTechnologies() {
+    showLoading();
+    
+    try {
+        const response = await fetch('/api/technologies/overview');
+        const result = await response.json();
+        
+        if (result.success) {
+            technologiesData = result.data;
+            displayTechnologies(technologiesData);
+            updateSummaryStats(technologiesData.summary_stats);
+            showMainContent();
+        } else {
+            showError(result.error || 'Failed to load technologies');
+        }
+    } catch (error) {
+        console.error('Error loading technologies:', error);
+        showError('Network error: ' + error.message);
+    }
+}
+
+function displayTechnologies(data) {
+    const grid = document.getElementById('technologies-grid');
+    const technologies = data.technologies;
+    
+    if (Object.keys(technologies).length === 0) {
+        grid.innerHTML = `
+            <div class="text-center py-12">
+                <div class="text-gray-400 mb-4">
+                    <i class="ri-stack-line ri-3x"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Technologies Found</h3>
+                <p class="text-gray-600">Run some scans to discover technologies in your infrastructure.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
+    
+    // Sort technologies by usage count
+    const sortedTechs = Object.entries(technologies).sort((a, b) => b[1].total_count - a[1].total_count);
+    
+    for (const [techKey, techInfo] of sortedTechs) {
+        const categoryColor = getCategoryColor(techInfo.category);
+        const versionInfo = Object.keys(techInfo.versions || {}).length > 0 
+            ? `<span class="text-xs text-gray-500">${Object.keys(techInfo.versions).join(', ')}</span>`
+            : '';
+        
+        html += `
+            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" 
+                 onclick="showTechnologyDetails('${techKey}')">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-semibold text-gray-900">${techInfo.name}</h4>
+                    <span class="px-2 py-1 text-xs rounded-full ${categoryColor}">
+                        ${techInfo.category}
+                    </span>
+                </div>
+                <div class="text-sm text-gray-600 mb-2">
+                    <i class="ri-computer-line mr-1"></i>
+                    ${techInfo.total_count} asset${techInfo.total_count !== 1 ? 's' : ''}
+                </div>
+                ${versionInfo}
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    grid.innerHTML = html;
+}
+
+function getCategoryColor(category) {
+    const colors = {
+        'Web Server': 'bg-red-100 text-red-800',
+        'JavaScript Framework': 'bg-yellow-100 text-yellow-800',
+        'Backend Framework': 'bg-green-100 text-green-800',
+        'CMS': 'bg-blue-100 text-blue-800',
+        'Programming Language': 'bg-purple-100 text-purple-800',
+        'Database': 'bg-indigo-100 text-indigo-800',
+        'CDN/Security': 'bg-pink-100 text-pink-800',
+        'Other': 'bg-gray-100 text-gray-800'
+    };
+    return colors[category] || colors['Other'];
+}
+
+function updateSummaryStats(stats) {
+    document.getElementById('total-technologies').textContent = stats.unique_technologies;
+    document.getElementById('assets-with-tech').textContent = stats.assets_with_tech;
+    document.getElementById('web-servers-count').textContent = Object.keys(stats.web_servers).length;
+    document.getElementById('frameworks-count').textContent = Object.keys(stats.frameworks).length;
+}
+
+async function applyFilters() {
+    const techName = document.getElementById('tech-name-filter').value;
+    const category = document.getElementById('category-filter').value;
+    
+    if (!techName && !category) {
+        // No filters, show all technologies
+        displayTechnologies(technologiesData);
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/technologies/filter', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                technology: techName,
+                category: category
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            displayTechnologies(result.data);
+        } else {
+            console.error('Filter error:', result.error);
+        }
+    } catch (error) {
+        console.error('Error applying filters:', error);
+    }
+}
+
+async function showTechnologyDetails(techKey) {
+    try {
+        const response = await fetch(`/api/technologies/assets/${encodeURIComponent(techKey)}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            const data = result.data;
+            const modal = document.getElementById('tech-modal');
+            const title = document.getElementById('modal-title');
+            const content = document.getElementById('modal-content');
+            
+            title.textContent = `${data.technology} - ${data.category}`;
+            
+            let html = `
+                <div class="mb-4">
+                    <p class="text-gray-600">
+                        <strong>${data.total_count}</strong> asset${data.total_count !== 1 ? 's' : ''} using this technology
+                    </p>
+                </div>
+            `;
+            
+            if (Object.keys(data.versions).length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-gray-900 mb-2">Versions Detected:</h4>
+                        <div class="flex flex-wrap gap-2">
+                `;
+                for (const [version, count] of Object.entries(data.versions)) {
+                    html += `<span class="px-2 py-1 bg-gray-100 text-gray-800 text-sm rounded">${version} (${count})</span>`;
+                }
+                html += '</div></div>';
+            }
+            
+            html += `
+                <div>
+                    <h4 class="font-semibold text-gray-900 mb-2">Assets:</h4>
+                    <div class="max-h-64 overflow-y-auto">
+            `;
+            
+            for (const asset of data.assets) {
+                const statusColor = getStatusColor(asset.status_code);
+                html += `
+                    <div class="border border-gray-200 rounded p-3 mb-2">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h5 class="font-medium text-gray-900">${asset.name}</h5>
+                                <p class="text-sm text-gray-600">${asset.title || 'No title'}</p>
+                                ${asset.url ? `<a href="${asset.url}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">${asset.url}</a>` : ''}
+                            </div>
+                            <div class="text-right">
+                                <span class="px-2 py-1 text-xs rounded ${statusColor}">
+                                    ${asset.status_code || 'N/A'}
+                                </span>
+                                <p class="text-xs text-gray-500 mt-1">${asset.asset_type}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div></div>';
+            content.innerHTML = html;
+            modal.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Error loading technology details:', error);
+    }
+}
+
+function getStatusColor(statusCode) {
+    if (statusCode >= 200 && statusCode < 300) return 'bg-green-100 text-green-800';
+    if (statusCode >= 300 && statusCode < 400) return 'bg-yellow-100 text-yellow-800';
+    if (statusCode >= 400) return 'bg-red-100 text-red-800';
+    return 'bg-gray-100 text-gray-800';
+}
+
+function closeTechModal() {
+    document.getElementById('tech-modal').classList.add('hidden');
+}
+
+// UI state management
+function showLoading() {
+    document.getElementById('loading-state').classList.remove('hidden');
+    document.getElementById('error-state').classList.add('hidden');
+    document.getElementById('main-content').classList.add('hidden');
+}
+
+function showError(message) {
+    document.getElementById('error-message').textContent = message;
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('error-state').classList.remove('hidden');
+    document.getElementById('main-content').classList.add('hidden');
+}
+
+function showMainContent() {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('error-state').classList.add('hidden');
+    document.getElementById('main-content').classList.remove('hidden');
+}
+
+// Close modal when clicking outside
+document.addEventListener('click', function(event) {
+    const modal = document.getElementById('tech-modal');
+    if (event.target === modal) {
+        closeTechModal();
+    }
+});
+</script>
+{% endblock %}
