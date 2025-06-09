@@ -2334,18 +2334,36 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
         }
 
     except Exception as e:
-        logger.error(f"❌ Progressive large-scale scan failed for {domain}: {str(e)}")
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'domain': domain,
-                'error': str(e),
-                'stage': 'failed',
-                'progressive_update': {
-                    'type': 'scan_failed',
-                    'error': str(e),
-                    'timestamp': datetime.now().isoformat()
+        error_msg = str(e)
+        error_type = type(e).__name__
+        logger.error(f"❌ Progressive large-scale scan failed for {domain}: {error_type}: {error_msg}")
+
+        # Update state with proper error handling
+        try:
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'domain': domain,
+                    'error': error_msg,
+                    'error_type': error_type,
+                    'stage': 'failed',
+                    'message': f'Progressive scan failed: {error_msg}',
+                    'progressive_update': {
+                        'type': 'scan_failed',
+                        'error': error_msg,
+                        'error_type': error_type,
+                        'timestamp': datetime.now().isoformat()
+                    }
                 }
-            }
-        )
-        raise
+            )
+        except Exception as state_error:
+            logger.error(f"❌ Failed to update task state: {str(state_error)}")
+
+        # Return failure result instead of raising
+        return {
+            'success': False,
+            'domain': domain,
+            'error': error_msg,
+            'error_type': error_type,
+            'message': f'Progressive large-scale scan failed: {error_msg}'
+        }

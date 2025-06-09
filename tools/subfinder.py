@@ -29,11 +29,13 @@ class SubfinderScanner(BaseScanner):
         Returns:
             Dict containing scan results
         """
-        if not self._is_valid_domain(domain):
-            raise BaseScannerError(f"Invalid domain format: {domain}")
+        # Clean domain format (remove protocol, path, etc.)
+        clean_domain = self._clean_domain(domain)
+        if not self._is_valid_domain(clean_domain):
+            raise BaseScannerError(f"Invalid domain format: {domain} (cleaned: {clean_domain})")
         
-        # Build command
-        cmd = [self.tool_path, '-d', domain]
+        # Build command with cleaned domain
+        cmd = [self.tool_path, '-d', clean_domain]
         
         # Add JSON output
         cmd.extend(['-json'])
@@ -105,6 +107,26 @@ class SubfinderScanner(BaseScanner):
         
         return subdomains
     
+    def _clean_domain(self, domain: str) -> str:
+        """Clean domain format by removing protocol, path, etc."""
+        # Remove protocol (http://, https://)
+        if '://' in domain:
+            domain = domain.split('://', 1)[1]
+
+        # Remove path (everything after first /)
+        if '/' in domain:
+            domain = domain.split('/', 1)[0]
+
+        # Remove port (everything after :)
+        if ':' in domain:
+            domain = domain.split(':', 1)[0]
+
+        # Remove www. prefix if present
+        if domain.startswith('www.'):
+            domain = domain[4:]
+
+        return domain.strip().lower()
+
     def _is_valid_domain(self, domain: str) -> bool:
         """Validate domain format"""
         domain_pattern = re.compile(
