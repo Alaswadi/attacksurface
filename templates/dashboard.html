@@ -651,8 +651,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Navigate to different pages
             if (section === 'assets') {
                 window.location.href = '/assets';
+            } else if (section === 'vulnerabilities') {
+                window.location.href = '/vulnerabilities';
             } else if (section === 'scans') {
                 window.location.href = '/real-scanning';
+            } else if (section === 'alerts') {
+                window.location.href = '/alerts';
+            } else if (section === 'reports') {
+                window.location.href = '/reports';
+            } else if (section === 'settings') {
+                window.location.href = '/settings';
             }
             // Add other navigation logic here
             console.log(`Navigating to: ${section}`);

@@ -490,8 +490,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const section = this.getAttribute('data-section');
             if (section === 'dashboard') {
                 window.location.href = '/dashboard';
+            } else if (section === 'vulnerabilities') {
+                window.location.href = '/vulnerabilities';
             } else if (section === 'scans') {
                 window.location.href = '/real-scanning';
+            } else if (section === 'alerts') {
+                window.location.href = '/alerts';
+            } else if (section === 'reports') {
+                window.location.href = '/reports';
+            } else if (section === 'settings') {
+                window.location.href = '/settings';
             }
             // Add other navigation logic here
         });

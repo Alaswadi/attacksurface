@@ -1,334 +1,302 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vulnerabilities - Attack Surface Discovery</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/dashboard.css') }}" rel="stylesheet">
-    <style>
-        .vulnerability-card {
-            border-left: 4px solid;
-            margin-bottom: 1rem;
-            transition: all 0.3s ease;
-        }
-        .vulnerability-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        .severity-critical { border-left-color: #dc3545; }
-        .severity-high { border-left-color: #fd7e14; }
-        .severity-medium { border-left-color: #ffc107; }
-        .severity-low { border-left-color: #20c997; }
-        .severity-info { border-left-color: #0dcaf0; }
-        
-        .severity-badge {
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .confidence-score {
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 20px;
-            padding: 0.25rem 0.75rem;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-        
-        .asset-link {
-            color: #6c757d;
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-        .asset-link:hover {
-            color: #495057;
-            text-decoration: underline;
-        }
-        
-        .vuln-description {
-            color: #6c757d;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-        
-        .vuln-meta {
-            font-size: 0.85rem;
-            color: #6c757d;
-        }
-        
-        .filter-section {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 1.5rem;
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .stats-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 4rem 2rem;
-            color: #6c757d;
-        }
-        
-        .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-    </style>
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block title %}Vulnerabilities - Attack Surface Monitoring{% endblock %}
+
+{% block content %}
+<div class="flex h-screen overflow-hidden">
     <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-brand">
-                <i class="fas fa-shield-alt"></i>
-                <span class="brand-text">Attack Surface</span>
+    <div id="sidebar" class="bg-gray-700 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+        <!-- Logo Section -->
+        <div class="flex items-center justify-center py-4 mb-4">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <i class="ri-shield-keyhole-line ri-lg text-blue-400"></i>
             </div>
-            <button class="sidebar-toggle" id="sidebarToggle">
-                <i class="fas fa-bars"></i>
+            <span id="logo-text" class="ml-3 text-lg font-semibold text-blue-400 opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-2">
+            <!-- Dashboard -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="dashboard" title="Dashboard">
+                <div class="flex items-center">
+                    <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Assets -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="assets" title="Assets">
+                <div class="flex items-center">
+                    <i class="ri-computer-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer bg-gray-600 transition-colors relative" data-section="vulnerabilities" title="Vulnerabilities">
+                <div class="flex items-center">
+                    <i class="ri-shield-check-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
+                <div class="flex items-center">
+                    <i class="ri-notification-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
+                    <span class="alert-badge bg-red-500 text-white rounded-full ml-auto opacity-0 transition-opacity duration-300">3</span>
+                </div>
+            </div>
+
+            <!-- Scans -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="scans" title="Scans">
+                <div class="flex items-center">
+                    <i class="ri-search-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Scans</span>
+                </div>
+            </div>
+
+            <!-- Reports -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="reports" title="Reports">
+                <div class="flex items-center">
+                    <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="settings" title="Settings">
+                <div class="flex items-center">
+                    <i class="ri-settings-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Toggle Button -->
+        <div class="p-2">
+            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center" title="Toggle Sidebar">
+                <i class="ri-menu-line ri-lg min-w-[24px]"></i>
+                <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
             </button>
         </div>
-        
-        <nav class="sidebar-nav">
-            <a href="{{ url_for('dashboard') }}" class="nav-item">
-                <i class="fas fa-tachometer-alt"></i>
-                <span class="nav-text">Dashboard</span>
-            </a>
-            <a href="{{ url_for('assets') }}" class="nav-item">
-                <i class="fas fa-server"></i>
-                <span class="nav-text">Assets</span>
-            </a>
-            <a href="{{ url_for('vulnerabilities') }}" class="nav-item active">
-                <i class="fas fa-bug"></i>
-                <span class="nav-text">Vulnerabilities</span>
-            </a>
-            <a href="{{ url_for('large_scale_scanning') }}" class="nav-item">
-                <i class="fas fa-search"></i>
-                <span class="nav-text">Large Scale Scanning</span>
-            </a>
-        </nav>
     </div>
 
     <!-- Main Content -->
-    <div class="main-content">
-        <div class="container-fluid">
-            <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h1 class="h3 mb-0">
-                        <i class="fas fa-bug text-danger me-2"></i>
-                        Vulnerabilities
-                    </h1>
-                    <p class="text-muted mb-0">Security vulnerabilities discovered across your attack surface</p>
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+            <h1 class="text-xl font-semibold text-gray-800">Vulnerabilities</h1>
+
+            <div class="flex items-center space-x-4">
+                <!-- Search -->
+                <div class="relative">
+                    <input type="search" id="vuln-search" placeholder="Search vulnerabilities..."
+                           class="w-80 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <i class="ri-search-line absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                 </div>
-                <div>
-                    <button class="btn btn-outline-primary" onclick="location.reload()">
-                        <i class="fas fa-sync-alt me-1"></i>
-                        Refresh
+                <!-- Refresh Button -->
+                <button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
+                    <i class="ri-refresh-line mr-2"></i>Refresh
+                </button>
+
+                <!-- User Menu -->
+                <div class="relative">
+                    <button class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100" onclick="toggleUserMenu()">
+                        <i class="ri-user-line text-gray-600"></i>
                     </button>
-                </div>
-            </div>
-
-            <!-- Statistics -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="stats-card">
-                        <div class="stats-number">{{ stats.total }}</div>
-                        <div>Total Vulnerabilities</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
-                        <div class="stats-number">{{ stats.critical + stats.high }}</div>
-                        <div>Critical & High</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);">
-                        <div class="stats-number">{{ stats.medium }}</div>
-                        <div>Medium Risk</div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #20c997 0%, #1aa179 100%);">
-                        <div class="stats-number">{{ stats.low + stats.info }}</div>
-                        <div>Low & Info</div>
+                    <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
+                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
                     </div>
                 </div>
             </div>
+        </header>
 
+        <!-- Vulnerabilities Content -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Statistics Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Total Vulnerabilities</h3>
+                    <p class="text-5xl font-semibold text-gray-800">{{ stats.total }}</p>
+                    <p class="text-sm text-gray-500 mt-1">All discovered vulnerabilities</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Critical & High</h3>
+                    <p class="text-5xl font-semibold text-red-600">{{ stats.critical + stats.high }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Require immediate attention</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Medium Risk</h3>
+                    <p class="text-5xl font-semibold text-orange-600">{{ stats.medium }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Should be addressed</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Low & Info</h3>
+                    <p class="text-5xl font-semibold text-green-600">{{ stats.low + stats.info }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Informational findings</p>
+                </div>
+            </div>
             <!-- Filters -->
-            <div class="filter-section">
-                <form method="GET" class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Severity</label>
-                        <select name="severity" class="form-select">
-                            <option value="">All Severities</option>
-                            <option value="critical" {{ 'selected' if request.args.get('severity') == 'critical' }}>Critical</option>
-                            <option value="high" {{ 'selected' if request.args.get('severity') == 'high' }}>High</option>
-                            <option value="medium" {{ 'selected' if request.args.get('severity') == 'medium' }}>Medium</option>
-                            <option value="low" {{ 'selected' if request.args.get('severity') == 'low' }}>Low</option>
-                            <option value="info" {{ 'selected' if request.args.get('severity') == 'info' }}>Info</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Status</label>
-                        <select name="status" class="form-select">
-                            <option value="">All Status</option>
-                            <option value="open" {{ 'selected' if request.args.get('status') == 'open' }}>Open</option>
-                            <option value="resolved" {{ 'selected' if request.args.get('status') == 'resolved' }}>Resolved</option>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Search</label>
-                        <input type="text" name="search" class="form-control" placeholder="Search vulnerabilities..." value="{{ request.args.get('search', '') }}">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">&nbsp;</label>
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-filter me-1"></i>
-                                Filter
-                            </button>
+            <div class="bg-white rounded shadow-sm border border-gray-100 mb-6">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex space-x-4">
+                        <!-- Severity Filter -->
+                        <div class="relative">
+                            <select id="severity-filter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">All Severities</option>
+                                <option value="critical" {{ 'selected' if request.args.get('severity') == 'critical' }}>Critical</option>
+                                <option value="high" {{ 'selected' if request.args.get('severity') == 'high' }}>High</option>
+                                <option value="medium" {{ 'selected' if request.args.get('severity') == 'medium' }}>Medium</option>
+                                <option value="low" {{ 'selected' if request.args.get('severity') == 'low' }}>Low</option>
+                                <option value="info" {{ 'selected' if request.args.get('severity') == 'info' }}>Info</option>
+                            </select>
+                            <i class="ri-arrow-down-s-line absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
                         </div>
-                    </div>
-                </form>
-            </div>
 
-            <!-- Vulnerabilities List -->
-            <div class="row">
-                <div class="col-12">
+                        <!-- Status Filter -->
+                        <div class="relative">
+                            <select id="status-filter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">All Status</option>
+                                <option value="open" {{ 'selected' if request.args.get('status') == 'open' }}>Open</option>
+                                <option value="resolved" {{ 'selected' if request.args.get('status') == 'resolved' }}>Resolved</option>
+                            </select>
+                            <i class="ri-arrow-down-s-line absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                        </div>
+
+                        <!-- Filter Button -->
+                        <button type="button" onclick="applyFilters()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
+                            <i class="ri-filter-line mr-2"></i>Filter
+                        </button>
+                    </div>
+                </div>
+                <!-- Vulnerabilities List -->
+                <div class="overflow-x-auto">
                     {% if vulnerabilities %}
-                        {% for vuln in vulnerabilities %}
-                        <div class="card vulnerability-card severity-{{ vuln.severity.value }}">
-                            <div class="card-body">
-                                <div class="row align-items-start">
-                                    <div class="col-md-8">
-                                        <div class="d-flex align-items-center mb-2">
-                                            <h5 class="card-title mb-0 me-3">{{ vuln.title }}</h5>
-                                            <span class="badge bg-{{ 'danger' if vuln.severity.value in ['critical', 'high'] else 'warning' if vuln.severity.value == 'medium' else 'success' if vuln.severity.value == 'low' else 'info' }} severity-badge">
-                                                {{ vuln.severity.value }}
+                        <div class="space-y-4">
+                            {% for vuln in vulnerabilities %}
+                            <div class="bg-white rounded shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center mb-3">
+                                            <h3 class="text-lg font-semibold text-gray-900 mr-3">{{ vuln.title }}</h3>
+                                            {% set severity_colors = {
+                                                'critical': 'bg-red-100 text-red-800',
+                                                'high': 'bg-orange-100 text-orange-800',
+                                                'medium': 'bg-yellow-100 text-yellow-800',
+                                                'low': 'bg-green-100 text-green-800',
+                                                'info': 'bg-blue-100 text-blue-800'
+                                            } %}
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ severity_colors.get(vuln.severity.value, 'bg-gray-100 text-gray-800') }}">
+                                                {{ vuln.severity.value.upper() }}
                                             </span>
                                             {% if vuln.asset_metadata and vuln.asset_metadata.get('confidence_score') %}
-                                            <span class="confidence-score ms-2">
+                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                                 {{ vuln.asset_metadata.get('confidence_score') }}% confidence
                                             </span>
                                             {% endif %}
                                         </div>
-                                        
+
                                         {% if vuln.description %}
-                                        <p class="vuln-description">{{ vuln.description }}</p>
+                                        <p class="text-gray-600 mb-3">{{ vuln.description }}</p>
                                         {% endif %}
-                                        
-                                        <div class="vuln-meta">
-                                            <i class="fas fa-server me-1"></i>
-                                            <a href="{{ url_for('assets') }}?search={{ vuln.asset.name }}" class="asset-link">
-                                                {{ vuln.asset.name }}
-                                            </a>
-                                            
+
+                                        <div class="flex items-center text-sm text-gray-500 space-x-4">
+                                            <div class="flex items-center">
+                                                <i class="ri-computer-line mr-1"></i>
+                                                <a href="{{ url_for('assets') }}?search={{ vuln.asset.name }}" class="text-blue-600 hover:text-blue-800">
+                                                    {{ vuln.asset.name }}
+                                                </a>
+                                            </div>
+
                                             {% if vuln.cve_id %}
-                                            <span class="ms-3">
-                                                <i class="fas fa-external-link-alt me-1"></i>
-                                                <a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name={{ vuln.cve_id }}" target="_blank" class="asset-link">
+                                            <div class="flex items-center">
+                                                <i class="ri-external-link-line mr-1"></i>
+                                                <a href="https://cve.mitre.org/cgi-bin/cvename.cgi?name={{ vuln.cve_id }}" target="_blank" class="text-blue-600 hover:text-blue-800">
                                                     {{ vuln.cve_id }}
                                                 </a>
-                                            </span>
+                                            </div>
                                             {% endif %}
-                                            
-                                            <span class="ms-3">
-                                                <i class="fas fa-calendar me-1"></i>
+
+                                            <div class="flex items-center">
+                                                <i class="ri-calendar-line mr-1"></i>
                                                 {{ vuln.discovered_at.strftime('%Y-%m-%d %H:%M') }}
-                                            </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    
-                                    <div class="col-md-4 text-end">
-                                        <div class="btn-group" role="group">
-                                            {% if not vuln.is_resolved %}
-                                            <button class="btn btn-sm btn-outline-success" onclick="markResolved({{ vuln.id }})">
-                                                <i class="fas fa-check me-1"></i>
-                                                Mark Resolved
-                                            </button>
-                                            {% else %}
-                                            <button class="btn btn-sm btn-outline-warning" onclick="markOpen({{ vuln.id }})">
-                                                <i class="fas fa-undo me-1"></i>
-                                                Reopen
-                                            </button>
-                                            {% endif %}
-                                            <button class="btn btn-sm btn-outline-danger" onclick="deleteVuln({{ vuln.id }})">
-                                                <i class="fas fa-trash me-1"></i>
-                                                Delete
-                                            </button>
-                                        </div>
+
+                                    <div class="flex space-x-2 ml-4">
+                                        {% if not vuln.is_resolved %}
+                                        <button onclick="markResolved({{ vuln.id }})" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm transition-colors flex items-center">
+                                            <i class="ri-check-line mr-1"></i>
+                                            Mark Resolved
+                                        </button>
+                                        {% else %}
+                                        <button onclick="markOpen({{ vuln.id }})" class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded text-sm transition-colors flex items-center">
+                                            <i class="ri-arrow-go-back-line mr-1"></i>
+                                            Reopen
+                                        </button>
+                                        {% endif %}
+                                        <button onclick="deleteVuln({{ vuln.id }})" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors flex items-center">
+                                            <i class="ri-delete-bin-line mr-1"></i>
+                                            Delete
+                                        </button>
                                     </div>
                                 </div>
                             </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
-                        
+
                         <!-- Pagination -->
                         {% if vulnerabilities.pages > 1 %}
-                        <nav aria-label="Vulnerabilities pagination">
-                            <ul class="pagination justify-content-center">
+                        <div class="flex justify-center mt-6">
+                            <nav class="flex space-x-2">
                                 {% if vulnerabilities.has_prev %}
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('vulnerabilities', page=vulnerabilities.prev_num, **request.args) }}">Previous</a>
-                                </li>
+                                <a href="{{ url_for('vulnerabilities', page=vulnerabilities.prev_num, **request.args) }}"
+                                   class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
+                                    Previous
+                                </a>
                                 {% endif %}
-                                
+
                                 {% for page_num in vulnerabilities.iter_pages() %}
                                     {% if page_num %}
                                         {% if page_num != vulnerabilities.page %}
-                                        <li class="page-item">
-                                            <a class="page-link" href="{{ url_for('vulnerabilities', page=page_num, **request.args) }}">{{ page_num }}</a>
-                                        </li>
+                                        <a href="{{ url_for('vulnerabilities', page=page_num, **request.args) }}"
+                                           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
+                                            {{ page_num }}
+                                        </a>
                                         {% else %}
-                                        <li class="page-item active">
-                                            <span class="page-link">{{ page_num }}</span>
-                                        </li>
+                                        <span class="px-3 py-2 bg-blue-600 border border-blue-600 rounded-md text-sm text-white">
+                                            {{ page_num }}
+                                        </span>
                                         {% endif %}
                                     {% else %}
-                                    <li class="page-item disabled">
-                                        <span class="page-link">…</span>
-                                    </li>
+                                    <span class="px-3 py-2 text-gray-500">…</span>
                                     {% endif %}
                                 {% endfor %}
-                                
+
                                 {% if vulnerabilities.has_next %}
-                                <li class="page-item">
-                                    <a class="page-link" href="{{ url_for('vulnerabilities', page=vulnerabilities.next_num, **request.args) }}">Next</a>
-                                </li>
+                                <a href="{{ url_for('vulnerabilities', page=vulnerabilities.next_num, **request.args) }}"
+                                   class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
+                                    Next
+                                </a>
                                 {% endif %}
-                            </ul>
-                        </nav>
+                            </nav>
+                        </div>
                         {% endif %}
-                        
+
                     {% else %}
-                        <div class="empty-state">
-                            <i class="fas fa-shield-alt"></i>
-                            <h4>No Vulnerabilities Found</h4>
-                            <p>No vulnerabilities match your current filters, or none have been discovered yet.</p>
-                            <a href="{{ url_for('large_scale_scanning') }}" class="btn btn-primary">
-                                <i class="fas fa-search me-1"></i>
+                        <div class="text-center py-12">
+                            <i class="ri-shield-check-line text-6xl text-gray-400 mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No Vulnerabilities Found</h3>
+                            <p class="text-gray-500 mb-6">No vulnerabilities match your current filters, or none have been discovered yet.</p>
+                            <a href="/large-scale-scanning" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors inline-flex items-center">
+                                <i class="ri-search-line mr-2"></i>
                                 Start Scanning
                             </a>
                         </div>
@@ -337,78 +305,200 @@
             </div>
         </div>
     </div>
+</div>
+<script>
+// Sidebar functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const logoText = document.getElementById('logo-text');
+    const toggleText = document.getElementById('toggle-text');
+    const alertBadge = document.querySelector('.alert-badge');
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-    <script>
-        function markResolved(vulnId) {
-            if (confirm('Mark this vulnerability as resolved?')) {
-                fetch(`/api/vulnerabilities/${vulnId}/resolve`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred');
-                });
-            }
+    // Load saved state
+    const isExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+    if (isExpanded) {
+        expandSidebar();
+    }
+
+    sidebarToggle.addEventListener('click', function() {
+        if (sidebar.classList.contains('w-64')) {
+            collapseSidebar();
+        } else {
+            expandSidebar();
         }
-        
-        function markOpen(vulnId) {
-            if (confirm('Reopen this vulnerability?')) {
-                fetch(`/api/vulnerabilities/${vulnId}/reopen`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred');
-                });
+    });
+
+    function expandSidebar() {
+        sidebar.classList.remove('w-16');
+        sidebar.classList.add('w-64');
+
+        setTimeout(() => {
+            navTexts.forEach(text => text.classList.remove('opacity-0'));
+            logoText.classList.remove('opacity-0');
+            toggleText.classList.remove('opacity-0');
+            if (alertBadge) alertBadge.classList.remove('opacity-0');
+            toggleText.textContent = 'Collapse';
+        }, 150);
+
+        localStorage.setItem('sidebarExpanded', 'true');
+    }
+
+    function collapseSidebar() {
+        navTexts.forEach(text => text.classList.add('opacity-0'));
+        logoText.classList.add('opacity-0');
+        toggleText.classList.add('opacity-0');
+        if (alertBadge) alertBadge.classList.add('opacity-0');
+
+        setTimeout(() => {
+            sidebar.classList.remove('w-64');
+            sidebar.classList.add('w-16');
+            toggleText.textContent = 'Expand';
+        }, 150);
+
+        localStorage.setItem('sidebarExpanded', 'false');
+    }
+
+    // Navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const section = this.getAttribute('data-section');
+            if (section) {
+                switch(section) {
+                    case 'dashboard':
+                        window.location.href = '/dashboard';
+                        break;
+                    case 'assets':
+                        window.location.href = '/assets';
+                        break;
+                    case 'vulnerabilities':
+                        // Already on vulnerabilities page
+                        break;
+                    case 'alerts':
+                        window.location.href = '/alerts';
+                        break;
+                    case 'scans':
+                        window.location.href = '/large-scale-scanning';
+                        break;
+                    case 'reports':
+                        window.location.href = '/reports';
+                        break;
+                    case 'settings':
+                        window.location.href = '/settings';
+                        break;
+                }
             }
-        }
-        
-        function deleteVuln(vulnId) {
-            if (confirm('Are you sure you want to delete this vulnerability? This action cannot be undone.')) {
-                fetch(`/api/vulnerabilities/${vulnId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload();
-                    } else {
-                        alert('Error: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred');
-                });
+        });
+    });
+});
+
+// User menu toggle
+function toggleUserMenu() {
+    const menu = document.getElementById('userMenu');
+    menu.classList.toggle('hidden');
+}
+
+// Close user menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('userMenu');
+    const button = event.target.closest('button');
+
+    if (!menu.contains(event.target) && !button) {
+        menu.classList.add('hidden');
+    }
+});
+
+// Filter functionality
+function applyFilters() {
+    const severityFilter = document.getElementById('severity-filter').value;
+    const statusFilter = document.getElementById('status-filter').value;
+    const searchInput = document.getElementById('vuln-search').value;
+
+    const params = new URLSearchParams();
+    if (severityFilter) params.append('severity', severityFilter);
+    if (statusFilter) params.append('status', statusFilter);
+    if (searchInput) params.append('search', searchInput);
+
+    window.location.href = '/vulnerabilities?' + params.toString();
+}
+
+// Vulnerability actions
+function markResolved(vulnId) {
+    if (confirm('Mark this vulnerability as resolved?')) {
+        fetch(`/api/vulnerabilities/${vulnId}/resolve`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
             }
-        }
-    </script>
-</body>
-</html>
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+        });
+    }
+}
+
+function markOpen(vulnId) {
+    if (confirm('Reopen this vulnerability?')) {
+        fetch(`/api/vulnerabilities/${vulnId}/reopen`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+        });
+    }
+}
+
+function deleteVuln(vulnId) {
+    if (confirm('Are you sure you want to delete this vulnerability? This action cannot be undone.')) {
+        fetch(`/api/vulnerabilities/${vulnId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred');
+        });
+    }
+}
+
+// Search functionality
+document.getElementById('vuln-search').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        applyFilters();
+    }
+});
+</script>
+
+{% endblock %}
