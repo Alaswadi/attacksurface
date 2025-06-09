@@ -191,20 +191,17 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
 
             logger.info(f"🔍 NUCLEI ASYNC: Found {len(raw_vulnerabilities)} potential vulnerabilities")
 
-            # Validate and score vulnerabilities
+            # Process and validate vulnerabilities (simplified - no confidence scoring)
             vulnerability_results = []
             validated_count = 0
 
             for vuln_data in raw_vulnerabilities:
-                confidence = calculate_vulnerability_confidence(vuln_data)
-                vuln_data['confidence_score'] = confidence
+                logger.info(f"🔍 PROCESSING: Template: {vuln_data.get('template_name', 'unknown')}")
+                logger.info(f"🔍 PROCESSING: Severity: {vuln_data.get('severity', 'unknown')}")
 
-                logger.info(f"🔍 VALIDATION: Template: {vuln_data.get('template_name', 'unknown')}")
-                logger.info(f"🔍 VALIDATION: Confidence: {confidence}")
-                logger.info(f"🔍 VALIDATION: Severity: {vuln_data.get('severity', 'unknown')}")
-
-                # Check if vulnerability passes validation
-                is_validated = validate_vulnerability_finding(vuln_data, confidence_threshold=60)
+                # Simple validation based on severity (no confidence scoring)
+                severity = vuln_data.get('severity', 'unknown').lower()
+                is_validated = severity in ['critical', 'high', 'medium']  # Auto-validate critical/high/medium
                 vuln_data['is_validated'] = is_validated
 
                 # Store ALL vulnerabilities, regardless of validation status
@@ -212,9 +209,9 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
 
                 if is_validated:
                     validated_count += 1
-                    logger.info(f"✅ VALIDATION: Accepted vulnerability: {vuln_data.get('template_name', 'unknown')}")
+                    logger.info(f"✅ VALIDATION: Auto-validated vulnerability: {vuln_data.get('template_name', 'unknown')} (severity: {severity})")
                 else:
-                    logger.info(f"⚠️ VALIDATION: Stored unvalidated vulnerability: {vuln_data.get('template_name', 'unknown')} (confidence: {confidence})")
+                    logger.info(f"⚠️ VALIDATION: Stored for manual review: {vuln_data.get('template_name', 'unknown')} (severity: {severity})")
 
             logger.info(f"🔍 NUCLEI ASYNC: Stored {len(vulnerability_results)} total vulnerabilities ({validated_count} validated, {len(raw_vulnerabilities) - validated_count} unvalidated)")
 
@@ -244,7 +241,7 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                         severity_str = vuln_data.get('severity', 'medium').lower()
                         severity = severity_mapping.get(severity_str, SeverityLevel.MEDIUM)
 
-                        # Create vulnerability record with validation fields
+                        # Create vulnerability record with validation fields (no confidence scoring)
                         vulnerability = Vulnerability(
                             title=vuln_data.get('template_name', 'Unknown Vulnerability'),
                             description=vuln_data.get('description', ''),
@@ -254,9 +251,8 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                             discovered_at=datetime.now(),
                             cve_id=vuln_data.get('cve_id'),
                             is_resolved=False,
-                            # New validation fields
-                            confidence_score=vuln_data.get('confidence_score', 0),
-                            is_validated=vuln_data.get('is_validated', False),
+                            # Validation fields (simplified)
+                            is_validated=vuln_data.get('is_validated', True),
                             template_name=vuln_data.get('template_name', ''),
                             cvss_score=vuln_data.get('cvss_score'),
                             asset_metadata=vuln_data  # Store raw scan data
@@ -273,7 +269,7 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                                 'template_name': vuln_data.get('template_name', ''),
                                 'severity': severity_str,
                                 'description': vuln_data.get('description', ''),
-                                'confidence_score': vuln_data.get('confidence_score', 0),
+                                'is_validated': vuln_data.get('is_validated', True),
                                 'discovered_at': datetime.now().isoformat()
                             }
                             if vuln_data.get('cve_id'):
@@ -287,7 +283,7 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
 
                             # Log with validation status
                             validation_status = "✅ VALIDATED" if vuln_data.get('is_validated') else "⚠️ UNVALIDATED"
-                            logger.info(f"{validation_status}: {vuln_data.get('template_name', 'Unknown')} (severity: {severity_str}, confidence: {vuln_data.get('confidence_score', 0)})")
+                            logger.info(f"{validation_status}: {vuln_data.get('template_name', 'Unknown')} (severity: {severity_str})")
 
                     except Exception as e:
                         logger.error(f"❌ NUCLEI ASYNC: Vulnerability storage failed: {str(e)}")

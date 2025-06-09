@@ -1,21 +1,7 @@
 -- Direct PostgreSQL fix for vulnerability validation fields
 -- Run this directly against your PostgreSQL database
 
--- Add confidence_score column
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'vulnerability' 
-        AND column_name = 'confidence_score'
-        AND table_schema = 'public'
-    ) THEN
-        ALTER TABLE vulnerability ADD COLUMN confidence_score INTEGER DEFAULT 0;
-        RAISE NOTICE 'Added confidence_score column';
-    ELSE
-        RAISE NOTICE 'confidence_score column already exists';
-    END IF;
-END $$;
+-- Simplified vulnerability validation (no confidence scoring)
 
 -- Add is_validated column
 DO $$ 
@@ -98,14 +84,12 @@ BEGIN
 END $$;
 
 -- Update existing vulnerabilities with default values
-UPDATE vulnerability 
-SET 
-    confidence_score = COALESCE(confidence_score, 50),
+UPDATE vulnerability
+SET
     is_validated = COALESCE(is_validated, TRUE),
     template_name = COALESCE(template_name, title)
-WHERE 
-    confidence_score IS NULL 
-    OR is_validated IS NULL 
+WHERE
+    is_validated IS NULL
     OR template_name IS NULL;
 
 -- Show final column structure
