@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Vulnerability validation functions
 def calculate_vulnerability_confidence(vuln_data):
     """Calculate confidence score for vulnerability finding"""
-    score = 50  # Base score
+    score = 60  # Higher base score (was 50)
 
     # Template-based confidence
     template_name = vuln_data.get('template_name', '').lower()
@@ -34,11 +34,11 @@ def calculate_vulnerability_confidence(vuln_data):
     elif 'default-login' in template_name:
         score += 20  # Default logins are usually accurate
     elif 'exposure' in template_name:
-        score += 15  # Exposures are generally reliable
+        score += 20  # Exposures are generally reliable (increased from 15)
     elif 'takeover' in template_name:
         score += 20  # Subdomain takeovers are critical
     elif 'misconfiguration' in template_name:
-        score += 10  # Misconfigurations vary in reliability
+        score += 15  # Misconfigurations are valuable (increased from 10)
 
     # Severity-based confidence
     severity = vuln_data.get('severity', '').lower()
@@ -47,60 +47,63 @@ def calculate_vulnerability_confidence(vuln_data):
     elif severity == 'high':
         score += 10
     elif severity == 'medium':
-        score += 5
+        score += 8  # Increased from 5
+    elif severity == 'low':
+        score += 5  # Added low severity bonus
+    elif severity == 'info':
+        score += 3  # Added info severity bonus
 
-    # Response-based validation
+    # Response-based validation (more generous)
     response_code = vuln_data.get('response_code', 0)
     if response_code in [200, 401, 403, 500]:
         score += 10  # Valid HTTP responses indicate real findings
     elif response_code in [404, 502, 503]:
-        score -= 10  # These often indicate false positives
+        score -= 5  # Reduced penalty (was -10)
 
-    # Template category confidence
+    # Template category confidence (more generous)
     template_path = vuln_data.get('template_path', '').lower()
-    if any(category in template_path for category in ['cves/', 'exposures/', 'default-logins/']):
+    if any(category in template_path for category in ['cves/', 'exposures/', 'default-logins/', 'misconfiguration/']):
         score += 10
+    elif any(category in template_path for category in ['technologies/', 'workflows/']):
+        score += 5  # Added bonus for these categories
     elif any(category in template_path for category in ['fuzzing/', 'helpers/']):
-        score -= 15  # These categories have higher false positive rates
+        score -= 10  # Reduced penalty (was -15)
 
-    return min(max(score, 0), 100)  # Clamp between 0-100
+    return min(max(score, 30), 100)  # Clamp between 30-100 (raised minimum)
 
-def validate_vulnerability_finding(vuln_data, confidence_threshold=70):
+def validate_vulnerability_finding(vuln_data, confidence_threshold=60):
     """Validate vulnerability finding to reduce false positives"""
 
-    # 1. Minimum confidence threshold
+    # 1. Minimum confidence threshold (lowered from 70 to 60)
     confidence = vuln_data.get('confidence_score', 0)
     if confidence < confidence_threshold:
+        logger.debug(f"🔍 VALIDATION: Rejected - confidence {confidence} < {confidence_threshold}")
         return False
 
-    # 2. Check for common false positive patterns in description
+    # 2. Check for common false positive patterns in description (more lenient)
     description = vuln_data.get('description', '').lower()
     false_positive_patterns = [
-        'possible', 'potential', 'might be', 'could be',
-        'generic', 'default page', 'common', 'may indicate',
-        'appears to be', 'seems to', 'likely'
+        'test page', 'example', 'placeholder', 'dummy'
     ]
     if any(pattern in description for pattern in false_positive_patterns):
-        # Lower threshold for uncertain language
-        if confidence < 85:
-            return False
+        logger.debug(f"🔍 VALIDATION: Rejected - false positive pattern in description")
+        return False
 
-    # 3. Validate response content length
+    # 3. Validate response content length (more lenient)
     response = vuln_data.get('response', '')
-    if len(response) < 30:  # Too short to be meaningful
+    if len(response) < 10:  # Reduced from 30 to 10
+        logger.debug(f"🔍 VALIDATION: Rejected - response too short ({len(response)} chars)")
         return False
 
-    # 4. Check for template reliability
+    # 4. Check for template reliability (more lenient)
     template_name = vuln_data.get('template_name', '').lower()
-    unreliable_templates = ['generic', 'test', 'sample', 'demo']
+    unreliable_templates = ['test-template', 'sample-template']
     if any(pattern in template_name for pattern in unreliable_templates):
+        logger.debug(f"🔍 VALIDATION: Rejected - unreliable template")
         return False
 
-    # 5. Severity validation
-    severity = vuln_data.get('severity', '').lower()
-    if severity in ['info', 'unknown'] and confidence < 80:
-        return False  # Higher bar for informational findings
-
+    # 5. Accept all severities (removed strict info filtering)
+    logger.debug(f"🔍 VALIDATION: Accepted - {vuln_data.get('template_name', 'unknown')} with confidence {confidence}")
     return True
 
 @celery.task(bind=True)

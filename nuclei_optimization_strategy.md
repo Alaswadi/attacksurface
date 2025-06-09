@@ -38,7 +38,7 @@
 ```bash
 nuclei -l targets.txt -jsonl \
   -t cves/ -t exposures/ -t default-logins/ -t takeovers/ \
-  -severity critical,high \
+  -severity critical,high,medium,low,info \
   -rl 200 -c 30 -bs 25 -ss host-spray \
   -timeout 8 -retries 1 -mhe 20 \
   -silent -disable-update-check

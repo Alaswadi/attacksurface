@@ -3,6 +3,7 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from flask_migrate import Migrate
 from config import config
 from models import db, User, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, AlertType
+from sqlalchemy import or_
 from forms import LoginForm, RegisterForm
 import os
 import logging
@@ -191,7 +192,82 @@ def create_app(config_name=None):
                              at_risk=assets_with_vulns,
                              critical_exposure=critical_exposure,
                              secure_assets=secure_assets)
-    
+
+    @app.route('/vulnerabilities')
+    @login_required
+    def vulnerabilities():
+        """Vulnerabilities management page"""
+        # Get user's organization
+        org = Organization.query.filter_by(user_id=current_user.id).first()
+        if not org:
+            # Create default organization for user
+            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
+            db.session.add(org)
+            db.session.commit()
+
+        # Get filter parameters
+        severity_filter = request.args.get('severity', '')
+        status_filter = request.args.get('status', '')
+        search_query = request.args.get('search', '')
+        page = request.args.get('page', 1, type=int)
+
+        # Build query
+        query = Vulnerability.query.filter_by(organization_id=org.id)
+
+        # Apply filters
+        if severity_filter:
+            severity_enum = getattr(SeverityLevel, severity_filter.upper(), None)
+            if severity_enum:
+                query = query.filter(Vulnerability.severity == severity_enum)
+
+        if status_filter == 'open':
+            query = query.filter(Vulnerability.is_resolved == False)
+        elif status_filter == 'resolved':
+            query = query.filter(Vulnerability.is_resolved == True)
+
+        if search_query:
+            query = query.filter(
+                or_(
+                    Vulnerability.title.contains(search_query),
+                    Vulnerability.description.contains(search_query),
+                    Vulnerability.cve_id.contains(search_query)
+                )
+            )
+
+        # Join with Asset to get asset information
+        query = query.join(Asset)
+
+        # Order by severity and discovery date
+        severity_order = {
+            SeverityLevel.CRITICAL: 0,
+            SeverityLevel.HIGH: 1,
+            SeverityLevel.MEDIUM: 2,
+            SeverityLevel.LOW: 3,
+            SeverityLevel.INFO: 4
+        }
+
+        vulnerabilities = query.order_by(
+            Vulnerability.is_resolved.asc(),  # Open vulnerabilities first
+            Vulnerability.discovered_at.desc()  # Most recent first
+        ).paginate(
+            page=page, per_page=20, error_out=False
+        )
+
+        # Calculate statistics
+        all_vulns = Vulnerability.query.filter_by(organization_id=org.id).all()
+        stats = {
+            'total': len(all_vulns),
+            'critical': len([v for v in all_vulns if v.severity == SeverityLevel.CRITICAL]),
+            'high': len([v for v in all_vulns if v.severity == SeverityLevel.HIGH]),
+            'medium': len([v for v in all_vulns if v.severity == SeverityLevel.MEDIUM]),
+            'low': len([v for v in all_vulns if v.severity == SeverityLevel.LOW]),
+            'info': len([v for v in all_vulns if v.severity == SeverityLevel.INFO])
+        }
+
+        return render_template('vulnerabilities.html',
+                             vulnerabilities=vulnerabilities,
+                             stats=stats)
+
     # Authentication routes
     from routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/auth')

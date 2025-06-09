@@ -1552,3 +1552,96 @@ def start_large_scale_scan_progressive():
             'success': False,
             'error': str(e)
         }), 500
+
+# ============================================================================
+# VULNERABILITY MANAGEMENT API
+# ============================================================================
+
+@api_bp.route('/vulnerabilities/<int:vuln_id>/resolve', methods=['POST'])
+@login_required
+def resolve_vulnerability(vuln_id):
+    """Mark a vulnerability as resolved"""
+    try:
+        # Get user's organization
+        org = Organization.query.filter_by(user_id=current_user.id).first()
+        if not org:
+            return jsonify({'success': False, 'error': 'Organization not found'}), 404
+
+        # Find the vulnerability
+        vulnerability = Vulnerability.query.filter_by(
+            id=vuln_id,
+            organization_id=org.id
+        ).first()
+
+        if not vulnerability:
+            return jsonify({'success': False, 'error': 'Vulnerability not found'}), 404
+
+        # Mark as resolved
+        vulnerability.is_resolved = True
+        vulnerability.resolved_at = datetime.now()
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Vulnerability marked as resolved'})
+
+    except Exception as e:
+        logging.error(f"Error resolving vulnerability {vuln_id}: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to resolve vulnerability'}), 500
+
+@api_bp.route('/vulnerabilities/<int:vuln_id>/reopen', methods=['POST'])
+@login_required
+def reopen_vulnerability(vuln_id):
+    """Reopen a resolved vulnerability"""
+    try:
+        # Get user's organization
+        org = Organization.query.filter_by(user_id=current_user.id).first()
+        if not org:
+            return jsonify({'success': False, 'error': 'Organization not found'}), 404
+
+        # Find the vulnerability
+        vulnerability = Vulnerability.query.filter_by(
+            id=vuln_id,
+            organization_id=org.id
+        ).first()
+
+        if not vulnerability:
+            return jsonify({'success': False, 'error': 'Vulnerability not found'}), 404
+
+        # Mark as open
+        vulnerability.is_resolved = False
+        vulnerability.resolved_at = None
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Vulnerability reopened'})
+
+    except Exception as e:
+        logging.error(f"Error reopening vulnerability {vuln_id}: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to reopen vulnerability'}), 500
+
+@api_bp.route('/vulnerabilities/<int:vuln_id>', methods=['DELETE'])
+@login_required
+def delete_vulnerability(vuln_id):
+    """Delete a vulnerability"""
+    try:
+        # Get user's organization
+        org = Organization.query.filter_by(user_id=current_user.id).first()
+        if not org:
+            return jsonify({'success': False, 'error': 'Organization not found'}), 404
+
+        # Find the vulnerability
+        vulnerability = Vulnerability.query.filter_by(
+            id=vuln_id,
+            organization_id=org.id
+        ).first()
+
+        if not vulnerability:
+            return jsonify({'success': False, 'error': 'Vulnerability not found'}), 404
+
+        # Delete the vulnerability
+        db.session.delete(vulnerability)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Vulnerability deleted successfully'})
+
+    except Exception as e:
+        logging.error(f"Error deleting vulnerability {vuln_id}: {str(e)}")
+        return jsonify({'success': False, 'error': 'Failed to delete vulnerability'}), 500
