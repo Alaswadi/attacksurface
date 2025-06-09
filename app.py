@@ -65,6 +65,15 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate = Migrate(app, db)
 
+    # Run Docker migration if needed
+    if os.environ.get('DATABASE_URL'):  # Only in Docker/production
+        try:
+            with app.app_context():
+                from docker_migration import run_docker_migration
+                run_docker_migration()
+        except Exception as e:
+            logging.error(f"Docker migration failed: {e}")
+
 
 
     # Initialize Redis checker with environment-aware URL
