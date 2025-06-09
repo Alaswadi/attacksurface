@@ -40,31 +40,24 @@
                 </div>
             </div>
 
+            <!-- Alerts -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
+                <div class="flex items-center">
+                    <i class="ri-alert-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
+                    <span class="alert-badge ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 nav-text opacity-0 transition-opacity duration-300">3</span>
+                </div>
+            </div>
+
             <!-- Technologies -->
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/technologies'" title="Technology Discovery">
                 <div class="flex items-center">
                     <i class="ri-stack-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
-                    <span class="nav-text ml-auto bg-blue-500 text-white text-xs rounded-full px-2 py-1 opacity-0 transition-opacity duration-300">NEW</span>
                 </div>
             </div>
 
-            <!-- Alerts -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
-                <div class="flex items-center">
-                    <i class="ri-notification-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
-                    <span class="alert-badge bg-red-500 text-white rounded-full ml-auto opacity-0 transition-opacity duration-300">3</span>
-                </div>
-            </div>
 
-            <!-- Scans -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="scans" title="Scans">
-                <div class="flex items-center">
-                    <i class="ri-search-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Scans</span>
-                </div>
-            </div>
 
             <!-- Reports -->
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="reports" title="Reports">
@@ -77,7 +70,7 @@
             <!-- Settings -->
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="settings" title="Settings">
                 <div class="flex items-center">
-                    <i class="ri-settings-line ri-lg min-w-[24px]"></i>
+                    <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
                 </div>
             </div>
@@ -108,11 +101,6 @@
                 <!-- Add Asset Button -->
                 <button id="add-asset-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
                     <i class="ri-add-line mr-2"></i>Add Asset
-                </button>
-
-                <!-- Large-Scale Scanning Button -->
-                <button id="large-scale-scan-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
-                    <i class="ri-radar-line mr-2"></i>Large-Scale Scan
                 </button>
 
                 <!-- User Menu -->
@@ -502,128 +490,7 @@
     </div>
 </div>
 
-<!-- Large-Scale Scanning Modal -->
-<div id="large-scale-scan-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="relative top-10 mx-auto p-5 border w-[600px] shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-medium text-gray-900">Large-Scale Attack Surface Scanning</h3>
-                <button id="close-large-scale-modal" class="text-gray-400 hover:text-gray-600">
-                    <i class="ri-close-line text-xl"></i>
-                </button>
-            </div>
 
-            <!-- Scan Configuration -->
-            <div id="scan-config-section" class="mb-6">
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <h4 class="font-medium text-blue-900 mb-2">
-                        <i class="ri-radar-line mr-2"></i>Progressive Attack Surface Discovery
-                    </h4>
-                    <p class="text-sm text-blue-800">
-                        Comprehensive scanning workflow: Subfinder → httpx → Nmap → Nuclei.
-                        Results will populate in real-time as each stage completes.
-                    </p>
-                </div>
-
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Target Domain</label>
-                        <input type="text" id="large-scale-domain-input" placeholder="e.g., example.com"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        <p class="text-xs text-gray-500 mt-1">Enter the root domain to scan for attack surface discovery</p>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Scan Type</label>
-                        <select id="large-scale-scan-type" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                            <option value="quick">Quick Scan (Fast, essential checks)</option>
-                            <option value="comprehensive">Comprehensive Scan (Thorough, all checks)</option>
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">Quick scans complete faster, comprehensive scans find more assets</p>
-                    </div>
-
-                    <button id="start-large-scale-scan" class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg transition-colors font-medium">
-                        <i class="ri-rocket-line mr-2"></i>Start Progressive Scan
-                    </button>
-                </div>
-            </div>
-
-            <!-- Scan Progress Section -->
-            <div id="scan-progress-section" class="hidden">
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <div class="flex items-center justify-between mb-2">
-                        <h4 class="font-medium text-green-900">
-                            <i class="ri-loader-4-line animate-spin mr-2"></i>Progressive Scan Active
-                        </h4>
-                        <span id="scan-task-id" class="text-xs text-green-700 font-mono"></span>
-                    </div>
-                    <p id="scan-current-stage" class="text-sm text-green-800 mb-2">Initializing scan...</p>
-
-                    <!-- Progress Bar -->
-                    <div class="w-full bg-green-200 rounded-full h-2 mb-3">
-                        <div id="large-scale-progress-bar" class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
-
-                    <!-- Statistics -->
-                    <div class="grid grid-cols-3 gap-4 text-center">
-                        <div>
-                            <div id="subdomains-found" class="text-lg font-semibold text-green-700">0</div>
-                            <div class="text-xs text-green-600">Subdomains Found</div>
-                        </div>
-                        <div>
-                            <div id="assets-stored" class="text-lg font-semibold text-green-700">0</div>
-                            <div class="text-xs text-green-600">Assets Stored</div>
-                        </div>
-                        <div>
-                            <div id="progressive-updates" class="text-lg font-semibold text-green-700">0</div>
-                            <div class="text-xs text-green-600">Updates Received</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Real-time Log -->
-                <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 max-h-32 overflow-y-auto">
-                    <h5 class="text-sm font-medium text-gray-700 mb-2">Real-time Progress</h5>
-                    <div id="scan-log" class="text-xs text-gray-600 space-y-1">
-                        <!-- Log entries will be added here -->
-                    </div>
-                </div>
-
-                <div class="mt-4 flex justify-between">
-                    <button id="view-assets-during-scan" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                        <i class="ri-eye-line mr-2"></i>View Assets (Live Updates)
-                    </button>
-                    <button id="stop-large-scale-scan" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors">
-                        <i class="ri-stop-line mr-2"></i>Stop Scan
-                    </button>
-                </div>
-            </div>
-
-            <!-- Scan Results Section -->
-            <div id="scan-results-section" class="hidden">
-                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <h4 class="font-medium text-green-900 mb-2">
-                        <i class="ri-check-line mr-2"></i>Scan Completed Successfully
-                    </h4>
-                    <p class="text-sm text-green-800">Progressive scan completed. All discovered assets have been added to your inventory.</p>
-                </div>
-
-                <div id="scan-summary" class="grid grid-cols-2 gap-4 mb-4">
-                    <!-- Summary will be populated here -->
-                </div>
-
-                <div class="flex justify-end space-x-3">
-                    <button id="close-scan-results" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
-                        Close
-                    </button>
-                    <button id="view-discovered-assets" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
-                        <i class="ri-eye-line mr-2"></i>View Discovered Assets
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -640,11 +507,7 @@ let progressiveScanTaskId = null;
 let progressiveScanActive = false;
 let progressiveUpdateCount = 0;
 
-// Large-scale scanning variables
-let largeScaleEventSource = null;
-let largeScaleScanTaskId = null;
-let largeScaleScanActive = false;
-let largeScaleUpdateCount = 0;
+
 
 // Add Asset modal scanning variables
 let addAssetEventSource = null;
@@ -662,7 +525,6 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAssets();
     initializeModals();
     initializeScanning();
-    initializeLargeScaleScanning();
 
     // Add click event to toggle button
     document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
@@ -675,8 +537,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.href = '/dashboard';
             } else if (section === 'vulnerabilities') {
                 window.location.href = '/vulnerabilities';
-            } else if (section === 'scans') {
-                window.location.href = '/real-scanning';
             } else if (section === 'alerts') {
                 window.location.href = '/alerts';
             } else if (section === 'reports') {
@@ -1433,8 +1293,8 @@ function showProgressiveNotification() {
         const viewProgressBtn = document.getElementById('view-scan-progress');
         if (viewProgressBtn && !viewProgressBtn.hasAttribute('data-handler-added')) {
             viewProgressBtn.addEventListener('click', function() {
-                if (largeScaleScanActive) {
-                    showLargeScaleScanModal();
+                if (addAssetScanActive) {
+                    showAddAssetModal();
                 }
             });
             viewProgressBtn.setAttribute('data-handler-added', 'true');
@@ -1472,7 +1332,7 @@ function checkForProgressiveScanning() {
         asset.asset_metadata && asset.asset_metadata.scan_status === 'scanning'
     );
 
-    const hasActiveScanning = largeScaleScanActive || addAssetScanActive;
+    const hasActiveScanning = addAssetScanActive;
 
     if (scanningAssets.length > 0 || hasActiveScanning) {
         showProgressiveNotification();
@@ -1588,347 +1448,11 @@ async function executeDelete() {
     }
 }
 
-// ============================================================================
-// LARGE-SCALE SCANNING FUNCTIONALITY
-// ============================================================================
 
-function initializeLargeScaleScanning() {
-    // Large-scale scan button click handler
-    document.getElementById('large-scale-scan-btn').addEventListener('click', showLargeScaleScanModal);
 
-    // Modal close handlers
-    document.getElementById('close-large-scale-modal').addEventListener('click', hideLargeScaleScanModal);
-    document.getElementById('large-scale-scan-modal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            hideLargeScaleScanModal();
-        }
-    });
 
-    // Start scan button
-    document.getElementById('start-large-scale-scan').addEventListener('click', startLargeScaleScan);
 
-    // Progress section buttons
-    document.getElementById('view-assets-during-scan').addEventListener('click', function() {
-        hideLargeScaleScanModal();
-        // Assets page is already visible, just refresh
-        loadAssets();
-    });
 
-    document.getElementById('stop-large-scale-scan').addEventListener('click', stopLargeScaleScan);
-
-    // Results section buttons
-    document.getElementById('close-scan-results').addEventListener('click', hideLargeScaleScanModal);
-    document.getElementById('view-discovered-assets').addEventListener('click', function() {
-        hideLargeScaleScanModal();
-        // Filter to show recently discovered assets
-        loadAssets();
-    });
-}
-
-function showLargeScaleScanModal() {
-    document.getElementById('large-scale-scan-modal').classList.remove('hidden');
-
-    // Reset modal to initial state
-    document.getElementById('scan-config-section').classList.remove('hidden');
-    document.getElementById('scan-progress-section').classList.add('hidden');
-    document.getElementById('scan-results-section').classList.add('hidden');
-
-    // Clear form fields
-    document.getElementById('large-scale-domain-input').value = '';
-    document.getElementById('large-scale-scan-type').value = 'quick';
-
-    // Reset progress indicators
-    resetLargeScaleProgress();
-}
-
-function hideLargeScaleScanModal() {
-    document.getElementById('large-scale-scan-modal').classList.add('hidden');
-
-    // Close any active event source
-    if (largeScaleEventSource) {
-        largeScaleEventSource.close();
-        largeScaleEventSource = null;
-    }
-
-    largeScaleScanActive = false;
-}
-
-function resetLargeScaleProgress() {
-    document.getElementById('large-scale-progress-bar').style.width = '0%';
-    document.getElementById('scan-current-stage').textContent = 'Initializing scan...';
-    document.getElementById('subdomains-found').textContent = '0';
-    document.getElementById('assets-stored').textContent = '0';
-    document.getElementById('progressive-updates').textContent = '0';
-    document.getElementById('scan-log').innerHTML = '';
-    largeScaleUpdateCount = 0;
-}
-
-async function startLargeScaleScan() {
-    const domain = document.getElementById('large-scale-domain-input').value.trim();
-    const scanType = document.getElementById('large-scale-scan-type').value;
-
-    if (!domain) {
-        showError('Please enter a domain to scan');
-        return;
-    }
-
-    // Validate domain format
-    const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9](?:\.[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9])*$/;
-    if (!domainRegex.test(domain)) {
-        showError('Please enter a valid domain name');
-        return;
-    }
-
-    try {
-        // Show progress section
-        document.getElementById('scan-config-section').classList.add('hidden');
-        document.getElementById('scan-progress-section').classList.remove('hidden');
-
-        largeScaleScanActive = true;
-        resetLargeScaleProgress();
-
-        addLogEntry('Starting large-scale progressive scan...', 'info');
-
-        // Start the progressive scan
-        const response = await fetch('/api/large-scale-scan-progressive', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                domain: domain,
-                scan_type: scanType
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            largeScaleScanTaskId = data.task_id;
-            document.getElementById('scan-task-id').textContent = `Task ID: ${data.task_id}`;
-
-            addLogEntry(`Scan initiated successfully (Task: ${data.task_id})`, 'success');
-
-            // Start Server-Sent Events for real-time updates
-            startLargeScaleProgressiveUpdates(data.progressive_updates_url);
-        } else {
-            throw new Error(data.error || 'Failed to start progressive scan');
-        }
-    } catch (error) {
-        console.error('Large-scale scan error:', error);
-        addLogEntry(`Scan failed: ${error.message}`, 'error');
-        showError('Failed to start scan: ' + error.message);
-
-        // Return to config section
-        document.getElementById('scan-progress-section').classList.add('hidden');
-        document.getElementById('scan-config-section').classList.remove('hidden');
-        largeScaleScanActive = false;
-    }
-}
-
-function startLargeScaleProgressiveUpdates(updatesUrl) {
-    if (largeScaleEventSource) {
-        largeScaleEventSource.close();
-    }
-
-    largeScaleEventSource = new EventSource(updatesUrl);
-
-    largeScaleEventSource.onopen = function(event) {
-        console.log('Large-scale SSE connection opened');
-        addLogEntry('Connected to real-time updates', 'info');
-    };
-
-    largeScaleEventSource.onmessage = function(event) {
-        try {
-            const data = JSON.parse(event.data);
-            handleLargeScaleProgressUpdate(data);
-        } catch (error) {
-            console.error('Error parsing SSE data:', error);
-        }
-    };
-
-    largeScaleEventSource.onerror = function(event) {
-        console.error('Large-scale SSE error:', event);
-        addLogEntry('Connection error, retrying...', 'warning');
-    };
-}
-
-function handleLargeScaleProgressUpdate(data) {
-    largeScaleUpdateCount++;
-    document.getElementById('progressive-updates').textContent = largeScaleUpdateCount;
-
-    console.log('Large-scale progress update:', data);
-
-    switch (data.type) {
-        case 'connected':
-            addLogEntry('Real-time updates connected', 'success');
-            break;
-
-        case 'progress':
-            updateLargeScaleProgress(data);
-            break;
-
-        case 'progressive_update':
-            handleProgressiveUpdate(data.update);
-            break;
-
-        case 'completed':
-            handleScanCompletion(data);
-            break;
-
-        case 'error':
-            addLogEntry(`Error: ${data.error}`, 'error');
-            showError('Scan error: ' + data.error);
-            break;
-
-        case 'timeout':
-            addLogEntry('Scan timeout - check assets page for results', 'warning');
-            break;
-    }
-}
-
-function updateLargeScaleProgress(data) {
-    const progress = data.progress || 0;
-    const stage = data.stage || 'Unknown';
-    const message = data.message || 'Processing...';
-
-    // Update progress bar
-    document.getElementById('large-scale-progress-bar').style.width = progress + '%';
-
-    // Update current stage
-    document.getElementById('scan-current-stage').textContent = message;
-
-    // Add log entry
-    addLogEntry(`${stage}: ${message}`, 'info');
-}
-
-function handleProgressiveUpdate(update) {
-    if (update.type === 'subdomains_discovered') {
-        const count = update.count || 0;
-        document.getElementById('subdomains-found').textContent = count;
-        addLogEntry(`Discovered ${count} subdomains`, 'success');
-
-        // Update notification banner
-        updateProgressiveNotificationStats(count, null, largeScaleUpdateCount);
-        showProgressiveNotification();
-    } else if (update.type === 'subdomains_stored') {
-        const storedCount = update.stored_count || 0;
-        document.getElementById('assets-stored').textContent = storedCount;
-        addLogEntry(`Stored ${storedCount} assets in database`, 'success');
-
-        // Update notification banner
-        const subdomainsCount = document.getElementById('subdomains-found').textContent;
-        updateProgressiveNotificationStats(subdomainsCount, storedCount, largeScaleUpdateCount);
-
-        // Refresh assets in background
-        loadAssets();
-    } else if (update.type === 'http_probing_complete') {
-        addLogEntry('HTTP probing completed', 'info');
-    } else if (update.type === 'port_scanning_complete') {
-        addLogEntry('Port scanning completed', 'info');
-    }
-}
-
-function handleScanCompletion(data) {
-    addLogEntry('Progressive scan completed successfully!', 'success');
-
-    // Close SSE connection
-    if (largeScaleEventSource) {
-        largeScaleEventSource.close();
-        largeScaleEventSource = null;
-    }
-
-    largeScaleScanActive = false;
-
-    // Hide progressive notification
-    hideProgressiveNotification();
-
-    // Show results section
-    document.getElementById('scan-progress-section').classList.add('hidden');
-    document.getElementById('scan-results-section').classList.remove('hidden');
-
-    // Populate scan summary
-    const summary = data.result || {};
-    const summaryHtml = `
-        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-            <h5 class="font-medium text-green-900 mb-2">Scan Summary</h5>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                    <span class="text-green-700">Subdomains Found:</span>
-                    <span class="font-medium">${summary.subdomains_found || 0}</span>
-                </div>
-                <div>
-                    <span class="text-green-700">Assets Stored:</span>
-                    <span class="font-medium">${summary.assets_stored || 0}</span>
-                </div>
-                <div>
-                    <span class="text-green-700">HTTP Services:</span>
-                    <span class="font-medium">${summary.http_services || 0}</span>
-                </div>
-                <div>
-                    <span class="text-green-700">Open Ports:</span>
-                    <span class="font-medium">${summary.open_ports || 0}</span>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.getElementById('scan-summary').innerHTML = summaryHtml;
-
-    // Refresh assets to show all discovered items
-    loadAssets();
-}
-
-function stopLargeScaleScan() {
-    if (largeScaleEventSource) {
-        largeScaleEventSource.close();
-        largeScaleEventSource = null;
-    }
-
-    largeScaleScanActive = false;
-    addLogEntry('Scan stopped by user', 'warning');
-
-    // Hide progressive notification
-    hideProgressiveNotification();
-
-    // Return to config section
-    document.getElementById('scan-progress-section').classList.add('hidden');
-    document.getElementById('scan-config-section').classList.remove('hidden');
-}
-
-function addLogEntry(message, type = 'info') {
-    const logContainer = document.getElementById('scan-log');
-    const timestamp = new Date().toLocaleTimeString();
-
-    let iconClass = 'ri-information-line';
-    let colorClass = 'text-gray-600';
-
-    switch (type) {
-        case 'success':
-            iconClass = 'ri-check-line';
-            colorClass = 'text-green-600';
-            break;
-        case 'error':
-            iconClass = 'ri-error-warning-line';
-            colorClass = 'text-red-600';
-            break;
-        case 'warning':
-            iconClass = 'ri-alert-line';
-            colorClass = 'text-yellow-600';
-            break;
-    }
-
-    const logEntry = document.createElement('div');
-    logEntry.className = `flex items-start space-x-2 ${colorClass}`;
-    logEntry.innerHTML = `
-        <i class="${iconClass} mt-0.5"></i>
-        <span class="text-xs text-gray-500">${timestamp}</span>
-        <span class="flex-1">${message}</span>
-    `;
-
-    logContainer.appendChild(logEntry);
-    logContainer.scrollTop = logContainer.scrollHeight;
-}
 
 // ============================================================================
 // ADD ASSET MODAL SCANNING FUNCTIONALITY

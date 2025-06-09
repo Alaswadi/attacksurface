@@ -40,29 +40,20 @@
                 </div>
             </div>
 
+            <!-- Alerts -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
+                <div class="flex items-center">
+                    <i class="ri-alert-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
+                    <span class="alert-badge ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 nav-text opacity-0 transition-opacity duration-300">3</span>
+                </div>
+            </div>
+
             <!-- Technologies -->
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/technologies'" title="Technology Discovery">
                 <div class="flex items-center">
                     <i class="ri-stack-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
-                    <span class="nav-text ml-auto bg-blue-500 text-white text-xs rounded-full px-2 py-1 opacity-0 transition-opacity duration-300">NEW</span>
-                </div>
-            </div>
-
-            <!-- Alerts -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
-                <div class="flex items-center">
-                    <i class="ri-notification-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
-                    <span class="alert-badge bg-red-500 text-white rounded-full ml-auto opacity-0 transition-opacity duration-300">3</span>
-                </div>
-            </div>
-
-            <!-- Scans -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="scans" title="Scans">
-                <div class="flex items-center">
-                    <i class="ri-search-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Scans</span>
                 </div>
             </div>
 
@@ -77,7 +68,7 @@
             <!-- Settings -->
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="settings" title="Settings">
                 <div class="flex items-center">
-                    <i class="ri-settings-line ri-lg min-w-[24px]"></i>
+                    <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
                 </div>
             </div>
@@ -346,9 +337,9 @@
                             <i class="ri-shield-check-line text-6xl text-gray-400 mb-4"></i>
                             <h3 class="text-lg font-medium text-gray-900 mb-2">No Vulnerabilities Found</h3>
                             <p class="text-gray-500 mb-6">No vulnerabilities match your current filters, or none have been discovered yet.</p>
-                            <a href="/large-scale-scanning" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors inline-flex items-center">
-                                <i class="ri-search-line mr-2"></i>
-                                Start Scanning
+                            <a href="/assets" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors inline-flex items-center">
+                                <i class="ri-add-line mr-2"></i>
+                                Add Assets & Scan
                             </a>
                         </div>
                     {% endif %}
@@ -428,9 +419,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         break;
                     case 'alerts':
                         window.location.href = '/alerts';
-                        break;
-                    case 'scans':
-                        window.location.href = '/large-scale-scanning';
                         break;
                     case 'reports':
                         window.location.href = '/reports';
