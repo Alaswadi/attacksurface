@@ -134,7 +134,7 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                     'bulk_size': 20,
                     'scan_strategy': 'host-spray',
                     'timeout': 15,              # Per-request timeout
-                    'severity': ['critical', 'high'],
+                    'severity': ['critical', 'high', 'medium', 'low', 'info'],
                     'retries': 2,
                     'max_host_error': 30
                 },
@@ -156,7 +156,7 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                     'bulk_size': 10,
                     'scan_strategy': 'host-spray',
                     'timeout': 30,              # Extended timeout for complex checks
-                    'severity': ['critical', 'high', 'medium', 'low'],
+                    'severity': ['critical', 'high', 'medium', 'low', 'info'],
                     'retries': 3,
                     'max_host_error': 100,
                     'include_tags': ['oast'],
@@ -199,9 +199,16 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                 confidence = calculate_vulnerability_confidence(vuln_data)
                 vuln_data['confidence_score'] = confidence
 
-                if validate_vulnerability_finding(vuln_data, confidence_threshold=70):
+                logger.info(f"🔍 VALIDATION: Template: {vuln_data.get('template_name', 'unknown')}")
+                logger.info(f"🔍 VALIDATION: Confidence: {confidence}")
+                logger.info(f"🔍 VALIDATION: Severity: {vuln_data.get('severity', 'unknown')}")
+
+                if validate_vulnerability_finding(vuln_data, confidence_threshold=60):
                     vulnerability_results.append(vuln_data)
                     validated_count += 1
+                    logger.info(f"✅ VALIDATION: Accepted vulnerability: {vuln_data.get('template_name', 'unknown')}")
+                else:
+                    logger.warning(f"❌ VALIDATION: Rejected vulnerability: {vuln_data.get('template_name', 'unknown')} (confidence: {confidence})")
 
             logger.info(f"🔍 NUCLEI ASYNC: Validated {validated_count}/{len(raw_vulnerabilities)} vulnerabilities")
 

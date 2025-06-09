@@ -58,7 +58,7 @@ nuclei -l targets.txt -jsonl \
 ```bash
 nuclei -l targets.txt -jsonl \
   -t cves/ -t exposures/ -t vulnerabilities/ -t misconfiguration/ -t workflows/ \
-  -severity critical,high,medium,low \
+  -severity critical,high,medium,low,info \
   -rl 100 -c 20 -bs 15 -ss host-spray \
   -timeout 15 -retries 3 -mhe 50 \
   -include-tags oast -exclude-tags dos,intrusive \
