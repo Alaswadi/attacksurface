@@ -78,15 +78,8 @@ class Vulnerability(db.Model):
     is_resolved = db.Column(db.Boolean, default=False)
     resolved_at = db.Column(db.DateTime)
 
-    # Validation and confidence fields (with nullable=True for backward compatibility)
-    confidence_score = db.Column(db.Integer, default=0, nullable=True)  # 0-100 confidence score
-    is_validated = db.Column(db.Boolean, default=False, nullable=True)  # Whether it passed validation
-    validation_notes = db.Column(db.Text, nullable=True)  # Notes about validation status
-    template_name = db.Column(db.String(255), nullable=True)  # Nuclei template that found this
-    cvss_score = db.Column(db.Float, nullable=True)  # CVSS score if available
-
-    # Additional metadata as JSON (for storing raw scan data)
-    asset_metadata = db.Column(db.JSON, nullable=True)
+    # Validation and confidence fields (dynamically added after migration)
+    # These fields are added by auto_migrate_vulnerability_fields() function
 
     # Foreign keys
     asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)

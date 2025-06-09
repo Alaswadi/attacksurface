@@ -51,127 +51,7 @@ def make_celery(app):
     celery.Task = ContextTask
     return celery
 
-def auto_migrate_vulnerability_fields():
-    """Automatically add vulnerability validation fields if they don't exist"""
-    try:
-        # Check if the new columns exist by trying to query them
-        from models import Vulnerability
-        test_query = db.session.query(Vulnerability.confidence_score).limit(1)
-        test_query.all()
-        logging.info("✅ Vulnerability validation fields already exist")
-        return True
-    except Exception:
-        logging.info("🔄 Auto-migrating vulnerability validation fields...")
 
-        try:
-            # Add the new columns using raw SQL
-            migration_sql = """
-            -- Add confidence_score column
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'vulnerability'
-                    AND column_name = 'confidence_score'
-                    AND table_schema = 'public'
-                ) THEN
-                    ALTER TABLE vulnerability ADD COLUMN confidence_score INTEGER DEFAULT 0;
-                END IF;
-            END $$;
-
-            -- Add is_validated column
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'vulnerability'
-                    AND column_name = 'is_validated'
-                    AND table_schema = 'public'
-                ) THEN
-                    ALTER TABLE vulnerability ADD COLUMN is_validated BOOLEAN DEFAULT FALSE;
-                END IF;
-            END $$;
-
-            -- Add validation_notes column
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'vulnerability'
-                    AND column_name = 'validation_notes'
-                    AND table_schema = 'public'
-                ) THEN
-                    ALTER TABLE vulnerability ADD COLUMN validation_notes TEXT;
-                END IF;
-            END $$;
-
-            -- Add template_name column
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'vulnerability'
-                    AND column_name = 'template_name'
-                    AND table_schema = 'public'
-                ) THEN
-                    ALTER TABLE vulnerability ADD COLUMN template_name VARCHAR(255);
-                END IF;
-            END $$;
-
-            -- Add cvss_score column
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'vulnerability'
-                    AND column_name = 'cvss_score'
-                    AND table_schema = 'public'
-                ) THEN
-                    ALTER TABLE vulnerability ADD COLUMN cvss_score REAL;
-                END IF;
-            END $$;
-
-            -- Add asset_metadata column
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'vulnerability'
-                    AND column_name = 'asset_metadata'
-                    AND table_schema = 'public'
-                ) THEN
-                    ALTER TABLE vulnerability ADD COLUMN asset_metadata JSONB;
-                END IF;
-            END $$;
-            """
-
-            # Execute the migration
-            db.session.execute(text(migration_sql))
-            db.session.commit()
-
-            # Update existing records
-            update_sql = """
-            UPDATE vulnerability
-            SET
-                confidence_score = COALESCE(confidence_score, 50),
-                is_validated = COALESCE(is_validated, TRUE),
-                template_name = COALESCE(template_name, title)
-            WHERE
-                confidence_score IS NULL
-                OR is_validated IS NULL
-                OR template_name IS NULL;
-            """
-
-            result = db.session.execute(text(update_sql))
-            db.session.commit()
-
-            logging.info(f"✅ Auto-migration completed successfully! Updated {result.rowcount} existing vulnerabilities")
-            return True
-
-        except Exception as e:
-            logging.error(f"❌ Auto-migration failed: {str(e)}")
-            db.session.rollback()
-            return False
 
 def create_app(config_name=None):
     app = Flask(__name__)
@@ -185,9 +65,7 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate = Migrate(app, db)
 
-    # Auto-run database migration for vulnerability validation fields
-    with app.app_context():
-        auto_migrate_vulnerability_fields()
+
 
     # Initialize Redis checker with environment-aware URL
     broker_url = (
