@@ -130,8 +130,13 @@ class NucleiScanner(BaseScanner):
             # Debug: Log the complete command
             logger.info(f"🔍 NUCLEI: Executing command: {' '.join(cmd)}")
 
-            # Run the scan
-            result = self._run_command(cmd)
+            # Run the scan with no timeout for comprehensive scanning
+            original_timeout = self.timeout
+            self.timeout = None  # Disable timeout for this scan
+            try:
+                result = self._run_command(cmd)
+            finally:
+                self.timeout = original_timeout  # Restore original timeout
 
             # Log Nuclei result details
             logger.info(f"🔍 NUCLEI: Return code: {result['returncode']}")

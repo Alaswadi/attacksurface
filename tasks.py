@@ -125,18 +125,18 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                 logger.warning("⚠️ NUCLEI ASYNC: Templates not available, aborting scan")
                 return {'success': False, 'error': 'Templates not available'}
 
-            # Configure Nuclei for comprehensive main domain scanning
+            # Configure Nuclei for comprehensive main domain scanning (more conservative)
             nuclei_config = {
                 'quick': {
                     'templates': ['cves/', 'exposures/', 'default-logins/', 'takeovers/'],
-                    'rate_limit': 150,          # Conservative for thoroughness
-                    'concurrency': 25,          # Balanced for stability
-                    'bulk_size': 20,
+                    'rate_limit': 50,           # Much more conservative to avoid being killed
+                    'concurrency': 10,          # Lower concurrency for stability
+                    'bulk_size': 5,             # Smaller bulk size
                     'scan_strategy': 'host-spray',
-                    'timeout': 15,              # Per-request timeout
+                    'timeout': 10,              # Shorter per-request timeout
                     'severity': ['critical', 'high', 'medium', 'low', 'info'],
-                    'retries': 2,
-                    'max_host_error': 30
+                    'retries': 1,               # Fewer retries
+                    'max_host_error': 10        # Lower error threshold
                 },
                 'deep': {
                     'templates': ['cves/', 'exposures/', 'vulnerabilities/', 'misconfiguration/', 'default-logins/', 'takeovers/', 'technologies/'],
@@ -325,20 +325,29 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
             }
 
     except Exception as e:
-        logger.error(f"❌ NUCLEI ASYNC: Comprehensive scan failed for {main_domain}: {str(e)}")
-        self.update_state(
-            state='FAILURE',
-            meta={
-                'domain': main_domain,
-                'error': str(e),
-                'stage': 'nuclei_failed'
-            }
-        )
+        error_msg = str(e)
+        logger.error(f"❌ NUCLEI ASYNC: Comprehensive scan failed for {main_domain}: {error_msg}")
+
+        # Update state with proper error handling
+        try:
+            self.update_state(
+                state='FAILURE',
+                meta={
+                    'domain': main_domain,
+                    'error': error_msg,
+                    'stage': 'nuclei_failed',
+                    'message': f'Nuclei scan failed: {error_msg}'
+                }
+            )
+        except Exception as state_error:
+            logger.error(f"❌ Failed to update task state: {str(state_error)}")
+
+        # Return failure result
         return {
             'success': False,
             'domain': main_domain,
-            'error': str(e),
-            'message': 'Comprehensive Nuclei scan failed'
+            'error': error_msg,
+            'message': f'Comprehensive Nuclei scan failed: {error_msg}'
         }
 
 @celery.task(bind=True)
