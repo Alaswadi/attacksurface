@@ -203,14 +203,20 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                 logger.info(f"🔍 VALIDATION: Confidence: {confidence}")
                 logger.info(f"🔍 VALIDATION: Severity: {vuln_data.get('severity', 'unknown')}")
 
-                if validate_vulnerability_finding(vuln_data, confidence_threshold=60):
-                    vulnerability_results.append(vuln_data)
+                # Check if vulnerability passes validation
+                is_validated = validate_vulnerability_finding(vuln_data, confidence_threshold=60)
+                vuln_data['is_validated'] = is_validated
+
+                # Store ALL vulnerabilities, regardless of validation status
+                vulnerability_results.append(vuln_data)
+
+                if is_validated:
                     validated_count += 1
                     logger.info(f"✅ VALIDATION: Accepted vulnerability: {vuln_data.get('template_name', 'unknown')}")
                 else:
-                    logger.warning(f"❌ VALIDATION: Rejected vulnerability: {vuln_data.get('template_name', 'unknown')} (confidence: {confidence})")
+                    logger.info(f"⚠️ VALIDATION: Stored unvalidated vulnerability: {vuln_data.get('template_name', 'unknown')} (confidence: {confidence})")
 
-            logger.info(f"🔍 NUCLEI ASYNC: Validated {validated_count}/{len(raw_vulnerabilities)} vulnerabilities")
+            logger.info(f"🔍 NUCLEI ASYNC: Stored {len(vulnerability_results)} total vulnerabilities ({validated_count} validated, {len(raw_vulnerabilities) - validated_count} unvalidated)")
 
             # Store vulnerabilities in database
             from models import Vulnerability, SeverityLevel, Asset
@@ -238,7 +244,7 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                         severity_str = vuln_data.get('severity', 'medium').lower()
                         severity = severity_mapping.get(severity_str, SeverityLevel.MEDIUM)
 
-                        # Create vulnerability record
+                        # Create vulnerability record with validation fields
                         vulnerability = Vulnerability(
                             title=vuln_data.get('template_name', 'Unknown Vulnerability'),
                             description=vuln_data.get('description', ''),
@@ -247,7 +253,13 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                             organization_id=organization_id,
                             discovered_at=datetime.now(),
                             cve_id=vuln_data.get('cve_id'),
-                            is_resolved=False
+                            is_resolved=False,
+                            # New validation fields
+                            confidence_score=vuln_data.get('confidence_score', 0),
+                            is_validated=vuln_data.get('is_validated', False),
+                            template_name=vuln_data.get('template_name', ''),
+                            cvss_score=vuln_data.get('cvss_score'),
+                            asset_metadata=vuln_data  # Store raw scan data
                         )
                         db.session.add(vulnerability)
 
@@ -272,6 +284,10 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                             existing_metadata['nuclei_scan_completed_at'] = datetime.now().isoformat()
                             main_domain_asset.asset_metadata = existing_metadata
                             vulnerabilities_stored += 1
+
+                            # Log with validation status
+                            validation_status = "✅ VALIDATED" if vuln_data.get('is_validated') else "⚠️ UNVALIDATED"
+                            logger.info(f"{validation_status}: {vuln_data.get('template_name', 'Unknown')} (severity: {severity_str}, confidence: {vuln_data.get('confidence_score', 0)})")
 
                     except Exception as e:
                         logger.error(f"❌ NUCLEI ASYNC: Vulnerability storage failed: {str(e)}")

@@ -208,6 +208,7 @@ def create_app(config_name=None):
         # Get filter parameters
         severity_filter = request.args.get('severity', '')
         status_filter = request.args.get('status', '')
+        validation_filter = request.args.get('validation', '')
         search_query = request.args.get('search', '')
         page = request.args.get('page', 1, type=int)
 
@@ -225,12 +226,18 @@ def create_app(config_name=None):
         elif status_filter == 'resolved':
             query = query.filter(Vulnerability.is_resolved == True)
 
+        if validation_filter == 'validated':
+            query = query.filter(Vulnerability.is_validated == True)
+        elif validation_filter == 'unvalidated':
+            query = query.filter(Vulnerability.is_validated == False)
+
         if search_query:
             query = query.filter(
                 or_(
                     Vulnerability.title.contains(search_query),
                     Vulnerability.description.contains(search_query),
-                    Vulnerability.cve_id.contains(search_query)
+                    Vulnerability.cve_id.contains(search_query),
+                    Vulnerability.template_name.contains(search_query)
                 )
             )
 
@@ -261,7 +268,10 @@ def create_app(config_name=None):
             'high': len([v for v in all_vulns if v.severity == SeverityLevel.HIGH]),
             'medium': len([v for v in all_vulns if v.severity == SeverityLevel.MEDIUM]),
             'low': len([v for v in all_vulns if v.severity == SeverityLevel.LOW]),
-            'info': len([v for v in all_vulns if v.severity == SeverityLevel.INFO])
+            'info': len([v for v in all_vulns if v.severity == SeverityLevel.INFO]),
+            # Validation statistics
+            'validated': len([v for v in all_vulns if getattr(v, 'is_validated', True)]),
+            'unvalidated': len([v for v in all_vulns if not getattr(v, 'is_validated', True)])
         }
 
         return render_template('vulnerabilities.html',

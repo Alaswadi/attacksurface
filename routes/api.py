@@ -229,7 +229,13 @@ def get_vulnerabilities():
             'severity': vuln.severity.value,
             'discovered_at': vuln.discovered_at.isoformat(),
             'is_resolved': vuln.is_resolved,
-            'asset_name': vuln.asset.name if vuln.asset else None
+            'asset_name': vuln.asset.name if vuln.asset else None,
+            # New validation fields
+            'confidence_score': vuln.confidence_score,
+            'is_validated': vuln.is_validated,
+            'template_name': vuln.template_name,
+            'cvss_score': vuln.cvss_score,
+            'validation_notes': vuln.validation_notes
         })
     
     return jsonify({'vulnerabilities': vulns_data})

@@ -77,7 +77,17 @@ class Vulnerability(db.Model):
     discovered_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_resolved = db.Column(db.Boolean, default=False)
     resolved_at = db.Column(db.DateTime)
-    
+
+    # Validation and confidence fields
+    confidence_score = db.Column(db.Integer, default=0)  # 0-100 confidence score
+    is_validated = db.Column(db.Boolean, default=False)  # Whether it passed validation
+    validation_notes = db.Column(db.Text)  # Notes about validation status
+    template_name = db.Column(db.String(255))  # Nuclei template that found this
+    cvss_score = db.Column(db.Float)  # CVSS score if available
+
+    # Additional metadata as JSON (for storing raw scan data)
+    asset_metadata = db.Column(db.JSON)
+
     # Foreign keys
     asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)

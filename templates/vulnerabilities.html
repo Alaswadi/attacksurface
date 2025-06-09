@@ -117,7 +117,7 @@
         <!-- Vulnerabilities Content -->
         <div class="flex-1 overflow-y-auto p-6">
             <!-- Statistics Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-6 gap-6 mb-6">
                 <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
                     <h3 class="text-gray-500 font-medium mb-2">Total Vulnerabilities</h3>
                     <p class="text-5xl font-semibold text-gray-800">{{ stats.total }}</p>
@@ -140,6 +140,18 @@
                     <h3 class="text-gray-500 font-medium mb-2">Low & Info</h3>
                     <p class="text-5xl font-semibold text-green-600">{{ stats.low + stats.info }}</p>
                     <p class="text-sm text-gray-500 mt-1">Informational findings</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Validated</h3>
+                    <p class="text-5xl font-semibold text-green-600">{{ stats.validated }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Passed validation checks</p>
+                </div>
+
+                <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-gray-500 font-medium mb-2">Unvalidated</h3>
+                    <p class="text-5xl font-semibold text-yellow-600">{{ stats.unvalidated }}</p>
+                    <p class="text-sm text-gray-500 mt-1">Require manual review</p>
                 </div>
             </div>
             <!-- Filters -->
@@ -165,6 +177,16 @@
                                 <option value="">All Status</option>
                                 <option value="open" {{ 'selected' if request.args.get('status') == 'open' }}>Open</option>
                                 <option value="resolved" {{ 'selected' if request.args.get('status') == 'resolved' }}>Resolved</option>
+                            </select>
+                            <i class="ri-arrow-down-s-line absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                        </div>
+
+                        <!-- Validation Filter -->
+                        <div class="relative">
+                            <select id="validation-filter" class="appearance-none bg-white border border-gray-300 rounded-lg px-4 py-2 pr-8 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">All Validation</option>
+                                <option value="validated" {{ 'selected' if request.args.get('validation') == 'validated' }}>Validated</option>
+                                <option value="unvalidated" {{ 'selected' if request.args.get('validation') == 'unvalidated' }}>Unvalidated</option>
                             </select>
                             <i class="ri-arrow-down-s-line absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none"></i>
                         </div>
@@ -195,9 +217,29 @@
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ severity_colors.get(vuln.severity.value, 'bg-gray-100 text-gray-800') }}">
                                                 {{ vuln.severity.value.upper() }}
                                             </span>
-                                            {% if vuln.asset_metadata and vuln.asset_metadata.get('confidence_score') %}
+
+                                            <!-- Validation Status Badge -->
+                                            {% if vuln.is_validated %}
+                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                <i class="ri-shield-check-line mr-1"></i>Validated
+                                            </span>
+                                            {% else %}
+                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                <i class="ri-alert-line mr-1"></i>Unvalidated
+                                            </span>
+                                            {% endif %}
+
+                                            <!-- Confidence Score -->
+                                            {% if vuln.confidence_score %}
                                             <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                {{ vuln.asset_metadata.get('confidence_score') }}% confidence
+                                                <i class="ri-bar-chart-line mr-1"></i>{{ vuln.confidence_score }}% confidence
+                                            </span>
+                                            {% endif %}
+
+                                            <!-- Template Name -->
+                                            {% if vuln.template_name %}
+                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="ri-code-line mr-1"></i>{{ vuln.template_name }}
                                             </span>
                                             {% endif %}
                                         </div>
@@ -413,11 +455,13 @@ document.addEventListener('click', function(event) {
 function applyFilters() {
     const severityFilter = document.getElementById('severity-filter').value;
     const statusFilter = document.getElementById('status-filter').value;
+    const validationFilter = document.getElementById('validation-filter').value;
     const searchInput = document.getElementById('vuln-search').value;
 
     const params = new URLSearchParams();
     if (severityFilter) params.append('severity', severityFilter);
     if (statusFilter) params.append('status', statusFilter);
+    if (validationFilter) params.append('validation', validationFilter);
     if (searchInput) params.append('search', searchInput);
 
     window.location.href = '/vulnerabilities?' + params.toString();
