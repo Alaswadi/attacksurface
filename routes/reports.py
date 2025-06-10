@@ -45,8 +45,13 @@ def generate_pdf_report():
             'error': 'PDF generation not available. Please install reportlab: pip install reportlab'
         }), 500
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         current_app.logger.error(f"Error generating PDF report: {str(e)}")
-        return jsonify({'error': 'Failed to generate PDF report'}), 500
+        current_app.logger.error(f"Full traceback: {error_details}")
+        print(f"PDF Generation Error: {str(e)}")
+        print(f"Full traceback: {error_details}")
+        return jsonify({'error': f'Failed to generate PDF report: {str(e)}'}), 500
 
 @reports_bp.route('/api/reports/generate-html')
 @login_required
@@ -85,12 +90,40 @@ def generate_html_report():
         return jsonify({'error': 'Failed to generate HTML report'}), 500
 
 def _get_report_data_internal(org):
-    """Internal function to get report data for an organization"""
-    # Get all assets
+    """Internal function to get comprehensive report data for an organization"""
+    # Get all assets with their vulnerabilities
     assets = Asset.query.filter_by(organization_id=org.id, is_active=True).all()
 
-    # Get all vulnerabilities
+    # Get all vulnerabilities with asset relationships
     vulnerabilities = Vulnerability.query.filter_by(organization_id=org.id).all()
+
+    # Enhanced asset coverage analysis
+    try:
+        asset_coverage_analysis = analyze_asset_coverage(assets)
+    except Exception as e:
+        print(f"Error in asset coverage analysis: {e}")
+        asset_coverage_analysis = {}
+
+    # Threat location mapping
+    try:
+        threat_location_mapping = analyze_threat_locations(assets, vulnerabilities)
+    except Exception as e:
+        print(f"Error in threat location mapping: {e}")
+        threat_location_mapping = {}
+
+    # Domain-specific threat analysis
+    try:
+        domain_threat_analysis = analyze_domain_threats(assets, vulnerabilities)
+    except Exception as e:
+        print(f"Error in domain threat analysis: {e}")
+        domain_threat_analysis = {}
+
+    # Enhanced threat intelligence
+    try:
+        enhanced_threat_intelligence = analyze_threat_intelligence(vulnerabilities, assets)
+    except Exception as e:
+        print(f"Error in enhanced threat intelligence: {e}")
+        enhanced_threat_intelligence = {}
 
     # Calculate asset statistics
     asset_stats = {
@@ -101,7 +134,8 @@ def _get_report_data_internal(org):
             'ip_addresses': len([a for a in assets if a.asset_type == AssetType.IP_ADDRESS]),
             'cloud_resources': len([a for a in assets if a.asset_type == AssetType.CLOUD_RESOURCE]),
             'services': len([a for a in assets if a.asset_type == AssetType.SERVICE])
-        }
+        },
+        'coverage_analysis': asset_coverage_analysis
     }
 
     # Calculate vulnerability statistics
@@ -160,7 +194,8 @@ def _get_report_data_internal(org):
     return {
         'organization': {
             'name': org.name,
-            'id': org.id
+            'id': org.id,
+            'created_at': org.created_at.isoformat() if org.created_at else None
         },
         'asset_stats': asset_stats,
         'vulnerability_stats': vuln_stats,
@@ -169,6 +204,9 @@ def _get_report_data_internal(org):
         'compliance_analysis': compliance_analysis,
         'recent_activity': recent_activity,
         'trend_data': trend_data,
+        'threat_location_mapping': threat_location_mapping,
+        'domain_threat_analysis': domain_threat_analysis,
+        'enhanced_threat_intelligence': enhanced_threat_intelligence,
         'generated_at': datetime.utcnow().isoformat()
     }
 
@@ -342,7 +380,7 @@ def generate_trend_data(org_id):
     }
 
 def generate_html_report_content(data):
-    """Generate HTML report content (no external dependencies)"""
+    """Generate comprehensive HTML report content with enhanced analysis"""
     org_name = data.get('organization', {}).get('name', 'Unknown Organization')
     generated_at = datetime.utcnow().strftime('%B %d, %Y at %I:%M %p UTC')
 
@@ -351,6 +389,12 @@ def generate_html_report_content(data):
     vuln_stats = data.get('vulnerability_stats', {})
     risk_metrics = data.get('risk_metrics', {})
     compliance = data.get('compliance_analysis', {})
+
+    # Enhanced analysis data
+    coverage_analysis = asset_stats.get('coverage_analysis', {})
+    threat_mapping = data.get('threat_location_mapping', {})
+    domain_analysis = data.get('domain_threat_analysis', {})
+    threat_intelligence = data.get('enhanced_threat_intelligence', {})
     tech_analysis = data.get('technology_analysis', {})
 
     html_content = f"""
@@ -479,9 +523,9 @@ def generate_html_report_content(data):
 </head>
 <body>
     <div class="header">
-        <h1>Security Compliance Report</h1>
-        <div class="subtitle">ISO 27001:2013 Assessment</div>
-        <div class="subtitle">{org_name}</div>
+        <h1>{org_name}</h1>
+        <div class="subtitle">Security Compliance Report</div>
+        <div class="subtitle">ISO 27001:2013 Comprehensive Attack Surface Assessment</div>
         <div class="subtitle">Generated on {generated_at}</div>
     </div>
 
@@ -704,6 +748,259 @@ def generate_html_report_content(data):
         html_content += """
     </div>"""
 
+    # Asset Coverage Analysis section
+    coverage_percentage = coverage_analysis.get('coverage_percentage', 0)
+    scanning_coverage = coverage_analysis.get('scanning_coverage', {})
+    discovery_timeline = coverage_analysis.get('discovery_timeline', {})
+
+    html_content += f"""
+    <div class="section">
+        <h2>Asset Coverage Analysis</h2>
+        <p>Comprehensive visibility into the organization's digital asset discovery and scanning coverage across the entire attack surface.</p>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{coverage_percentage}%</div>
+                <div class="metric-label">Infrastructure Scanning Coverage</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{scanning_coverage.get('scanned_assets', 0)}</div>
+                <div class="metric-label">Scanned Assets</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{scanning_coverage.get('never_scanned', 0)}</div>
+                <div class="metric-label">Never Scanned</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{scanning_coverage.get('recently_scanned', 0)}</div>
+                <div class="metric-label">Recently Scanned (7 days)</div>
+            </div>
+        </div>
+
+        <h3>Asset Discovery Timeline</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Time Period</th>
+                    <th>Assets Discovered</th>
+                    <th>Percentage</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Last 24 Hours</td>
+                    <td>{discovery_timeline.get('last_24h', 0)}</td>
+                    <td>{(discovery_timeline.get('last_24h', 0) / max(sum(discovery_timeline.values()), 1) * 100):.1f}%</td>
+                </tr>
+                <tr>
+                    <td>Last 7 Days</td>
+                    <td>{discovery_timeline.get('last_7d', 0)}</td>
+                    <td>{(discovery_timeline.get('last_7d', 0) / max(sum(discovery_timeline.values()), 1) * 100):.1f}%</td>
+                </tr>
+                <tr>
+                    <td>Last 30 Days</td>
+                    <td>{discovery_timeline.get('last_30d', 0)}</td>
+                    <td>{(discovery_timeline.get('last_30d', 0) / max(sum(discovery_timeline.values()), 1) * 100):.1f}%</td>
+                </tr>
+                <tr>
+                    <td>Older</td>
+                    <td>{discovery_timeline.get('older', 0)}</td>
+                    <td>{(discovery_timeline.get('older', 0) / max(sum(discovery_timeline.values()), 1) * 100):.1f}%</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>"""
+
+    # Threat Location Mapping section
+    assets_with_threats = threat_mapping.get('assets_with_threats', {})
+
+    html_content += f"""
+    <div class="section">
+        <h2>Threat Location Mapping</h2>
+        <p>Specific identification of assets containing vulnerabilities with clear visibility into threat locations within the attack surface.</p>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{len(assets_with_threats)}</div>
+                <div class="metric-label">Assets with Identified Threats</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{round((len(assets_with_threats) / max(asset_stats.get('total', 1), 1)) * 100, 1)}%</div>
+                <div class="metric-label">Risk Concentration</div>
+            </div>
+        </div>"""
+
+    if assets_with_threats:
+        # Sort assets by total threat count
+        sorted_assets = sorted(assets_with_threats.items(),
+                             key=lambda x: sum(x[1]['severity_counts'].values()), reverse=True)
+
+        html_content += """
+        <h3>Top Threatened Assets</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Asset Name</th>
+                    <th>Asset Type</th>
+                    <th>Critical</th>
+                    <th>High</th>
+                    <th>Medium</th>
+                    <th>Total Threats</th>
+                </tr>
+            </thead>
+            <tbody>"""
+
+        for asset_name, asset_data in sorted_assets[:10]:  # Top 10 most threatened assets
+            severity_counts = asset_data['severity_counts']
+            total_threats = sum(severity_counts.values())
+
+            html_content += f"""
+                <tr>
+                    <td>{asset_name[:40] + ('...' if len(asset_name) > 40 else '')}</td>
+                    <td>{asset_data['asset_type'].title()}</td>
+                    <td class="severity-critical">{severity_counts.get('critical', 0)}</td>
+                    <td class="severity-high">{severity_counts.get('high', 0)}</td>
+                    <td class="severity-medium">{severity_counts.get('medium', 0)}</td>
+                    <td><strong>{total_threats}</strong></td>
+                </tr>"""
+
+        html_content += """
+            </tbody>
+        </table>"""
+
+    html_content += """
+    </div>"""
+
+    # Domain-Specific Threat Analysis section
+    domain_breakdown = domain_analysis.get('domain_breakdown', {})
+
+    html_content += f"""
+    <div class="section">
+        <h2>Domain-Specific Threat Analysis</h2>
+        <p>Analysis of security threats across {domain_analysis.get('total_domains', 0)} domains,
+        with {domain_analysis.get('high_risk_domains', 0)} domains classified as high-risk.</p>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{domain_analysis.get('total_domains', 0)}</div>
+                <div class="metric-label">Total Domains Analyzed</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{domain_analysis.get('high_risk_domains', 0)}</div>
+                <div class="metric-label">High-Risk Domains</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{domain_analysis.get('domains_with_vulnerabilities', 0)}</div>
+                <div class="metric-label">Domains with Vulnerabilities</div>
+            </div>
+        </div>"""
+
+    if domain_breakdown:
+        html_content += """
+        <h3>Domain Risk Ranking</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Domain</th>
+                    <th>Risk Level</th>
+                    <th>Assets</th>
+                    <th>Vulnerabilities</th>
+                    <th>Risk Score</th>
+                </tr>
+            </thead>
+            <tbody>"""
+
+        for domain, domain_info in list(domain_breakdown.items())[:10]:  # Top 10 domains
+            risk_level = domain_info['risk_level']
+            html_content += f"""
+                <tr>
+                    <td>{domain[:35] + ('...' if len(domain) > 35 else '')}</td>
+                    <td><span class="domain-risk {risk_level}">{risk_level.title()}</span></td>
+                    <td>{domain_info['total_assets']}</td>
+                    <td>{domain_info['total_vulnerabilities']}</td>
+                    <td><strong>{domain_info['risk_score']}</strong></td>
+                </tr>"""
+
+        html_content += """
+            </tbody>
+        </table>"""
+
+    html_content += """
+    </div>"""
+
+    # Enhanced Threat Intelligence section
+    attack_vectors = threat_intelligence.get('attack_vectors', {})
+    remediation_matrix = threat_intelligence.get('remediation_priority_matrix', [])
+
+    html_content += """
+    <div class="section">
+        <h2>Enhanced Threat Intelligence</h2>
+        <p>Comprehensive analysis of identified threats with business impact context, attack vector categorization, and prioritized remediation guidance.</p>"""
+
+    if attack_vectors:
+        html_content += """
+        <h3>Attack Vector Distribution</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Attack Vector</th>
+                    <th>Count</th>
+                    <th>Critical</th>
+                    <th>High</th>
+                    <th>Medium</th>
+                </tr>
+            </thead>
+            <tbody>"""
+
+        for vector, vector_info in attack_vectors.items():
+            if vector != 'unknown':  # Skip unknown vectors for cleaner report
+                severities = vector_info['severities']
+                html_content += f"""
+                    <tr>
+                        <td>{vector.title()}</td>
+                        <td><strong>{vector_info['count']}</strong></td>
+                        <td class="severity-critical">{severities.get('critical', 0)}</td>
+                        <td class="severity-high">{severities.get('high', 0)}</td>
+                        <td class="severity-medium">{severities.get('medium', 0)}</td>
+                    </tr>"""
+
+        html_content += """
+            </tbody>
+        </table>"""
+
+    if remediation_matrix:
+        html_content += """
+        <h3>Top Priority Remediation Items</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Priority</th>
+                    <th>Vulnerability</th>
+                    <th>Asset</th>
+                    <th>Severity</th>
+                    <th>Business Impact</th>
+                </tr>
+            </thead>
+            <tbody>"""
+
+        for i, item in enumerate(remediation_matrix[:5], 1):  # Top 5 priorities
+            severity_class = f"severity-{item['severity']}"
+            html_content += f"""
+                <tr>
+                    <td><strong>{i}</strong></td>
+                    <td>{item['title'][:40] + ('...' if len(item['title']) > 40 else '')}</td>
+                    <td>{item['asset_name'][:25] + ('...' if len(item['asset_name']) > 25 else '')}</td>
+                    <td class="{severity_class}">{item['severity'].title()}</td>
+                    <td>{item['business_impact'].title()}</td>
+                </tr>"""
+
+        html_content += """
+            </tbody>
+        </table>"""
+
+    html_content += """
+    </div>"""
+
     # Footer
     html_content += f"""
     <div class="footer">
@@ -711,9 +1008,510 @@ def generate_html_report_content(data):
         <p>This report contains confidential security information and should be handled according to
         your organization's information security policies. Distribution should be limited to
         authorized personnel only.</p>
-        <p>Report generated on {generated_at} | Framework: ISO 27001:2013</p>
+        <p>Report generated on {generated_at} | Framework: ISO 27001:2013 | Comprehensive Attack Surface Assessment</p>
     </div>
 </body>
 </html>"""
 
     return html_content
+
+def analyze_asset_coverage(assets):
+    """Analyze comprehensive asset coverage and discovery timeline"""
+    now = datetime.utcnow()
+
+    # Discovery timeline analysis
+    discovery_timeline = {
+        'last_24h': 0,
+        'last_7d': 0,
+        'last_30d': 0,
+        'older': 0
+    }
+
+    # Asset criticality analysis
+    criticality_analysis = {
+        'critical': 0,  # Assets with critical vulnerabilities
+        'high': 0,      # Assets with high vulnerabilities
+        'medium': 0,    # Assets with medium vulnerabilities
+        'low': 0,       # Assets with low/info vulnerabilities
+        'clean': 0      # Assets with no vulnerabilities
+    }
+
+    # Scanning coverage statistics
+    scanning_coverage = {
+        'total_assets': len(assets),
+        'scanned_assets': 0,
+        'never_scanned': 0,
+        'recently_scanned': 0,  # Last 7 days
+        'stale_scans': 0        # Older than 30 days
+    }
+
+    # Exposure level analysis
+    exposure_levels = {
+        'public': 0,     # Assets with public exposure
+        'internal': 0,   # Internal assets
+        'unknown': 0     # Unknown exposure
+    }
+
+    for asset in assets:
+        # Discovery timeline
+        if hasattr(asset, 'discovered_at') and asset.discovered_at:
+            try:
+                days_since_discovery = (now - asset.discovered_at).days
+                if days_since_discovery <= 1:
+                    discovery_timeline['last_24h'] += 1
+                elif days_since_discovery <= 7:
+                    discovery_timeline['last_7d'] += 1
+                elif days_since_discovery <= 30:
+                    discovery_timeline['last_30d'] += 1
+                else:
+                    discovery_timeline['older'] += 1
+            except Exception as e:
+                print(f"Error processing asset discovery date: {e}")
+                discovery_timeline['older'] += 1
+
+        # Scanning coverage
+        if hasattr(asset, 'last_scanned') and asset.last_scanned:
+            try:
+                scanning_coverage['scanned_assets'] += 1
+                days_since_scan = (now - asset.last_scanned).days
+                if days_since_scan <= 7:
+                    scanning_coverage['recently_scanned'] += 1
+                elif days_since_scan > 30:
+                    scanning_coverage['stale_scans'] += 1
+            except Exception as e:
+                print(f"Error processing asset scan date: {e}")
+                scanning_coverage['scanned_assets'] += 1
+        else:
+            scanning_coverage['never_scanned'] += 1
+
+        # Exposure level analysis (based on asset metadata)
+        try:
+            if hasattr(asset, 'asset_metadata') and asset.asset_metadata:
+                http_probe = asset.asset_metadata.get('http_probe', {})
+                if http_probe.get('status_code'):
+                    exposure_levels['public'] += 1
+                else:
+                    exposure_levels['internal'] += 1
+            else:
+                exposure_levels['unknown'] += 1
+        except Exception as e:
+            print(f"Error processing asset metadata: {e}")
+            exposure_levels['unknown'] += 1
+
+        # Asset criticality (will be updated by vulnerability analysis)
+        try:
+            if not hasattr(asset, 'vulnerabilities') or not asset.vulnerabilities:
+                criticality_analysis['clean'] += 1
+        except Exception as e:
+            print(f"Error processing asset vulnerabilities: {e}")
+            criticality_analysis['clean'] += 1
+
+    return {
+        'discovery_timeline': discovery_timeline,
+        'criticality_analysis': criticality_analysis,
+        'scanning_coverage': scanning_coverage,
+        'exposure_levels': exposure_levels,
+        'coverage_percentage': round((scanning_coverage['scanned_assets'] / max(len(assets), 1)) * 100, 1)
+    }
+
+def analyze_threat_locations(assets, vulnerabilities):
+    """Analyze specific threat locations and asset-to-vulnerability mapping"""
+    threat_locations = {
+        'assets_with_threats': {},
+        'threat_distribution': {},
+        'geographic_analysis': {},
+        'network_segments': {}
+    }
+
+    # Create asset lookup
+    asset_lookup = {asset.id: asset for asset in assets}
+
+    # Analyze each vulnerability and its location
+    for vuln in vulnerabilities:
+        asset = asset_lookup.get(vuln.asset_id)
+        if not asset:
+            continue
+
+        asset_name = asset.name
+        asset_type = asset.asset_type.value
+
+        # Initialize asset threat data if not exists
+        if asset_name not in threat_locations['assets_with_threats']:
+            threat_locations['assets_with_threats'][asset_name] = {
+                'asset_type': asset_type,
+                'asset_id': asset.id,
+                'vulnerabilities': [],
+                'severity_counts': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0},
+                'technologies': [],
+                'ports': [],
+                'last_scanned': asset.last_scanned.isoformat() if asset.last_scanned else None,
+                'discovery_method': asset.asset_metadata.get('discovery_method') if asset.asset_metadata else None
+            }
+
+        # Add vulnerability to asset
+        threat_locations['assets_with_threats'][asset_name]['vulnerabilities'].append({
+            'id': vuln.id,
+            'title': vuln.title,
+            'description': vuln.description,
+            'severity': vuln.severity.value,
+            'cve_id': vuln.cve_id,
+            'discovered_at': vuln.discovered_at.isoformat() if vuln.discovered_at else None,
+            'is_resolved': vuln.is_resolved,
+            'template_name': vuln.template_name,
+            'cvss_score': vuln.cvss_score
+        })
+
+        # Update severity counts
+        threat_locations['assets_with_threats'][asset_name]['severity_counts'][vuln.severity.value] += 1
+
+        # Extract technology and port information from asset metadata
+        if asset.asset_metadata:
+            http_probe = asset.asset_metadata.get('http_probe', {})
+            if http_probe.get('tech'):
+                threat_locations['assets_with_threats'][asset_name]['technologies'] = http_probe.get('tech', [])
+
+            ports = asset.asset_metadata.get('ports', [])
+            if ports:
+                threat_locations['assets_with_threats'][asset_name]['ports'] = ports
+
+        # Threat distribution by asset type
+        if asset_type not in threat_locations['threat_distribution']:
+            threat_locations['threat_distribution'][asset_type] = {
+                'total_assets': 0,
+                'assets_with_threats': 0,
+                'total_vulnerabilities': 0,
+                'severity_breakdown': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+            }
+
+        threat_locations['threat_distribution'][asset_type]['total_vulnerabilities'] += 1
+        threat_locations['threat_distribution'][asset_type]['severity_breakdown'][vuln.severity.value] += 1
+
+    # Count total assets and assets with threats by type
+    for asset in assets:
+        asset_type = asset.asset_type.value
+        if asset_type not in threat_locations['threat_distribution']:
+            threat_locations['threat_distribution'][asset_type] = {
+                'total_assets': 0,
+                'assets_with_threats': 0,
+                'total_vulnerabilities': 0,
+                'severity_breakdown': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+            }
+
+        threat_locations['threat_distribution'][asset_type]['total_assets'] += 1
+
+        if asset.name in threat_locations['assets_with_threats']:
+            threat_locations['threat_distribution'][asset_type]['assets_with_threats'] += 1
+
+    return threat_locations
+
+def analyze_domain_threats(assets, vulnerabilities):
+    """Analyze domain-specific threat patterns and risk scoring"""
+    domain_analysis = {}
+
+    # Create asset lookup
+    asset_lookup = {asset.id: asset for asset in assets}
+
+    # Group assets by parent domain
+    domain_groups = {}
+    for asset in assets:
+        if asset.asset_type in [AssetType.DOMAIN, AssetType.SUBDOMAIN]:
+            # Extract parent domain
+            if asset.asset_type == AssetType.DOMAIN:
+                parent_domain = asset.name
+            else:
+                # For subdomains, extract parent domain
+                parts = asset.name.split('.')
+                if len(parts) >= 2:
+                    parent_domain = '.'.join(parts[-2:])
+                else:
+                    parent_domain = asset.name
+
+            if parent_domain not in domain_groups:
+                domain_groups[parent_domain] = {
+                    'assets': [],
+                    'subdomains': [],
+                    'vulnerabilities': [],
+                    'technologies': set(),
+                    'ports': set(),
+                    'risk_score': 0
+                }
+
+            domain_groups[parent_domain]['assets'].append(asset)
+            if asset.asset_type == AssetType.SUBDOMAIN:
+                domain_groups[parent_domain]['subdomains'].append(asset.name)
+
+    # Analyze vulnerabilities by domain
+    for vuln in vulnerabilities:
+        asset = asset_lookup.get(vuln.asset_id)
+        if not asset or asset.asset_type not in [AssetType.DOMAIN, AssetType.SUBDOMAIN]:
+            continue
+
+        # Determine parent domain
+        if asset.asset_type == AssetType.DOMAIN:
+            parent_domain = asset.name
+        else:
+            parts = asset.name.split('.')
+            if len(parts) >= 2:
+                parent_domain = '.'.join(parts[-2:])
+            else:
+                parent_domain = asset.name
+
+        if parent_domain in domain_groups:
+            domain_groups[parent_domain]['vulnerabilities'].append({
+                'asset_name': asset.name,
+                'vulnerability': {
+                    'title': vuln.title,
+                    'severity': vuln.severity.value,
+                    'cve_id': vuln.cve_id,
+                    'discovered_at': vuln.discovered_at.isoformat() if vuln.discovered_at else None,
+                    'is_resolved': vuln.is_resolved
+                }
+            })
+
+    # Calculate domain risk scores and analysis
+    for domain, data in domain_groups.items():
+        # Risk scoring based on vulnerabilities
+        risk_score = 0
+        severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0}
+
+        for vuln_data in data['vulnerabilities']:
+            severity = vuln_data['vulnerability']['severity']
+            severity_counts[severity] += 1
+
+            # Risk scoring weights
+            if severity == 'critical':
+                risk_score += 10
+            elif severity == 'high':
+                risk_score += 7
+            elif severity == 'medium':
+                risk_score += 4
+            elif severity == 'low':
+                risk_score += 2
+            elif severity == 'info':
+                risk_score += 1
+
+        # Collect technologies and ports
+        for asset in data['assets']:
+            if asset.asset_metadata:
+                http_probe = asset.asset_metadata.get('http_probe', {})
+                if http_probe.get('tech'):
+                    data['technologies'].update(http_probe.get('tech', []))
+
+                ports = asset.asset_metadata.get('ports', [])
+                for port in ports:
+                    if isinstance(port, dict) and 'port' in port:
+                        data['ports'].add(f"{port['port']}/{port.get('protocol', 'tcp')}")
+
+        # Finalize domain analysis
+        domain_analysis[domain] = {
+            'total_assets': len(data['assets']),
+            'total_subdomains': len(data['subdomains']),
+            'total_vulnerabilities': len(data['vulnerabilities']),
+            'risk_score': risk_score,
+            'risk_level': calculate_risk_level(risk_score),
+            'severity_distribution': severity_counts,
+            'technologies': list(data['technologies']),
+            'open_ports': list(data['ports']),
+            'subdomains': data['subdomains'][:10],  # Limit to first 10 for report
+            'vulnerability_details': data['vulnerabilities'][:5]  # Limit to top 5 for report
+        }
+
+    # Sort domains by risk score
+    sorted_domains = sorted(domain_analysis.items(), key=lambda x: x[1]['risk_score'], reverse=True)
+
+    return {
+        'domain_breakdown': dict(sorted_domains),
+        'total_domains': len(domain_analysis),
+        'high_risk_domains': len([d for d in domain_analysis.values() if d['risk_level'] in ['critical', 'high']]),
+        'domains_with_vulnerabilities': len([d for d in domain_analysis.values() if d['total_vulnerabilities'] > 0])
+    }
+
+def calculate_risk_level(risk_score):
+    """Calculate risk level based on risk score"""
+    if risk_score >= 50:
+        return 'critical'
+    elif risk_score >= 25:
+        return 'high'
+    elif risk_score >= 10:
+        return 'medium'
+    elif risk_score >= 5:
+        return 'low'
+    else:
+        return 'minimal'
+
+def analyze_threat_intelligence(vulnerabilities, assets):
+    """Analyze enhanced threat intelligence with business impact context"""
+    threat_intelligence = {
+        'attack_vectors': {},
+        'business_impact_analysis': {},
+        'remediation_priority_matrix': [],
+        'vulnerability_patterns': {},
+        'threat_trends': {}
+    }
+
+    # Create asset lookup
+    asset_lookup = {asset.id: asset for asset in assets}
+
+    # Analyze attack vectors
+    attack_vector_mapping = {
+        'web': ['xss', 'sql', 'csrf', 'lfi', 'rfi', 'ssrf', 'xxe'],
+        'network': ['port', 'service', 'protocol', 'ssh', 'ftp', 'telnet'],
+        'application': ['auth', 'session', 'crypto', 'injection', 'deserialization'],
+        'infrastructure': ['ssl', 'tls', 'certificate', 'dns', 'subdomain'],
+        'configuration': ['default', 'misconfiguration', 'exposure', 'disclosure']
+    }
+
+    for vuln in vulnerabilities:
+        asset = asset_lookup.get(vuln.asset_id)
+        if not asset:
+            continue
+
+        # Determine attack vector
+        attack_vector = 'unknown'
+        vuln_text = (vuln.title + ' ' + (vuln.description or '')).lower()
+
+        for vector, keywords in attack_vector_mapping.items():
+            if any(keyword in vuln_text for keyword in keywords):
+                attack_vector = vector
+                break
+
+        if attack_vector not in threat_intelligence['attack_vectors']:
+            threat_intelligence['attack_vectors'][attack_vector] = {
+                'count': 0,
+                'severities': {'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0},
+                'examples': []
+            }
+
+        threat_intelligence['attack_vectors'][attack_vector]['count'] += 1
+        threat_intelligence['attack_vectors'][attack_vector]['severities'][vuln.severity.value] += 1
+
+        if len(threat_intelligence['attack_vectors'][attack_vector]['examples']) < 3:
+            threat_intelligence['attack_vectors'][attack_vector]['examples'].append({
+                'title': vuln.title,
+                'asset': asset.name,
+                'severity': vuln.severity.value
+            })
+
+        # Business impact analysis
+        business_impact = determine_business_impact(vuln, asset)
+        if business_impact not in threat_intelligence['business_impact_analysis']:
+            threat_intelligence['business_impact_analysis'][business_impact] = {
+                'count': 0,
+                'assets_affected': set(),
+                'total_risk_score': 0
+            }
+
+        threat_intelligence['business_impact_analysis'][business_impact]['count'] += 1
+        threat_intelligence['business_impact_analysis'][business_impact]['assets_affected'].add(asset.name)
+
+        # Add to remediation priority matrix
+        priority_score = calculate_remediation_priority(vuln, asset)
+        threat_intelligence['remediation_priority_matrix'].append({
+            'vulnerability_id': vuln.id,
+            'title': vuln.title,
+            'asset_name': asset.name,
+            'asset_type': asset.asset_type.value,
+            'severity': vuln.severity.value,
+            'priority_score': priority_score,
+            'business_impact': business_impact,
+            'remediation_effort': estimate_remediation_effort(vuln),
+            'attack_vector': attack_vector
+        })
+
+    # Convert sets to counts for JSON serialization
+    for impact_data in threat_intelligence['business_impact_analysis'].values():
+        impact_data['unique_assets'] = len(impact_data['assets_affected'])
+        del impact_data['assets_affected']
+
+    # Sort remediation matrix by priority
+    threat_intelligence['remediation_priority_matrix'].sort(
+        key=lambda x: x['priority_score'], reverse=True
+    )
+
+    # Limit to top 20 for report
+    threat_intelligence['remediation_priority_matrix'] = threat_intelligence['remediation_priority_matrix'][:20]
+
+    return threat_intelligence
+
+def determine_business_impact(vulnerability, asset):
+    """Determine business impact level based on vulnerability and asset characteristics"""
+    # High impact scenarios
+    if vulnerability.severity in [SeverityLevel.CRITICAL, SeverityLevel.HIGH]:
+        if asset.asset_type == AssetType.DOMAIN:
+            return 'critical'
+        elif 'admin' in asset.name.lower() or 'api' in asset.name.lower():
+            return 'high'
+
+    # Medium impact scenarios
+    if vulnerability.severity == SeverityLevel.MEDIUM:
+        if asset.asset_type in [AssetType.DOMAIN, AssetType.SUBDOMAIN]:
+            return 'medium'
+
+    # Low impact scenarios
+    if vulnerability.severity in [SeverityLevel.LOW, SeverityLevel.INFO]:
+        return 'low'
+
+    return 'medium'  # Default
+
+def calculate_remediation_priority(vulnerability, asset):
+    """Calculate remediation priority score"""
+    score = 0
+
+    # Severity weight (40% of score)
+    severity_weights = {
+        SeverityLevel.CRITICAL: 40,
+        SeverityLevel.HIGH: 30,
+        SeverityLevel.MEDIUM: 20,
+        SeverityLevel.LOW: 10,
+        SeverityLevel.INFO: 5
+    }
+    score += severity_weights.get(vulnerability.severity, 0)
+
+    # Asset criticality weight (30% of score)
+    if asset.asset_type == AssetType.DOMAIN:
+        score += 30
+    elif asset.asset_type == AssetType.SUBDOMAIN:
+        if any(keyword in asset.name.lower() for keyword in ['admin', 'api', 'login', 'auth']):
+            score += 25
+        else:
+            score += 15
+    elif asset.asset_type == AssetType.SERVICE:
+        score += 20
+    else:
+        score += 10
+
+    # Exposure weight (20% of score)
+    if asset.asset_metadata:
+        http_probe = asset.asset_metadata.get('http_probe', {})
+        if http_probe.get('status_code'):
+            score += 20  # Publicly accessible
+        else:
+            score += 10  # Internal
+
+    # Age weight (10% of score)
+    if vulnerability.discovered_at:
+        days_old = (datetime.utcnow() - vulnerability.discovered_at).days
+        if days_old > 30:
+            score += 10  # Older vulnerabilities get higher priority
+        elif days_old > 7:
+            score += 5
+
+    return min(score, 100)  # Cap at 100
+
+def estimate_remediation_effort(vulnerability):
+    """Estimate remediation effort level"""
+    title_lower = vulnerability.title.lower()
+
+    # High effort
+    if any(keyword in title_lower for keyword in ['architecture', 'design', 'framework', 'major']):
+        return 'high'
+
+    # Medium effort
+    if any(keyword in title_lower for keyword in ['configuration', 'update', 'patch', 'version']):
+        return 'medium'
+
+    # Low effort
+    if any(keyword in title_lower for keyword in ['header', 'cookie', 'redirect', 'disclosure']):
+        return 'low'
+
+    return 'medium'  # Default
