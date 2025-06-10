@@ -5,6 +5,7 @@ Generates PDF reports for security compliance frameworks
 
 import io
 import json
+import os
 from datetime import datetime
 from typing import Dict, List, Any
 import base64
@@ -20,9 +21,79 @@ try:
     from reportlab.graphics.shapes import Drawing
     from reportlab.graphics.charts.piecharts import Pie
     from reportlab.graphics.charts.barcharts import VerticalBarChart
+    from reportlab.pdfgen import canvas
+    from reportlab.platypus.flowables import Flowable
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
+
+class CoverPageFlowable(Flowable):
+    """Custom flowable for cover page with image and text overlays"""
+
+    def __init__(self, image_path, org_name, assessment_date, width, height):
+        self.image_path = image_path
+        self.org_name = org_name
+        self.assessment_date = assessment_date
+        self.width = width
+        self.height = height
+        # Set the flowable size
+        Flowable.__init__(self)
+
+    def wrap(self, availWidth, availHeight):
+        """Return the space required by this flowable"""
+        # Use the available space, but respect our desired dimensions
+        width = min(self.width, availWidth) if self.width > 0 else availWidth
+        height = min(self.height, availHeight) if self.height > 0 else availHeight
+
+        # Update our dimensions to match what we're actually using
+        self.width = width
+        self.height = height
+
+        return (width, height)
+
+    def draw(self):
+        """Draw the cover page with image and text overlays - FULL PAGE"""
+        canvas = self.canv
+
+        # Get full page dimensions
+        page_width, page_height = A4
+
+        # Calculate offset to draw from page origin (not frame origin)
+        # This allows us to draw over the entire page, ignoring margins
+        x_offset = -78  # Negative left margin
+        y_offset = -24  # Negative bottom margin
+
+        # Always draw a background first (so page isn't blank even if image fails)
+        canvas.setFillColor(HexColor('#1e3a8a'))
+        canvas.rect(x_offset, y_offset, page_width, page_height, fill=1)
+
+        # Try to draw the image on top of the background
+        if os.path.exists(self.image_path):
+            try:
+                canvas.drawImage(self.image_path, x_offset, y_offset,
+                               width=page_width, height=page_height, preserveAspectRatio=True)
+            except Exception:
+                # Image failed to load, but we have the background color as fallback
+                pass
+
+        # Set up text styling for overlays
+        canvas.setFont("Helvetica-Bold", 24)  # Larger font for full page
+        canvas.setFillColor(white)
+
+        # Position text in the blank space below "Attack Surface Assessment"
+        # Based on the image, this appears to be in the lower portion
+        text_y_position = (page_height * 0.40) + y_offset  # 40% from bottom of full page
+        text_x_center = (page_width / 2) + x_offset
+
+        # Draw organization name
+        org_text_width = canvas.stringWidth(self.org_name, "Helvetica-Bold", 24)
+        canvas.drawString(text_x_center - (org_text_width / 2), text_y_position, self.org_name)
+
+        # Draw assessment date below organization name
+        canvas.setFont("Helvetica", 18)  # Larger font for full page
+        date_text = f"Assessment Date: {self.assessment_date}"
+        date_text_width = canvas.stringWidth(date_text, "Helvetica", 18)
+        canvas.drawString(text_x_center - (date_text_width / 2), text_y_position - 40, date_text)
 
 class ComplianceReportGenerator:
     """Generate professional compliance reports"""
@@ -85,14 +156,14 @@ class ComplianceReportGenerator:
         """Generate ISO 27001 compliance report"""
         if not REPORTLAB_AVAILABLE:
             raise ImportError("ReportLab is required for PDF generation. Install with: pip install reportlab")
-        
+
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72,
-                              topMargin=72, bottomMargin=18)
-        
+                              topMargin=72, bottomMargin=18)  # Normal margins for content pages
+
         story = []
-        
-        # Title page
+
+        # Title page (full page cover)
         story.extend(self._create_title_page(report_data))
         story.append(PageBreak())
         
@@ -133,40 +204,70 @@ class ComplianceReportGenerator:
         doc.build(story)
         buffer.seek(0)
         return buffer
-    
+
     def _create_title_page(self, data: Dict[str, Any]) -> List:
-        """Create report title page"""
+        """Create report title page with cover image and dynamic text overlays"""
         story = []
-        
-        # Organization name (prominent)
+
+        # Get organization name and assessment date
         org_name = data.get('organization', {}).get('name', 'Unknown Organization')
-        story.append(Paragraph(f"{org_name}", self.styles['CustomTitle']))
-        story.append(Spacer(1, 0.3*inch))
-
-        # Title
-        story.append(Paragraph("Security Compliance Report", self.styles['SectionHeader']))
-        story.append(Spacer(1, 0.2*inch))
-
-        # Subtitle
-        story.append(Paragraph("ISO 27001:2013 Attack Surface Assessment", self.styles['SubHeader']))
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Report details
         generated_at = datetime.fromisoformat(data.get('generated_at', datetime.utcnow().isoformat()))
-        story.append(Paragraph(f"<b>Report Date:</b> {generated_at.strftime('%B %d, %Y')}", self.styles['Normal']))
-        story.append(Paragraph(f"<b>Framework:</b> ISO 27001:2013", self.styles['Normal']))
-        story.append(Paragraph(f"<b>Report Type:</b> Attack Surface Assessment", self.styles['Normal']))
-        story.append(Spacer(1, 0.5*inch))
-        
-        # Disclaimer
-        disclaimer = """
-        <b>CONFIDENTIAL</b><br/>
-        This report contains confidential security information and should be handled according to 
-        your organization's information security policies. Distribution should be limited to 
-        authorized personnel only.
-        """
-        story.append(Paragraph(disclaimer, self.styles['ExecutiveSummary']))
-        
+        assessment_date = generated_at.strftime('%B %d, %Y')
+
+        # Path to cover image - use Flask-aware path resolution
+        try:
+            from flask import current_app
+            # Try to use Flask's static folder if available
+            if current_app:
+                cover_image_path = os.path.join(current_app.root_path, 'static', 'img', 'cover_page.png')
+            else:
+                # Fallback to relative path resolution
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                project_root = os.path.dirname(script_dir)
+                cover_image_path = os.path.join(project_root, 'static', 'img', 'cover_page.png')
+        except (ImportError, RuntimeError):
+            # Fallback if Flask is not available or no app context
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(script_dir)
+            cover_image_path = os.path.join(project_root, 'static', 'img', 'cover_page.png')
+
+        # Check if cover image exists, if not fall back to text-based cover
+        if os.path.exists(cover_image_path):
+            # Use custom cover page with image and text overlays - FULL PAGE
+            page_width, page_height = A4
+            # Use full page dimensions for cover page (no margins)
+            cover_page = CoverPageFlowable(
+                image_path=cover_image_path,
+                org_name=org_name,
+                assessment_date=assessment_date,
+                width=page_width,   # Full page width
+                height=page_height  # Full page height
+            )
+            story.append(cover_page)
+        else:
+            # Fallback to original text-based title page
+            story.append(Paragraph(f"{org_name}", self.styles['CustomTitle']))
+            story.append(Spacer(1, 0.3*inch))
+            story.append(Paragraph("Security Compliance Report", self.styles['SectionHeader']))
+            story.append(Spacer(1, 0.2*inch))
+            story.append(Paragraph("ISO 27001:2013 Attack Surface Assessment", self.styles['SubHeader']))
+            story.append(Spacer(1, 0.3*inch))
+
+            # Report details
+            story.append(Paragraph(f"<b>Report Date:</b> {assessment_date}", self.styles['Normal']))
+            story.append(Paragraph(f"<b>Framework:</b> ISO 27001:2013", self.styles['Normal']))
+            story.append(Paragraph(f"<b>Report Type:</b> Attack Surface Assessment", self.styles['Normal']))
+            story.append(Spacer(1, 0.5*inch))
+
+            # Disclaimer
+            disclaimer = """
+            <b>CONFIDENTIAL</b><br/>
+            This report contains confidential security information and should be handled according to
+            your organization's information security policies. Distribution should be limited to
+            authorized personnel only.
+            """
+            story.append(Paragraph(disclaimer, self.styles['ExecutiveSummary']))
+
         return story
     
     def _create_executive_summary(self, data: Dict[str, Any]) -> List:
