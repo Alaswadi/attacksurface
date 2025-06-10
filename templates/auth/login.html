@@ -1,75 +1,101 @@
 {% extends "base.html" %}
 
-{% block title %}Login - Attack Surface Monitoring{% endblock %}
+{% block title %}Login - Attack Surface Management{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen flex items-center justify-center bg-slate-900 py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-md w-full space-y-8">
-        <div>
-            <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary text-white">
-                <i class="ri-shield-keyhole-line ri-lg"></i>
+        <!-- Logo and Header -->
+        <div class="text-center">
+            <div class="mx-auto mb-6 flex justify-center">
+                <img src="{{ url_for('static', filename='img/attacksurfaceproFull.png') }}"
+                     alt="AttackSurface Pro"
+                     class="h-20 w-auto object-contain">
             </div>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                Sign in to your account
-            </h2>
-            <p class="mt-2 text-center text-sm text-gray-600">
-                Monitor your attack surface with confidence
-            </p>
-        </div>
-        
-        <form class="mt-8 space-y-6" method="POST">
-            {{ form.hidden_tag() }}
-            <div class="rounded-md shadow-sm -space-y-px">
-                <div>
-                    {{ form.username.label(class="sr-only") }}
-                    {{ form.username(class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm", placeholder="Username") }}
-                    {% if form.username.errors %}
-                        <div class="text-red-500 text-sm mt-1">
-                            {% for error in form.username.errors %}
-                                <p>{{ error }}</p>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-                <div>
-                    {{ form.password.label(class="sr-only") }}
-                    {{ form.password(class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm", placeholder="Password") }}
-                    {% if form.password.errors %}
-                        <div class="text-red-500 text-sm mt-1">
-                            {% for error in form.password.errors %}
-                                <p>{{ error }}</p>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    {{ form.remember_me(class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded") }}
-                    {{ form.remember_me.label(class="ml-2 block text-sm text-gray-900") }}
-                </div>
-
-                <div class="text-sm">
-                    <a href="#" class="font-medium text-primary hover:text-primary-dark">
-                        Forgot your password?
-                    </a>
-                </div>
-            </div>
-
-            <div>
-                {{ form.submit(class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary") }}
-            </div>
-
-            <div class="text-center">
-                <p class="text-sm text-gray-600">
-                    Don't have an account?
-                    <a href="{{ url_for('auth.register') }}" class="font-medium text-primary hover:text-primary-dark">
-                        Sign up
-                    </a>
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-white mb-2">
+                    Sign in to your account
+                </h2>
+                <p class="text-sm text-slate-400">
+                    Monitor your attack surface with confidence
                 </p>
             </div>
-        </form>
+        </div>
+
+        <!-- Login Form -->
+        <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-lg p-8 shadow-xl">
+            <form class="space-y-6" method="POST">
+                {{ form.hidden_tag() }}
+
+                <!-- Username Field -->
+                <div>
+                    {{ form.username.label(class="block text-sm font-medium text-slate-300 mb-2") }}
+                    {{ form.username(class="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors", placeholder="Enter your username") }}
+                    {% if form.username.errors %}
+                        <div class="mt-2 text-red-400 text-sm">
+                            {% for error in form.username.errors %}
+                                <p class="flex items-center">
+                                    <i class="ri-error-warning-line mr-1"></i>
+                                    {{ error }}
+                                </p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Password Field -->
+                <div>
+                    {{ form.password.label(class="block text-sm font-medium text-slate-300 mb-2") }}
+                    {{ form.password(class="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors", placeholder="Enter your password") }}
+                    {% if form.password.errors %}
+                        <div class="mt-2 text-red-400 text-sm">
+                            {% for error in form.password.errors %}
+                                <p class="flex items-center">
+                                    <i class="ri-error-warning-line mr-1"></i>
+                                    {{ error }}
+                                </p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Remember Me and Forgot Password -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        {{ form.remember_me(class="h-4 w-4 text-primary focus:ring-primary border-slate-600 bg-slate-900 rounded") }}
+                        {{ form.remember_me.label(class="ml-2 block text-sm text-slate-300") }}
+                    </div>
+
+                    <div class="text-sm">
+                        <a href="#" class="font-medium text-primary hover:text-primary/80 transition-colors">
+                            Forgot password?
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div>
+                    {{ form.submit(class="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary focus:ring-offset-slate-800 transition-colors") }}
+                </div>
+
+                <!-- Sign Up Link -->
+                <div class="text-center pt-4 border-t border-slate-700">
+                    <p class="text-sm text-slate-400">
+                        Don't have an account?
+                        <a href="{{ url_for('auth.register') }}" class="font-medium text-primary hover:text-primary/80 transition-colors">
+                            Create account
+                        </a>
+                    </p>
+                </div>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center">
+            <p class="text-xs text-slate-500">
+                Secure • Reliable • Professional
+            </p>
+        </div>
     </div>
 </div>
 {% endblock %}

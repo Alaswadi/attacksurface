@@ -1,0 +1,21 @@
+{
+    "name": "Attack Surface Management",
+    "short_name": "AttackSurface",
+    "description": "Monitor your attack surface with confidence",
+    "icons": [
+        {
+            "src": "/static/img/favicon.png",
+            "sizes": "32x32",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/img/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#4ade80",
+    "background_color": "#0f172a",
+    "display": "standalone",
+    "start_url": "/dashboard"
+}

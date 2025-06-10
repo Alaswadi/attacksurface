@@ -10,11 +10,11 @@
     <!-- Sidebar -->
     <div id="sidebar" class="bg-slate-900 border-r border-slate-800 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
         <!-- Logo Section -->
-        <div class="flex items-center justify-center py-4 mb-4">
-            <div class="w-10 h-10 flex items-center justify-center">
-                <i class="ri-shield-keyhole-line ri-lg text-primary"></i>
+        <div class="flex items-center justify-center py-6 mb-6">
+            <!-- Expanded text only -->
+            <div id="logo-expanded" class="opacity-0 transition-opacity duration-300 flex items-center justify-center w-full px-4">
+                <span class="text-white font-bold text-lg whitespace-nowrap">AttackSurfacePro</span>
             </div>
-            <span id="logo-text" class="ml-3 text-lg font-semibold text-primary opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
         </div>
 
         <!-- Navigation Items -->
@@ -708,7 +708,7 @@ function initializeSidebar() {
 
 function expandSidebar() {
     const sidebar = document.getElementById('sidebar');
-    const logoText = document.getElementById('logo-text');
+    const logoExpanded = document.getElementById('logo-expanded');
     const navTexts = document.querySelectorAll('.nav-text');
     const toggleIcon = document.querySelector('#sidebar-toggle i');
     const toggleText = document.getElementById('toggle-text');
@@ -717,8 +717,8 @@ function expandSidebar() {
     sidebar.classList.add('w-64');
 
     setTimeout(() => {
-        logoText.classList.remove('opacity-0');
-        logoText.classList.add('opacity-100');
+        logoExpanded.classList.remove('opacity-0');
+        logoExpanded.classList.add('opacity-100');
         navTexts.forEach(text => {
             text.classList.remove('opacity-0');
             text.classList.add('opacity-100');
@@ -735,13 +735,13 @@ function expandSidebar() {
 
 function collapseSidebar() {
     const sidebar = document.getElementById('sidebar');
-    const logoText = document.getElementById('logo-text');
+    const logoExpanded = document.getElementById('logo-expanded');
     const navTexts = document.querySelectorAll('.nav-text');
     const toggleIcon = document.querySelector('#sidebar-toggle i');
     const toggleText = document.getElementById('toggle-text');
 
-    logoText.classList.remove('opacity-100');
-    logoText.classList.add('opacity-0');
+    logoExpanded.classList.remove('opacity-100');
+    logoExpanded.classList.add('opacity-0');
     navTexts.forEach(text => {
         text.classList.remove('opacity-100');
         text.classList.add('opacity-0');
