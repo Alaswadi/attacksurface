@@ -1,0 +1,651 @@
+{% extends "base.html" %}
+
+{% block title %}Compliance Reports - Attack Surface Management{% endblock %}
+
+{% block content %}
+<!-- Mobile sidebar overlay -->
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+<div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-slate-900 border-r border-slate-800 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+        <!-- Logo Section -->
+        <div class="flex items-center justify-center py-4 mb-4">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <i class="ri-shield-keyhole-line ri-lg text-primary"></i>
+            </div>
+            <span id="logo-text" class="ml-3 text-lg font-semibold text-primary opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
+        </div>
+
+        <!-- Navigation Items -->
+        <nav class="flex-1 px-2">
+            <!-- Dashboard -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/dashboard'" title="Dashboard">
+                <div class="flex items-center">
+                    <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Assets -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/assets'" title="Assets">
+                <div class="flex items-center">
+                    <i class="ri-computer-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/vulnerabilities'" title="Vulnerabilities">
+                <div class="flex items-center">
+                    <i class="ri-bug-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
+                </div>
+            </div>
+
+            <!-- Technologies -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/technologies'" title="Technology Discovery">
+                <div class="flex items-center">
+                    <i class="ri-stack-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
+                </div>
+            </div>
+
+            <!-- Reports -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors bg-slate-700 relative" title="Reports">
+                <div class="flex items-center">
+                    <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/settings'" title="Settings">
+                <div class="flex items-center">
+                    <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Toggle Button -->
+        <div class="p-2">
+            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-slate-700 transition-colors flex items-center justify-center" title="Toggle Sidebar">
+                <i class="ri-menu-line ri-lg min-w-[24px]"></i>
+                <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+        <!-- Header -->
+        <header class="h-16 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 mobile-header">
+            <div class="flex items-center">
+                <!-- Mobile menu button -->
+                <button id="mobile-menu-btn" class="mobile-menu-btn mr-3 md:hidden flex items-center justify-center touch-target">
+                    <i class="ri-menu-line ri-lg"></i>
+                </button>
+
+                <h1 class="text-lg md:text-xl font-bold mr-4 md:mr-8 responsive-text-xl">{{ current_user.username.upper() }}</h1>
+            </div>
+
+            <div class="flex items-center gap-2 md:gap-4">
+                <!-- Help button - hidden on small mobile -->
+                <div class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-slate-800 cursor-pointer touch-target">
+                    <i class="ri-question-line"></i>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <span class="text-sm hidden sm:inline">User</span>
+                    <div class="w-10 h-10 flex items-center justify-center rounded-full bg-purple-500 cursor-pointer touch-target">
+                        <span class="text-white font-medium">{{ current_user.username[0].upper() }}</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+            <!-- Title -->
+            <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold responsive-text-2xl">Compliance Reports</h1>
+                    <p class="text-slate-400 text-sm mt-1 mobile-text-sm">Generate professional security compliance reports</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="refresh-data" class="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors touch-target">
+                        <i class="ri-refresh-line"></i>
+                        <span class="hidden sm:inline">Refresh Data</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-state" class="flex items-center justify-center py-12">
+                <div class="flex items-center gap-3">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <span class="text-slate-400">Loading report data...</span>
+                </div>
+            </div>
+
+            <!-- Report Content -->
+            <div id="report-content" class="hidden">
+                <!-- Report Overview Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+                    <!-- Security Score Card -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium">Security Score</h3>
+                            <i class="ri-shield-check-line text-2xl text-primary"></i>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <span id="security-score" class="text-3xl font-bold text-primary">-</span>
+                            <span class="text-slate-400 text-sm">/10</span>
+                        </div>
+                        <p class="text-slate-400 text-sm mt-2">Overall security posture</p>
+                    </div>
+
+                    <!-- Compliance Score Card -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium">ISO 27001</h3>
+                            <i class="ri-award-line text-2xl text-blue-400"></i>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <span id="compliance-score" class="text-3xl font-bold text-blue-400">-</span>
+                            <span class="text-slate-400 text-sm">%</span>
+                        </div>
+                        <p class="text-slate-400 text-sm mt-2">Compliance level</p>
+                    </div>
+
+                    <!-- Critical Issues Card -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium">Critical Issues</h3>
+                            <i class="ri-error-warning-line text-2xl text-red-400"></i>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <span id="critical-issues" class="text-3xl font-bold text-red-400">-</span>
+                        </div>
+                        <p class="text-slate-400 text-sm mt-2">Require immediate attention</p>
+                    </div>
+
+                    <!-- Assets at Risk Card -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium">Assets at Risk</h3>
+                            <i class="ri-computer-line text-2xl text-amber-400"></i>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <span id="assets-at-risk" class="text-3xl font-bold text-amber-400">-</span>
+                            <span class="text-slate-400 text-sm">(<span id="risk-percentage">-</span>%)</span>
+                        </div>
+                        <p class="text-slate-400 text-sm mt-2">Have vulnerabilities</p>
+                    </div>
+                </div>
+
+                <!-- Report Generation Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <!-- Report Types -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <h3 class="text-xl font-medium mb-4">Available Reports</h3>
+                        <div class="space-y-4">
+                            <!-- ISO 27001 Report -->
+                            <div class="border border-slate-700 rounded-lg p-4 hover:border-primary/50 transition-colors">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-lg mb-2">ISO 27001 Compliance Report</h4>
+                                        <p class="text-slate-400 text-sm mb-3">
+                                            Comprehensive security assessment aligned with ISO 27001:2013 controls.
+                                            Includes executive summary, risk analysis, and remediation recommendations.
+                                            Available in PDF format (requires ReportLab) or HTML format (no dependencies).
+                                        </p>
+                                        <div class="flex flex-wrap gap-2 mb-3">
+                                            <span class="px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs">Executive Summary</span>
+                                            <span class="px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs">Asset Inventory</span>
+                                            <span class="px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs">Risk Assessment</span>
+                                            <span class="px-2 py-1 bg-blue-900/30 text-blue-400 rounded text-xs">Compliance Analysis</span>
+                                        </div>
+                                    </div>
+                                    <i class="ri-file-text-line text-2xl text-blue-400 ml-4"></i>
+                                </div>
+                                <div class="flex gap-3 mt-4">
+                                    <button id="generate-pdf" class="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/80 text-slate-900 rounded-lg font-medium transition-colors touch-target">
+                                        <i class="ri-download-line"></i>
+                                        Generate PDF
+                                    </button>
+                                    <button id="generate-html" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors touch-target">
+                                        <i class="ri-file-code-line"></i>
+                                        Export HTML
+                                    </button>
+                                    <button id="preview-report" class="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors touch-target">
+                                        <i class="ri-eye-line"></i>
+                                        Preview
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Future Report Types -->
+                            <div class="border border-slate-700 rounded-lg p-4 opacity-50">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-lg mb-2">SOC 2 Compliance Report</h4>
+                                        <p class="text-slate-400 text-sm mb-3">
+                                            Coming soon - SOC 2 Type II compliance assessment and controls evaluation.
+                                        </p>
+                                        <span class="px-2 py-1 bg-slate-700 text-slate-400 rounded text-xs">Coming Soon</span>
+                                    </div>
+                                    <i class="ri-file-text-line text-2xl text-slate-500 ml-4"></i>
+                                </div>
+                            </div>
+
+                            <div class="border border-slate-700 rounded-lg p-4 opacity-50">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-lg mb-2">NIST Cybersecurity Framework</h4>
+                                        <p class="text-slate-400 text-sm mb-3">
+                                            Coming soon - NIST CSF assessment and maturity evaluation.
+                                        </p>
+                                        <span class="px-2 py-1 bg-slate-700 text-slate-400 rounded text-xs">Coming Soon</span>
+                                    </div>
+                                    <i class="ri-file-text-line text-2xl text-slate-500 ml-4"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Report Preview -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <h3 class="text-xl font-medium mb-4">Report Summary</h3>
+                        <div id="report-summary" class="space-y-4">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Analysis -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Vulnerability Breakdown -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <h3 class="text-xl font-medium mb-4">Vulnerability Analysis</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Critical</span>
+                                <span id="vuln-critical" class="font-medium text-red-400">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">High</span>
+                                <span id="vuln-high" class="font-medium text-orange-400">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Medium</span>
+                                <span id="vuln-medium" class="font-medium text-yellow-400">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Low</span>
+                                <span id="vuln-low" class="font-medium text-blue-400">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Info</span>
+                                <span id="vuln-info" class="font-medium text-slate-400">-</span>
+                            </div>
+                            <hr class="border-slate-700">
+                            <div class="flex justify-between items-center font-medium">
+                                <span>Total</span>
+                                <span id="vuln-total">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Asset Breakdown -->
+                    <div class="bg-slate-800/50 rounded-lg p-6 card">
+                        <h3 class="text-xl font-medium mb-4">Asset Inventory</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Domains</span>
+                                <span id="asset-domains" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Subdomains</span>
+                                <span id="asset-subdomains" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">IP Addresses</span>
+                                <span id="asset-ips" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Cloud Resources</span>
+                                <span id="asset-cloud" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-400">Services</span>
+                                <span id="asset-services" class="font-medium">-</span>
+                            </div>
+                            <hr class="border-slate-700">
+                            <div class="flex justify-between items-center font-medium">
+                                <span>Total</span>
+                                <span id="asset-total">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let reportData = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSidebar();
+    loadReportData();
+    
+    // Event listeners
+    document.getElementById('refresh-data').addEventListener('click', loadReportData);
+    document.getElementById('generate-pdf').addEventListener('click', generatePDFReport);
+    document.getElementById('generate-html').addEventListener('click', generateHTMLReport);
+    document.getElementById('preview-report').addEventListener('click', previewReport);
+});
+
+// Sidebar functionality
+function initializeSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const logoText = document.getElementById('logo-text');
+    const toggleText = document.getElementById('toggle-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+
+    // Load saved state
+    const isExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+    if (isExpanded && window.innerWidth >= 768) {
+        expandSidebar();
+    }
+
+    // Desktop toggle
+    sidebarToggle.addEventListener('click', function() {
+        if (sidebar.classList.contains('w-64')) {
+            collapseSidebar();
+        } else {
+            expandSidebar();
+        }
+    });
+
+    // Mobile menu
+    mobileMenuBtn.addEventListener('click', function() {
+        sidebar.classList.toggle('mobile-open');
+        sidebarOverlay.classList.toggle('active');
+    });
+
+    // Close mobile menu when clicking overlay
+    sidebarOverlay.addEventListener('click', function() {
+        sidebar.classList.remove('mobile-open');
+        sidebarOverlay.classList.remove('active');
+    });
+
+    function expandSidebar() {
+        sidebar.classList.remove('w-16');
+        sidebar.classList.add('w-64');
+        logoText.classList.remove('opacity-0');
+        toggleText.classList.remove('opacity-0');
+        navTexts.forEach(text => text.classList.remove('opacity-0'));
+        toggleText.textContent = 'Collapse';
+        localStorage.setItem('sidebarExpanded', 'true');
+    }
+
+    function collapseSidebar() {
+        sidebar.classList.remove('w-64');
+        sidebar.classList.add('w-16');
+        logoText.classList.add('opacity-0');
+        toggleText.classList.add('opacity-0');
+        navTexts.forEach(text => text.classList.add('opacity-0'));
+        toggleText.textContent = 'Expand';
+        localStorage.setItem('sidebarExpanded', 'false');
+    }
+}
+
+// Load report data
+async function loadReportData() {
+    try {
+        document.getElementById('loading-state').classList.remove('hidden');
+        document.getElementById('report-content').classList.add('hidden');
+        
+        const response = await fetch('/api/reports/data');
+        if (!response.ok) {
+            throw new Error('Failed to load report data');
+        }
+        
+        reportData = await response.json();
+        populateReportData(reportData);
+        
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('report-content').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error('Error loading report data:', error);
+        showError('Failed to load report data. Please try again.');
+        document.getElementById('loading-state').classList.add('hidden');
+    }
+}
+
+// Populate report data in UI
+function populateReportData(data) {
+    // Overview cards
+    document.getElementById('security-score').textContent = data.risk_metrics?.security_score || '-';
+    document.getElementById('compliance-score').textContent = data.compliance_analysis?.overall_score || '-';
+    document.getElementById('critical-issues').textContent = data.risk_metrics?.critical_high_open || '-';
+    document.getElementById('assets-at-risk').textContent = data.risk_metrics?.assets_at_risk || '-';
+    document.getElementById('risk-percentage').textContent = data.risk_metrics?.risk_percentage || '-';
+    
+    // Vulnerability breakdown
+    const vulnStats = data.vulnerability_stats?.by_severity || {};
+    document.getElementById('vuln-critical').textContent = vulnStats.critical || 0;
+    document.getElementById('vuln-high').textContent = vulnStats.high || 0;
+    document.getElementById('vuln-medium').textContent = vulnStats.medium || 0;
+    document.getElementById('vuln-low').textContent = vulnStats.low || 0;
+    document.getElementById('vuln-info').textContent = vulnStats.info || 0;
+    document.getElementById('vuln-total').textContent = data.vulnerability_stats?.total || 0;
+    
+    // Asset breakdown
+    const assetStats = data.asset_stats?.by_type || {};
+    document.getElementById('asset-domains').textContent = assetStats.domains || 0;
+    document.getElementById('asset-subdomains').textContent = assetStats.subdomains || 0;
+    document.getElementById('asset-ips').textContent = assetStats.ip_addresses || 0;
+    document.getElementById('asset-cloud').textContent = assetStats.cloud_resources || 0;
+    document.getElementById('asset-services').textContent = assetStats.services || 0;
+    document.getElementById('asset-total').textContent = data.asset_stats?.total || 0;
+    
+    // Report summary
+    populateReportSummary(data);
+}
+
+// Populate report summary
+function populateReportSummary(data) {
+    const summaryContainer = document.getElementById('report-summary');
+    const compliance = data.compliance_analysis || {};
+    const complianceLevel = compliance.compliance_level || 'unknown';
+    
+    summaryContainer.innerHTML = `
+        <div class="space-y-3">
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">Organization</span>
+                <span class="font-medium">${data.organization?.name || 'Unknown'}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">Report Date</span>
+                <span class="font-medium">${new Date().toLocaleDateString()}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">Framework</span>
+                <span class="font-medium">ISO 27001:2013</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">Compliance Level</span>
+                <span class="font-medium capitalize ${getComplianceLevelColor(complianceLevel)}">${complianceLevel}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">Total Assets</span>
+                <span class="font-medium">${data.asset_stats?.total || 0}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-slate-400">Open Issues</span>
+                <span class="font-medium">${data.vulnerability_stats?.open || 0}</span>
+            </div>
+        </div>
+    `;
+}
+
+// Get compliance level color
+function getComplianceLevelColor(level) {
+    switch (level) {
+        case 'excellent': return 'text-green-400';
+        case 'good': return 'text-blue-400';
+        case 'fair': return 'text-yellow-400';
+        case 'poor': return 'text-red-400';
+        default: return 'text-slate-400';
+    }
+}
+
+// Generate PDF report
+async function generatePDFReport() {
+    try {
+        const button = document.getElementById('generate-pdf');
+        const originalText = button.innerHTML;
+
+        // Show loading state
+        button.innerHTML = '<i class="ri-loader-4-line animate-spin"></i> Generating...';
+        button.disabled = true;
+
+        const response = await fetch('/api/reports/generate-pdf');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to generate PDF report');
+        }
+
+        // Download the PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Security_Compliance_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        showSuccess('PDF report generated successfully!');
+
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        if (error.message.includes('reportlab')) {
+            showError('PDF generation requires ReportLab. Try HTML export instead or install: pip install reportlab');
+        } else {
+            showError('Failed to generate PDF report. Please try again.');
+        }
+    } finally {
+        // Reset button
+        const button = document.getElementById('generate-pdf');
+        button.innerHTML = '<i class="ri-download-line"></i> Generate PDF';
+        button.disabled = false;
+    }
+}
+
+// Generate HTML report
+async function generateHTMLReport() {
+    try {
+        const button = document.getElementById('generate-html');
+        const originalText = button.innerHTML;
+
+        // Show loading state
+        button.innerHTML = '<i class="ri-loader-4-line animate-spin"></i> Generating...';
+        button.disabled = true;
+
+        const response = await fetch('/api/reports/generate-html');
+        if (!response.ok) {
+            throw new Error('Failed to generate HTML report');
+        }
+
+        // Download the HTML
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Security_Compliance_Report_${new Date().toISOString().split('T')[0]}.html`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        showSuccess('HTML report generated successfully!');
+
+    } catch (error) {
+        console.error('Error generating HTML:', error);
+        showError('Failed to generate HTML report. Please try again.');
+    } finally {
+        // Reset button
+        const button = document.getElementById('generate-html');
+        button.innerHTML = '<i class="ri-file-code-line"></i> Export HTML';
+        button.disabled = false;
+    }
+}
+
+// Preview report (placeholder)
+function previewReport() {
+    showInfo('Report preview feature coming soon!');
+}
+
+// Utility functions
+function showSuccess(message) {
+    showNotification(message, 'success');
+}
+
+function showError(message) {
+    showNotification(message, 'error');
+}
+
+function showInfo(message) {
+    showNotification(message, 'info');
+}
+
+function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm ${getNotificationClasses(type)}`;
+    notification.innerHTML = `
+        <div class="flex items-center justify-between">
+            <span>${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-lg font-bold">&times;</button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+function getNotificationClasses(type) {
+    switch (type) {
+        case 'success':
+            return 'bg-green-100 text-green-700 border border-green-300';
+        case 'error':
+            return 'bg-red-100 text-red-700 border border-red-300';
+        case 'info':
+            return 'bg-blue-100 text-blue-700 border border-blue-300';
+        default:
+            return 'bg-gray-100 text-gray-700 border border-gray-300';
+    }
+}
+</script>
+{% endblock %}

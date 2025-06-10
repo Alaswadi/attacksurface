@@ -17,7 +17,7 @@
         <!-- Navigation Items -->
         <nav class="flex-1 px-2">
             <!-- Dashboard -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="dashboard" title="Dashboard">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/dashboard'" title="Dashboard">
                 <div class="flex items-center">
                     <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
@@ -25,7 +25,7 @@
             </div>
 
             <!-- Assets -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="assets" title="Assets">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/assets'" title="Assets">
                 <div class="flex items-center">
                     <i class="ri-computer-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
@@ -33,26 +33,34 @@
             </div>
 
             <!-- Vulnerabilities -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="vulnerabilities" title="Vulnerabilities">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/vulnerabilities'" title="Vulnerabilities">
                 <div class="flex items-center">
-                    <i class="ri-shield-cross-line ri-lg min-w-[24px]"></i>
+                    <i class="ri-bug-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
                 </div>
             </div>
 
             <!-- Technologies -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="technologies" title="Technology Discovery">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/technologies'" title="Technology Discovery">
                 <div class="flex items-center">
                     <i class="ri-stack-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
                 </div>
             </div>
 
-            <!-- Settings -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors bg-slate-700 relative" data-section="settings" title="Settings">
+            <!-- Reports -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/reports'" title="Reports">
                 <div class="flex items-center">
-                    <i class="ri-settings-3-line ri-lg min-w-[24px] text-primary"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap text-primary">Settings</span>
+                    <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors bg-slate-700 relative" title="Settings">
+                <div class="flex items-center">
+                    <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
                 </div>
             </div>
         </nav>
@@ -834,21 +842,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeFormHandlers();
     initializeSliders();
 
-    // Add click events to navigation items
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const section = this.getAttribute('data-section');
-            if (section === 'dashboard') {
-                window.location.href = '/dashboard';
-            } else if (section === 'assets') {
-                window.location.href = '/assets';
-            } else if (section === 'vulnerabilities') {
-                window.location.href = '/vulnerabilities';
-            } else if (section === 'technologies') {
-                window.location.href = '/technologies';
-            }
-        });
-    });
+    // Navigation items with onclick handlers are handled automatically
+    // No additional navigation handlers needed since all items now use onclick
 });
 
 // Sidebar functionality

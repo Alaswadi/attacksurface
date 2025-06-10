@@ -36,27 +36,10 @@
             </div>
 
             <!-- Vulnerabilities -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="vulnerabilities" title="Vulnerabilities">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/vulnerabilities'" title="Vulnerabilities">
                 <div class="flex items-center">
                     <i class="ri-bug-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
-                </div>
-            </div>
-
-            <!-- Scans -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="scans" title="Scans">
-                <div class="flex items-center">
-                    <i class="ri-radar-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Scans</span>
-                </div>
-            </div>
-
-            <!-- Alerts -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="alerts" title="Alerts">
-                <div class="flex items-center">
-                    <i class="ri-alarm-warning-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
-                    <span class="alert-badge ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 nav-text opacity-0 transition-opacity duration-300">{{ active_alerts }}</span>
                 </div>
             </div>
 
@@ -69,7 +52,7 @@
             </div>
 
             <!-- Reports -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="reports" title="Reports">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/reports'" title="Reports">
                 <div class="flex items-center">
                     <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
@@ -77,7 +60,7 @@
             </div>
 
             <!-- Settings -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="settings" title="Settings">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/settings'" title="Settings">
                 <div class="flex items-center">
                     <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
@@ -859,23 +842,16 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleButton.addEventListener('click', toggleSidebar);
     }
 
-    // Add click events to navigation items
-    document.querySelectorAll('.nav-item').forEach(item => {
+    // Navigation items with onclick handlers are handled automatically
+    // Only need to handle data-section items for dashboard sections
+    document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         item.addEventListener('click', function() {
             const section = this.getAttribute('data-section');
             setActiveNavItem(section);
 
-            // Navigate to different pages
+            // Navigate to different pages for data-section items
             if (section === 'assets') {
                 window.location.href = '/assets';
-            } else if (section === 'vulnerabilities') {
-                window.location.href = '/vulnerabilities';
-            } else if (section === 'scans') {
-                window.location.href = '/real-scanning';
-            } else if (section === 'alerts') {
-                window.location.href = '/alerts';
-            } else if (section === 'reports') {
-                window.location.href = '/reports';
             } else if (section === 'settings') {
                 window.location.href = '/settings';
             }

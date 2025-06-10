@@ -299,6 +299,20 @@ def create_app(config_name=None):
                              vulnerabilities=vulnerabilities,
                              stats=stats)
 
+    @app.route('/reports')
+    @login_required
+    def reports():
+        """Compliance reporting page"""
+        # Get user's organization
+        org = Organization.query.filter_by(user_id=current_user.id).first()
+        if not org:
+            # Create default organization for user
+            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
+            db.session.add(org)
+            db.session.commit()
+
+        return render_template('reports.html', organization=org)
+
     # Authentication routes
     from routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -310,7 +324,11 @@ def create_app(config_name=None):
     # Technologies routes
     from routes.technologies import technologies_bp
     app.register_blueprint(technologies_bp)
-    
+
+    # Reports routes
+    from routes.reports import reports_bp
+    app.register_blueprint(reports_bp)
+
     return app
 
 def generate_vulnerability_chart_data(org_id):
