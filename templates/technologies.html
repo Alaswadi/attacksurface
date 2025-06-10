@@ -3,21 +3,21 @@
 {% block title %}Technologies - Attack Surface Monitoring{% endblock %}
 
 {% block content %}
-<div class="flex h-screen overflow-hidden">
+<div class="flex h-screen overflow-hidden bg-slate-900">
     <!-- Sidebar -->
-    <div id="sidebar" class="bg-gray-700 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+    <div id="sidebar" class="bg-slate-800 flex flex-col text-white transition-all duration-300 ease-in-out w-16 border-r border-slate-700">
         <!-- Logo Section -->
         <div class="flex items-center justify-center py-4 mb-4">
             <div class="w-10 h-10 flex items-center justify-center">
-                <i class="ri-shield-keyhole-line ri-lg text-blue-400"></i>
+                <i class="ri-shield-keyhole-line ri-lg text-primary"></i>
             </div>
-            <span id="logo-text" class="ml-3 text-lg font-semibold text-blue-400 opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
+            <span id="logo-text" class="ml-3 text-lg font-semibold text-primary opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
         </div>
 
         <!-- Navigation Items -->
         <nav class="flex-1 px-2">
             <!-- Dashboard -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/dashboard'" title="Dashboard">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="dashboard" title="Dashboard">
                 <div class="flex items-center">
                     <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
@@ -25,7 +25,7 @@
             </div>
 
             <!-- Assets -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/assets'" title="Assets">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="assets" title="Assets">
                 <div class="flex items-center">
                     <i class="ri-computer-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
@@ -33,40 +33,23 @@
             </div>
 
             <!-- Vulnerabilities -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/vulnerabilities'" title="Vulnerabilities">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="vulnerabilities" title="Vulnerabilities">
                 <div class="flex items-center">
-                    <i class="ri-shield-check-line ri-lg min-w-[24px]"></i>
+                    <i class="ri-shield-cross-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
                 </div>
             </div>
 
-            <!-- Alerts -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/alerts'" title="Alerts">
-                <div class="flex items-center">
-                    <i class="ri-alert-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
-                    <span class="alert-badge ml-auto bg-red-500 text-white text-xs rounded-full px-2 py-1 nav-text opacity-0 transition-opacity duration-300">3</span>
-                </div>
-            </div>
-
             <!-- Technologies (Active) -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer transition-colors bg-gray-600 relative" title="Technologies">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer transition-colors bg-slate-700 relative" data-section="technologies" title="Technologies">
                 <div class="flex items-center">
-                    <i class="ri-stack-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
-                </div>
-            </div>
-
-            <!-- Reports -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/reports'" title="Reports">
-                <div class="flex items-center">
-                    <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
-                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+                    <i class="ri-stack-line ri-lg min-w-[24px] text-primary"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap text-primary">Technologies</span>
                 </div>
             </div>
 
             <!-- Settings -->
-            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/settings'" title="Settings">
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" data-section="settings" title="Settings">
                 <div class="flex items-center">
                     <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
@@ -76,128 +59,152 @@
 
         <!-- Toggle Button -->
         <div class="p-2">
-            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center" title="Toggle Sidebar">
+            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-slate-700 transition-colors flex items-center justify-center" title="Toggle Sidebar">
                 <i class="ri-menu-line ri-lg min-w-[24px]"></i>
                 <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
             </button>
         </div>
     </div>
 
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden"></div>
+
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Header -->
-        <div class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-            <div class="flex items-center justify-between">
+        <header class="h-16 border-b border-slate-700 bg-slate-800 flex items-center justify-between px-4 md:px-6">
+            <!-- Mobile menu button -->
+            <button id="mobile-menu-btn" class="lg:hidden p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                <i class="ri-menu-line text-xl text-white"></i>
+            </button>
+
+            <div class="flex items-center justify-between w-full lg:w-auto">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Technology Discovery</h1>
-                    <p class="text-gray-600 mt-1">Analyze discovered technologies across your attack surface</p>
+                    <h1 class="text-xl md:text-2xl font-bold text-white">Technology Discovery</h1>
+                    <p class="text-slate-400 mt-1 text-sm hidden sm:block">Analyze discovered technologies across your attack surface</p>
                 </div>
-                
-                <div class="flex items-center space-x-4">
-                    <button id="refresh-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+
+                <div class="flex items-center space-x-4 ml-6">
+                    <button id="refresh-btn" class="bg-primary hover:bg-primary/90 text-slate-900 px-4 py-2 rounded-lg transition-all duration-200 flex items-center font-medium shadow-lg hover:shadow-xl hover:scale-105">
                         <i class="ri-refresh-line mr-2"></i>
-                        Refresh Data
+                        <span class="hidden sm:inline">Refresh Data</span>
+                        <span class="sm:hidden">Refresh</span>
                     </button>
-                    
-                    <div class="relative">
-                        <button class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100" onclick="toggleUserMenu()">
-                            <i class="ri-user-line text-gray-600"></i>
-                        </button>
-                        <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
-                            <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
-                        </div>
-                    </div>
                 </div>
             </div>
-        </div>
+
+            <!-- User Menu -->
+            <div class="relative">
+                <button class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-700 hover:bg-slate-600 transition-colors" onclick="toggleUserMenu()">
+                    <i class="ri-user-line text-white"></i>
+                </button>
+                <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-50">
+                    <a href="#" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Profile</a>
+                    <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Logout</a>
+                </div>
+            </div>
+        </header>
 
         <!-- Content Area -->
-        <div class="flex-1 overflow-auto p-6">
+        <div class="flex-1 overflow-auto p-4 md:p-6">
             <!-- Loading State -->
             <div id="loading-state" class="text-center py-12">
-                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p class="mt-4 text-gray-600">Loading technology data...</p>
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <p class="mt-4 text-slate-400">Loading technology data...</p>
             </div>
 
             <!-- Error State -->
             <div id="error-state" class="hidden text-center py-12">
-                <div class="text-red-500 mb-4">
-                    <i class="ri-error-warning-line ri-3x"></i>
+                <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="ri-error-warning-line text-2xl text-red-400"></i>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-2">Error Loading Technologies</h3>
-                <p id="error-message" class="text-gray-600 mb-4"></p>
-                <button onclick="loadTechnologies()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <h3 class="text-lg font-semibold text-white mb-2">Error Loading Technologies</h3>
+                <p id="error-message" class="text-slate-400 mb-4"></p>
+                <button onclick="loadTechnologies()" class="bg-primary hover:bg-primary/90 text-slate-900 px-4 py-2 rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl hover:scale-105">
                     Try Again
                 </button>
             </div>
 
             <!-- Main Content -->
             <div id="main-content" class="hidden">
-                <!-- Summary Stats -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-blue-100">
-                                <i class="ri-stack-line ri-xl text-blue-600"></i>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Total Technologies</p>
-                                <p id="total-technologies" class="text-2xl font-bold text-gray-900">0</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-green-100">
-                                <i class="ri-computer-line ri-xl text-green-600"></i>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Assets with Tech</p>
-                                <p id="assets-with-tech" class="text-2xl font-bold text-gray-900">0</p>
+                <!-- Page Title -->
+                <div class="mb-6">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+                        <div>
+                            <h2 class="text-xl md:text-2xl font-bold mb-2 text-white">Technology Inventory</h2>
+                            <div class="flex flex-wrap items-center gap-4 text-sm text-slate-400">
+                                <div class="flex items-center gap-2">
+                                    <span>Discovered technologies and frameworks</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-purple-100">
-                                <i class="ri-server-line ri-xl text-purple-600"></i>
+                    <!-- Summary Stats -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+                        <!-- Total Technologies -->
+                        <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-slate-400 font-medium text-sm">Total Technologies</h3>
+                                <div class="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                                    <i class="ri-stack-line text-primary"></i>
+                                </div>
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Web Servers</p>
-                                <p id="web-servers-count" class="text-2xl font-bold text-gray-900">0</p>
-                            </div>
+                            <p id="total-technologies" class="text-2xl md:text-3xl font-bold text-primary mb-1">0</p>
+                            <p class="text-xs text-slate-400">Unique technologies found</p>
                         </div>
-                    </div>
 
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-orange-100">
-                                <i class="ri-code-line ri-xl text-orange-600"></i>
+                        <!-- Assets with Tech -->
+                        <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-slate-400 font-medium text-sm">Assets with Tech</h3>
+                                <div class="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="ri-computer-line text-green-400"></i>
+                                </div>
                             </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600">Frameworks</p>
-                                <p id="frameworks-count" class="text-2xl font-bold text-gray-900">0</p>
+                            <p id="assets-with-tech" class="text-2xl md:text-3xl font-bold text-green-400 mb-1">0</p>
+                            <p class="text-xs text-slate-400">Assets with technology data</p>
+                        </div>
+
+                        <!-- Web Servers -->
+                        <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-slate-400 font-medium text-sm">Web Servers</h3>
+                                <div class="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="ri-server-line text-purple-400"></i>
+                                </div>
                             </div>
+                            <p id="web-servers-count" class="text-2xl md:text-3xl font-bold text-purple-400 mb-1">0</p>
+                            <p class="text-xs text-slate-400">Server technologies</p>
+                        </div>
+
+                        <!-- Frameworks -->
+                        <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-slate-400 font-medium text-sm">Frameworks</h3>
+                                <div class="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                                    <i class="ri-code-line text-orange-400"></i>
+                                </div>
+                            </div>
+                            <p id="frameworks-count" class="text-2xl md:text-3xl font-bold text-orange-400 mb-1">0</p>
+                            <p class="text-xs text-slate-400">Development frameworks</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Filters -->
-                <div class="bg-white rounded-lg shadow mb-6">
-                    <div class="p-6 border-b border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Filter Technologies</h3>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg mb-6">
+                    <div class="p-4 md:p-6">
+                        <h3 class="text-lg font-semibold text-white mb-4">Filter Technologies</h3>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Technology Name</label>
-                                <input type="text" id="tech-name-filter" placeholder="e.g., Apache, React, WordPress" 
-                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <label class="block text-sm font-medium text-slate-400 mb-2">Technology Name</label>
+                                <input type="text" id="tech-name-filter" placeholder="e.g., Apache, React, WordPress"
+                                       class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-slate-400">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                                <select id="category-filter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <label class="block text-sm font-medium text-slate-400 mb-2">Category</label>
+                                <select id="category-filter" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white">
                                     <option value="">All Categories</option>
                                     <option value="Web Server">Web Servers</option>
                                     <option value="JavaScript Framework">JavaScript Frameworks</option>
@@ -210,7 +217,7 @@
                                 </select>
                             </div>
                             <div class="flex items-end">
-                                <button id="apply-filters-btn" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                <button id="apply-filters-btn" class="w-full bg-primary hover:bg-primary/90 text-slate-900 px-4 py-2 rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl hover:scale-105">
                                     Apply Filters
                                 </button>
                             </div>
@@ -219,12 +226,12 @@
                 </div>
 
                 <!-- Technologies Grid -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="p-6 border-b border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900">Discovered Technologies</h3>
-                        <p class="text-gray-600 mt-1">Click on any technology to view detailed asset information</p>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-lg">
+                    <div class="p-4 md:p-6 border-b border-slate-700">
+                        <h3 class="text-lg font-semibold text-white">Discovered Technologies</h3>
+                        <p class="text-slate-400 mt-1">Click on any technology to view detailed asset information</p>
                     </div>
-                    <div id="technologies-grid" class="p-6">
+                    <div id="technologies-grid" class="p-4 md:p-6">
                         <!-- Technologies will be populated here -->
                     </div>
                 </div>
@@ -234,16 +241,18 @@
 </div>
 
 <!-- Technology Details Modal -->
-<div id="tech-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-        <div class="flex items-center justify-between mb-4">
-            <h3 id="modal-title" class="text-lg font-semibold text-gray-900"></h3>
-            <button onclick="closeTechModal()" class="text-gray-400 hover:text-gray-600">
-                <i class="ri-close-line ri-xl"></i>
-            </button>
-        </div>
-        <div id="modal-content">
-            <!-- Modal content will be populated here -->
+<div id="tech-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 w-11/12 md:w-3/4 lg:w-1/2 max-w-4xl">
+        <div class="bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
+            <div class="flex items-center justify-between p-6 border-b border-slate-700">
+                <h3 id="modal-title" class="text-lg font-semibold text-white"></h3>
+                <button onclick="closeTechModal()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="ri-close-line ri-xl"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="p-6">
+                <!-- Modal content will be populated here -->
+            </div>
         </div>
     </div>
 </div>
@@ -252,41 +261,79 @@
 {% block scripts %}
 <script>
 // Global variables
-let sidebarExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+let isMobile = false;
 let technologiesData = null;
+
+// Check if mobile
+function checkMobile() {
+    return window.innerWidth < 1024;
+}
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
     initializeSidebar();
+    initializeMobileSidebar();
     loadTechnologies();
-    
+
     // Add event listeners
-    document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+    document.getElementById('sidebar-toggle').addEventListener('click', function() {
+        if (checkMobile()) {
+            toggleMobileSidebar();
+        } else {
+            toggleSidebar();
+        }
+    });
     document.getElementById('refresh-btn').addEventListener('click', loadTechnologies);
     document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
-    
+
     // Add enter key support for filter input
     document.getElementById('tech-name-filter').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             applyFilters();
         }
     });
+
+    // Navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const section = this.getAttribute('data-section');
+            if (section) {
+                switch(section) {
+                    case 'dashboard':
+                        window.location.href = '/dashboard';
+                        break;
+                    case 'assets':
+                        window.location.href = '/assets';
+                        break;
+                    case 'vulnerabilities':
+                        window.location.href = '/vulnerabilities';
+                        break;
+                    case 'technologies':
+                        // Already on technologies page
+                        break;
+                    case 'settings':
+                        window.location.href = '/settings';
+                        break;
+                }
+            }
+        });
+    });
 });
 
 // Sidebar functionality
 function initializeSidebar() {
-    if (sidebarExpanded) {
+    const isExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+    if (isExpanded && !checkMobile()) {
         expandSidebar();
-    } else {
-        collapseSidebar();
     }
 }
 
 function expandSidebar() {
+    if (checkMobile()) return;
+
     const sidebar = document.getElementById('sidebar');
     const logoText = document.getElementById('logo-text');
     const navTexts = document.querySelectorAll('.nav-text');
-    const toggleIcon = document.querySelector('#sidebar-toggle i');
     const toggleText = document.getElementById('toggle-text');
 
     sidebar.classList.remove('w-16');
@@ -294,54 +341,117 @@ function expandSidebar() {
 
     setTimeout(() => {
         logoText.classList.remove('opacity-0');
-        logoText.classList.add('opacity-100');
-        navTexts.forEach(text => {
-            text.classList.remove('opacity-0');
-            text.classList.add('opacity-100');
-        });
+        navTexts.forEach(text => text.classList.remove('opacity-0'));
+        toggleText.classList.remove('opacity-0');
+        toggleText.textContent = 'Collapse';
     }, 150);
 
-    toggleIcon.classList.remove('ri-menu-line');
-    toggleIcon.classList.add('ri-menu-fold-line');
-    toggleText.textContent = 'Collapse';
-
-    sidebarExpanded = true;
     localStorage.setItem('sidebarExpanded', 'true');
 }
 
 function collapseSidebar() {
+    if (checkMobile()) return;
+
     const sidebar = document.getElementById('sidebar');
     const logoText = document.getElementById('logo-text');
     const navTexts = document.querySelectorAll('.nav-text');
-    const toggleIcon = document.querySelector('#sidebar-toggle i');
     const toggleText = document.getElementById('toggle-text');
 
-    logoText.classList.remove('opacity-100');
     logoText.classList.add('opacity-0');
-    navTexts.forEach(text => {
-        text.classList.remove('opacity-100');
-        text.classList.add('opacity-0');
-    });
+    navTexts.forEach(text => text.classList.add('opacity-0'));
+    toggleText.classList.add('opacity-0');
 
     setTimeout(() => {
         sidebar.classList.remove('w-64');
         sidebar.classList.add('w-16');
+        toggleText.textContent = 'Expand';
     }, 150);
 
-    toggleIcon.classList.remove('ri-menu-fold-line');
-    toggleIcon.classList.add('ri-menu-line');
-    toggleText.textContent = 'Expand';
-
-    sidebarExpanded = false;
     localStorage.setItem('sidebarExpanded', 'false');
 }
 
 function toggleSidebar() {
-    if (sidebarExpanded) {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar.classList.contains('w-64')) {
         collapseSidebar();
     } else {
         expandSidebar();
     }
+}
+
+// Mobile sidebar functionality
+function initializeMobileSidebar() {
+    const overlay = document.getElementById('sidebar-overlay');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', toggleMobileSidebar);
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', closeMobileSidebar);
+    }
+
+    // Close mobile sidebar when clicking nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            if (checkMobile()) {
+                closeMobileSidebar();
+            }
+        });
+    });
+}
+
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+
+    if (sidebar.classList.contains('translate-x-0')) {
+        closeMobileSidebar();
+    } else {
+        openMobileSidebar();
+    }
+}
+
+function openMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    sidebar.classList.remove('-translate-x-full');
+    sidebar.classList.add('translate-x-0');
+    sidebar.classList.add('fixed', 'z-50', 'w-64');
+
+    if (overlay) {
+        overlay.classList.remove('hidden');
+    }
+
+    // Show nav text immediately on mobile
+    const navTexts = document.querySelectorAll('.nav-text');
+    const logoText = document.getElementById('logo-text');
+    navTexts.forEach(text => text.classList.remove('opacity-0'));
+    if (logoText) logoText.classList.remove('opacity-0');
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    sidebar.classList.remove('translate-x-0');
+    sidebar.classList.add('-translate-x-full');
+
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+
+    setTimeout(() => {
+        sidebar.classList.remove('fixed', 'z-50', 'w-64');
+        sidebar.classList.add('w-16');
+
+        // Hide nav text on mobile when closed
+        const navTexts = document.querySelectorAll('.nav-text');
+        const logoText = document.getElementById('logo-text');
+        navTexts.forEach(text => text.classList.add('opacity-0'));
+        if (logoText) logoText.classList.add('opacity-0');
+    }, 300);
 }
 
 function toggleUserMenu() {
@@ -383,41 +493,41 @@ async function loadTechnologies() {
 function displayTechnologies(data) {
     const grid = document.getElementById('technologies-grid');
     const technologies = data.technologies;
-    
+
     if (Object.keys(technologies).length === 0) {
         grid.innerHTML = `
             <div class="text-center py-12">
-                <div class="text-gray-400 mb-4">
-                    <i class="ri-stack-line ri-3x"></i>
+                <div class="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="ri-stack-line text-2xl text-slate-400"></i>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Technologies Found</h3>
-                <p class="text-gray-600">Run some scans to discover technologies in your infrastructure.</p>
+                <h3 class="text-lg font-semibold text-white mb-2">No Technologies Found</h3>
+                <p class="text-slate-400">Run some scans to discover technologies in your infrastructure.</p>
             </div>
         `;
         return;
     }
-    
+
     let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
-    
+
     // Sort technologies by usage count
     const sortedTechs = Object.entries(technologies).sort((a, b) => b[1].total_count - a[1].total_count);
-    
+
     for (const [techKey, techInfo] of sortedTechs) {
         const categoryColor = getCategoryColor(techInfo.category);
-        const versionInfo = Object.keys(techInfo.versions || {}).length > 0 
-            ? `<span class="text-xs text-gray-500">${Object.keys(techInfo.versions).join(', ')}</span>`
+        const versionInfo = Object.keys(techInfo.versions || {}).length > 0
+            ? `<span class="text-xs text-slate-400">${Object.keys(techInfo.versions).join(', ')}</span>`
             : '';
-        
+
         html += `
-            <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer" 
+            <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-4 hover:bg-slate-700/70 transition-all duration-200 cursor-pointer hover:scale-105"
                  onclick="showTechnologyDetails('${techKey}')">
                 <div class="flex items-center justify-between mb-2">
-                    <h4 class="font-semibold text-gray-900">${techInfo.name}</h4>
-                    <span class="px-2 py-1 text-xs rounded-full ${categoryColor}">
+                    <h4 class="font-semibold text-white">${techInfo.name}</h4>
+                    <span class="px-2 py-1 text-xs rounded-full border ${categoryColor}">
                         ${techInfo.category}
                     </span>
                 </div>
-                <div class="text-sm text-gray-600 mb-2">
+                <div class="text-sm text-slate-300 mb-2">
                     <i class="ri-computer-line mr-1"></i>
                     ${techInfo.total_count} asset${techInfo.total_count !== 1 ? 's' : ''}
                 </div>
@@ -425,21 +535,21 @@ function displayTechnologies(data) {
             </div>
         `;
     }
-    
+
     html += '</div>';
     grid.innerHTML = html;
 }
 
 function getCategoryColor(category) {
     const colors = {
-        'Web Server': 'bg-red-100 text-red-800',
-        'JavaScript Framework': 'bg-yellow-100 text-yellow-800',
-        'Backend Framework': 'bg-green-100 text-green-800',
-        'CMS': 'bg-blue-100 text-blue-800',
-        'Programming Language': 'bg-purple-100 text-purple-800',
-        'Database': 'bg-indigo-100 text-indigo-800',
-        'CDN/Security': 'bg-pink-100 text-pink-800',
-        'Other': 'bg-gray-100 text-gray-800'
+        'Web Server': 'bg-red-500/20 text-red-400 border-red-500/30',
+        'JavaScript Framework': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+        'Backend Framework': 'bg-green-500/20 text-green-400 border-green-500/30',
+        'CMS': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+        'Programming Language': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+        'Database': 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+        'CDN/Security': 'bg-pink-500/20 text-pink-400 border-pink-500/30',
+        'Other': 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     };
     return colors[category] || colors['Other'];
 }
@@ -500,45 +610,45 @@ async function showTechnologyDetails(techKey) {
             
             let html = `
                 <div class="mb-4">
-                    <p class="text-gray-600">
-                        <strong>${data.total_count}</strong> asset${data.total_count !== 1 ? 's' : ''} using this technology
+                    <p class="text-slate-300">
+                        <strong class="text-white">${data.total_count}</strong> asset${data.total_count !== 1 ? 's' : ''} using this technology
                     </p>
                 </div>
             `;
-            
+
             if (Object.keys(data.versions).length > 0) {
                 html += `
                     <div class="mb-4">
-                        <h4 class="font-semibold text-gray-900 mb-2">Versions Detected:</h4>
+                        <h4 class="font-semibold text-white mb-2">Versions Detected:</h4>
                         <div class="flex flex-wrap gap-2">
                 `;
                 for (const [version, count] of Object.entries(data.versions)) {
-                    html += `<span class="px-2 py-1 bg-gray-100 text-gray-800 text-sm rounded">${version} (${count})</span>`;
+                    html += `<span class="px-2 py-1 bg-slate-700 border border-slate-600 text-slate-300 text-sm rounded">${version} (${count})</span>`;
                 }
                 html += '</div></div>';
             }
-            
+
             html += `
                 <div>
-                    <h4 class="font-semibold text-gray-900 mb-2">Assets:</h4>
-                    <div class="max-h-64 overflow-y-auto">
+                    <h4 class="font-semibold text-white mb-2">Assets:</h4>
+                    <div class="max-h-64 overflow-y-auto space-y-2">
             `;
-            
+
             for (const asset of data.assets) {
                 const statusColor = getStatusColor(asset.status_code);
                 html += `
-                    <div class="border border-gray-200 rounded p-3 mb-2">
+                    <div class="bg-slate-700/50 border border-slate-600 rounded-lg p-3">
                         <div class="flex items-center justify-between">
-                            <div>
-                                <h5 class="font-medium text-gray-900">${asset.name}</h5>
-                                <p class="text-sm text-gray-600">${asset.title || 'No title'}</p>
-                                ${asset.url ? `<a href="${asset.url}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">${asset.url}</a>` : ''}
+                            <div class="flex-1 min-w-0">
+                                <h5 class="font-medium text-white truncate">${asset.name}</h5>
+                                <p class="text-sm text-slate-400 truncate">${asset.title || 'No title'}</p>
+                                ${asset.url ? `<a href="${asset.url}" target="_blank" class="text-primary hover:text-primary/80 text-sm transition-colors">${asset.url}</a>` : ''}
                             </div>
-                            <div class="text-right">
-                                <span class="px-2 py-1 text-xs rounded ${statusColor}">
+                            <div class="text-right ml-4">
+                                <span class="px-2 py-1 text-xs rounded border ${statusColor}">
                                     ${asset.status_code || 'N/A'}
                                 </span>
-                                <p class="text-xs text-gray-500 mt-1">${asset.asset_type}</p>
+                                <p class="text-xs text-slate-500 mt-1">${asset.asset_type}</p>
                             </div>
                         </div>
                     </div>
@@ -555,15 +665,31 @@ async function showTechnologyDetails(techKey) {
 }
 
 function getStatusColor(statusCode) {
-    if (statusCode >= 200 && statusCode < 300) return 'bg-green-100 text-green-800';
-    if (statusCode >= 300 && statusCode < 400) return 'bg-yellow-100 text-yellow-800';
-    if (statusCode >= 400) return 'bg-red-100 text-red-800';
-    return 'bg-gray-100 text-gray-800';
+    if (statusCode >= 200 && statusCode < 300) return 'bg-green-500/20 text-green-400 border-green-500/30';
+    if (statusCode >= 300 && statusCode < 400) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    if (statusCode >= 400) return 'bg-red-500/20 text-red-400 border-red-500/30';
+    return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
 }
 
 function closeTechModal() {
     document.getElementById('tech-modal').classList.add('hidden');
 }
+
+// User menu functionality
+function toggleUserMenu() {
+    const menu = document.getElementById('userMenu');
+    menu.classList.toggle('hidden');
+}
+
+// Close user menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('userMenu');
+    const button = event.target.closest('button');
+
+    if (!menu.contains(event.target) && !button) {
+        menu.classList.add('hidden');
+    }
+});
 
 // UI state management
 function showLoading() {
@@ -584,6 +710,36 @@ function showMainContent() {
     document.getElementById('error-state').classList.add('hidden');
     document.getElementById('main-content').classList.remove('hidden');
 }
+
+// Handle window resize
+window.addEventListener('resize', function() {
+    const wasMobile = isMobile;
+    isMobile = checkMobile();
+
+    if (wasMobile !== isMobile) {
+        // Reset sidebar state when switching between mobile/desktop
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+
+        if (isMobile) {
+            closeMobileSidebar();
+        } else {
+            // Reset to desktop state
+            sidebar.classList.remove('fixed', 'z-50', 'translate-x-0', '-translate-x-full');
+            if (overlay) overlay.classList.add('hidden');
+
+            // Apply saved desktop state
+            const isExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+            if (isExpanded) {
+                sidebar.classList.add('w-64');
+                sidebar.classList.remove('w-16');
+            } else {
+                sidebar.classList.add('w-16');
+                sidebar.classList.remove('w-64');
+            }
+        }
+    }
+});
 
 // Close modal when clicking outside
 document.addEventListener('click', function(event) {
