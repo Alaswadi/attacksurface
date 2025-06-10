@@ -180,6 +180,57 @@
                     </div>
                 </div>
 
+                <!-- Statistics Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+                    <!-- Total Assets -->
+                    <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-slate-400 font-medium text-sm">Total Assets</h3>
+                            <div class="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                                <i class="ri-computer-line text-primary"></i>
+                            </div>
+                        </div>
+                        <p id="total-assets-count" class="text-2xl md:text-3xl font-bold text-primary mb-1">{{ total_assets }}</p>
+                        <p class="text-xs text-slate-400">All discovered assets</p>
+                    </div>
+
+                    <!-- At Risk Assets -->
+                    <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-slate-400 font-medium text-sm">At Risk</h3>
+                            <div class="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                                <i class="ri-alert-line text-orange-400"></i>
+                            </div>
+                        </div>
+                        <p id="at-risk-count" class="text-2xl md:text-3xl font-bold text-orange-400 mb-1">{{ at_risk }}</p>
+                        <p class="text-xs text-slate-400">Assets with vulnerabilities</p>
+                    </div>
+
+                    <!-- Critical Exposure -->
+                    <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-slate-400 font-medium text-sm">Critical Exposure</h3>
+                            <div class="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
+                                <i class="ri-shield-cross-line text-red-400"></i>
+                            </div>
+                        </div>
+                        <p id="critical-exposure-count" class="text-2xl md:text-3xl font-bold text-red-400 mb-1">{{ critical_exposure }}</p>
+                        <p class="text-xs text-slate-400">Critical vulnerabilities</p>
+                    </div>
+
+                    <!-- Secure Assets -->
+                    <div class="card bg-slate-800/50 border border-slate-700 rounded-lg p-4 md:p-6 hover:bg-slate-800/70 transition-colors">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-slate-400 font-medium text-sm">Secure</h3>
+                            <div class="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                                <i class="ri-shield-check-line text-green-400"></i>
+                            </div>
+                        </div>
+                        <p id="secure-assets-count" class="text-2xl md:text-3xl font-bold text-green-400 mb-1">{{ secure_assets }}</p>
+                        <p class="text-xs text-slate-400">No known vulnerabilities</p>
+                    </div>
+                </div>
+
                 <!-- Filter Tabs and Controls -->
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
                     <!-- Asset Type Tabs -->
@@ -890,6 +941,7 @@ async function loadAssets() {
             }
             console.log('Assets found, applying filters...');
             filterAssets(); // Apply current filters instead of renderAssets() directly
+            updateStatistics(); // Update statistics cards
         }
     } catch (error) {
         console.error('Error loading assets:', error);
@@ -900,6 +952,81 @@ async function loadAssets() {
                 <p class="text-red-500 mt-2">Error loading assets: ${error.message}</p>
             `;
         }
+    }
+}
+
+// Update statistics cards based on current assets data
+async function updateStatistics() {
+    if (!assetsData || assetsData.length === 0) {
+        // If no assets, set all counts to 0
+        updateStatisticCard('total-assets-count', 0);
+        updateStatisticCard('at-risk-count', 0);
+        updateStatisticCard('critical-exposure-count', 0);
+        updateStatisticCard('secure-assets-count', 0);
+        return;
+    }
+
+    try {
+        // Fetch real-time statistics from the API
+        const response = await fetch('/api/assets-stats');
+        if (response.ok) {
+            const stats = await response.json();
+
+            // Update the UI with real data
+            updateStatisticCard('total-assets-count', stats.total_assets || assetsData.length);
+            updateStatisticCard('at-risk-count', stats.at_risk || 0);
+            updateStatisticCard('critical-exposure-count', stats.critical_exposure || 0);
+            updateStatisticCard('secure-assets-count', stats.secure_assets || assetsData.length);
+
+            console.log('Statistics updated from API:', stats);
+        } else {
+            // Fallback to client-side calculation
+            calculateStatisticsFromAssets();
+        }
+    } catch (error) {
+        console.error('Error fetching statistics:', error);
+        // Fallback to client-side calculation
+        calculateStatisticsFromAssets();
+    }
+}
+
+// Fallback function to calculate statistics from assets data
+function calculateStatisticsFromAssets() {
+    const totalAssets = assetsData.length;
+
+    // Count assets with vulnerabilities (at risk)
+    // Use vulnerability_count from the API response
+    const atRiskAssets = assetsData.filter(asset =>
+        asset.vulnerability_count && asset.vulnerability_count > 0
+    ).length;
+
+    // Count assets with critical vulnerabilities
+    const criticalExposure = assetsData.filter(asset =>
+        asset.risk_level === 'critical'
+    ).length;
+
+    // Count secure assets (no known vulnerabilities)
+    const secureAssets = totalAssets - atRiskAssets;
+
+    // Update the UI
+    updateStatisticCard('total-assets-count', totalAssets);
+    updateStatisticCard('at-risk-count', atRiskAssets);
+    updateStatisticCard('critical-exposure-count', criticalExposure);
+    updateStatisticCard('secure-assets-count', secureAssets);
+
+    console.log('Statistics calculated from assets:', {
+        total: totalAssets,
+        atRisk: atRiskAssets,
+        critical: criticalExposure,
+        secure: secureAssets
+    });
+}
+
+// Helper function to update individual statistic cards
+function updateStatisticCard(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = value;
     }
 }
 
@@ -1887,8 +2014,12 @@ function handleAddAssetProgressiveUpdate(update) {
         loadAssets();
     } else if (update.type === 'http_probing_complete') {
         addAddAssetLogEntry('HTTP probing completed', 'info');
+        // Refresh assets to update any status changes
+        loadAssets();
     } else if (update.type === 'port_scanning_complete') {
         addAddAssetLogEntry('Port scanning completed', 'info');
+        // Refresh assets to update any status changes
+        loadAssets();
     }
 }
 

@@ -301,6 +301,42 @@ def get_dashboard_stats():
         'asset_breakdown': asset_counts
     })
 
+@api_bp.route('/assets-stats', methods=['GET'])
+@login_required
+def get_assets_stats():
+    """Get dashboard statistics for assets page"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    # Get asset statistics
+    total_assets = Asset.query.filter_by(organization_id=org.id, is_active=True).count()
+
+    # Assets with vulnerabilities (at risk)
+    assets_with_vulns = db.session.query(Asset.id).join(Vulnerability).filter(
+        Asset.organization_id == org.id,
+        Asset.is_active == True,
+        Vulnerability.is_resolved == False
+    ).distinct().count()
+
+    # Critical exposure (assets with critical vulnerabilities)
+    critical_exposure = db.session.query(Asset.id).join(Vulnerability).filter(
+        Asset.organization_id == org.id,
+        Asset.is_active == True,
+        Vulnerability.severity == SeverityLevel.CRITICAL,
+        Vulnerability.is_resolved == False
+    ).distinct().count()
+
+    # Secure assets (no unresolved vulnerabilities)
+    secure_assets = total_assets - assets_with_vulns
+
+    return jsonify({
+        'total_assets': total_assets,
+        'at_risk': assets_with_vulns,
+        'critical_exposure': critical_exposure,
+        'secure_assets': secure_assets
+    })
+
 @api_bp.route('/scan', methods=['POST'])
 @login_required
 def start_scan():
