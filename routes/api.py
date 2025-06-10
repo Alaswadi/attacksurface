@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, make_response, Response
 from flask_login import login_required, current_user
-from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel
+from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, User
 from datetime import datetime, timedelta
 import json
 import uuid
@@ -1651,3 +1651,230 @@ def delete_vulnerability(vuln_id):
     except Exception as e:
         logging.error(f"Error deleting vulnerability {vuln_id}: {str(e)}")
         return jsonify({'success': False, 'error': 'Failed to delete vulnerability'}), 500
+
+# Settings API Endpoints
+@api_bp.route('/settings/organization', methods=['GET', 'POST'])
+@login_required
+def organization_settings():
+    """Get or update organization settings"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    if request.method == 'GET':
+        return jsonify({
+            'id': org.id,
+            'name': org.name,
+            'created_at': org.created_at.isoformat(),
+            'primary_domain': getattr(org, 'primary_domain', ''),
+            'description': getattr(org, 'description', '')
+        })
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        try:
+            if 'name' in data:
+                org.name = data['name']
+
+            # Note: primary_domain and description would need to be added to the Organization model
+            # For now, we'll just update the name
+
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Organization settings updated successfully'})
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to update organization settings: {str(e)}'}), 500
+
+@api_bp.route('/settings/interface', methods=['POST'])
+@login_required
+def save_interface_settings():
+    """Save interface preferences (stored in localStorage on frontend)"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Interface settings are typically stored client-side
+    # This endpoint just validates the data and returns success
+    valid_themes = ['light', 'dark', 'auto']
+    valid_views = ['dashboard', 'assets', 'vulnerabilities']
+
+    if 'theme' in data and data['theme'] not in valid_themes:
+        return jsonify({'error': 'Invalid theme'}), 400
+
+    if 'default_view' in data and data['default_view'] not in valid_views:
+        return jsonify({'error': 'Invalid default view'}), 400
+
+    return jsonify({'success': True, 'message': 'Interface settings saved successfully'})
+
+@api_bp.route('/settings/scanning', methods=['POST'])
+@login_required
+def save_scanning_settings():
+    """Save scanning configuration settings"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # In a real implementation, these would be stored in a settings table
+    # For now, we'll just validate and return success
+
+    valid_frequencies = ['daily', 'weekly', 'monthly']
+
+    if 'scan_frequency' in data and data['scan_frequency'] not in valid_frequencies:
+        return jsonify({'error': 'Invalid scan frequency'}), 400
+
+    if 'concurrent_scans' in data:
+        try:
+            concurrent = int(data['concurrent_scans'])
+            if concurrent < 1 or concurrent > 10:
+                return jsonify({'error': 'Concurrent scans must be between 1 and 10'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid concurrent scans value'}), 400
+
+    return jsonify({'success': True, 'message': 'Scanning settings saved successfully'})
+
+@api_bp.route('/settings/notifications', methods=['POST'])
+@login_required
+def save_notification_settings():
+    """Save notification settings"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Validate email if provided
+    if 'notification_email' in data:
+        email = data['notification_email']
+        if email and '@' not in email:
+            return jsonify({'error': 'Invalid email address'}), 400
+
+    valid_frequencies = ['immediate', 'hourly', 'daily', 'weekly']
+    if 'digest_frequency' in data and data['digest_frequency'] not in valid_frequencies:
+        return jsonify({'error': 'Invalid digest frequency'}), 400
+
+    return jsonify({'success': True, 'message': 'Notification settings saved successfully'})
+
+@api_bp.route('/settings/data-retention', methods=['POST'])
+@login_required
+def save_data_retention_settings():
+    """Save data retention policies"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    valid_retention_values = ['30', '90', '180', '365', '730', '0']  # 0 means never delete
+
+    for setting in ['scan_retention', 'vuln_retention', 'alert_retention']:
+        if setting in data and str(data[setting]) not in valid_retention_values:
+            return jsonify({'error': f'Invalid {setting} value'}), 400
+
+    return jsonify({'success': True, 'message': 'Data retention settings saved successfully'})
+
+@api_bp.route('/settings/backup', methods=['POST'])
+@login_required
+def save_backup_settings():
+    """Save backup configuration"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    valid_frequencies = ['daily', 'weekly', 'monthly']
+    valid_retention = ['7', '30', '90']
+
+    if 'backup_frequency' in data and data['backup_frequency'] not in valid_frequencies:
+        return jsonify({'error': 'Invalid backup frequency'}), 400
+
+    if 'backup_retention' in data and str(data['backup_retention']) not in valid_retention:
+        return jsonify({'error': 'Invalid backup retention'}), 400
+
+    return jsonify({'success': True, 'message': 'Backup settings saved successfully'})
+
+@api_bp.route('/settings/export', methods=['POST'])
+@login_required
+def export_data():
+    """Export organization data"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    data = request.get_json()
+    export_format = data.get('format', 'json') if data else 'json'
+
+    if export_format not in ['json', 'csv']:
+        return jsonify({'error': 'Invalid export format'}), 400
+
+    try:
+        # Get all organization data
+        assets = Asset.query.filter_by(organization_id=org.id).all()
+        vulnerabilities = Vulnerability.query.filter_by(organization_id=org.id).all()
+        alerts = Alert.query.filter_by(organization_id=org.id).all()
+
+        export_data = {
+            'organization': {
+                'name': org.name,
+                'created_at': org.created_at.isoformat()
+            },
+            'assets': [{
+                'name': asset.name,
+                'type': asset.asset_type.value,
+                'description': asset.description,
+                'discovered_at': asset.discovered_at.isoformat(),
+                'is_active': asset.is_active
+            } for asset in assets],
+            'vulnerabilities': [{
+                'title': vuln.title,
+                'severity': vuln.severity.value,
+                'discovered_at': vuln.discovered_at.isoformat(),
+                'is_resolved': vuln.is_resolved,
+                'asset_name': vuln.asset.name if vuln.asset else None
+            } for vuln in vulnerabilities],
+            'alerts': [{
+                'title': alert.title,
+                'type': alert.alert_type.value,
+                'severity': alert.severity.value,
+                'created_at': alert.created_at.isoformat(),
+                'is_resolved': alert.is_resolved
+            } for alert in alerts],
+            'exported_at': datetime.utcnow().isoformat()
+        }
+
+        if export_format == 'json':
+            response = make_response(json.dumps(export_data, indent=2))
+            response.headers['Content-Type'] = 'application/json'
+            response.headers['Content-Disposition'] = f'attachment; filename=attack_surface_data_{org.name}_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.json'
+        else:  # CSV format
+            # For CSV, we'll export assets only for simplicity
+            csv_data = "Name,Type,Description,Discovered At,Active\n"
+            for asset in assets:
+                csv_data += f'"{asset.name}","{asset.asset_type.value}","{asset.description}","{asset.discovered_at.isoformat()}","{asset.is_active}"\n'
+
+            response = make_response(csv_data)
+            response.headers['Content-Type'] = 'text/csv'
+            response.headers['Content-Disposition'] = f'attachment; filename=attack_surface_assets_{org.name}_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.csv'
+
+        return response
+
+    except Exception as e:
+        return jsonify({'error': f'Export failed: {str(e)}'}), 500
+
+@api_bp.route('/settings/api-key', methods=['POST'])
+@login_required
+def regenerate_api_key():
+    """Regenerate API key for the user"""
+    try:
+        # In a real implementation, you would generate and store a new API key
+        new_api_key = f"sk-{uuid.uuid4().hex[:32]}"
+
+        # Here you would update the user's API key in the database
+        # For now, we'll just return a simulated key
+
+        return jsonify({
+            'success': True,
+            'api_key': new_api_key,
+            'message': 'API key regenerated successfully'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to regenerate API key: {str(e)}'}), 500

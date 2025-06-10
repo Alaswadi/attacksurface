@@ -1,0 +1,1110 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Attack Surface Monitoring{% endblock %}
+
+{% block content %}
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-gray-700 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+        <!-- Logo Section -->
+        <div class="flex items-center justify-center py-4 mb-4">
+            <div class="w-10 h-10 flex items-center justify-center">
+                <i class="ri-shield-keyhole-line ri-lg text-blue-400"></i>
+            </div>
+            <span id="logo-text" class="ml-3 text-lg font-semibold text-blue-400 opacity-0 transition-opacity duration-300 whitespace-nowrap">AttackSurface</span>
+        </div>
+
+        <!-- Navigation Items -->
+        <nav class="flex-1 px-2">
+            <!-- Dashboard -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="dashboard" title="Dashboard">
+                <div class="flex items-center">
+                    <i class="ri-dashboard-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
+                </div>
+            </div>
+
+            <!-- Assets -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="assets" title="Assets">
+                <div class="flex items-center">
+                    <i class="ri-computer-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
+                </div>
+            </div>
+
+            <!-- Vulnerabilities -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="vulnerabilities" title="Vulnerabilities">
+                <div class="flex items-center">
+                    <i class="ri-shield-check-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="alerts" title="Alerts">
+                <div class="flex items-center">
+                    <i class="ri-alert-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Alerts</span>
+                </div>
+            </div>
+
+            <!-- Technologies -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" onclick="window.location.href='/technologies'" title="Technology Discovery">
+                <div class="flex items-center">
+                    <i class="ri-stack-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
+                </div>
+            </div>
+
+            <!-- Reports -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors relative" data-section="reports" title="Reports">
+                <div class="flex items-center">
+                    <i class="ri-file-chart-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors bg-gray-600 relative" data-section="settings" title="Settings">
+                <div class="flex items-center">
+                    <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Toggle Button -->
+        <div class="p-2">
+            <button id="sidebar-toggle" class="w-full p-3 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center" title="Toggle Sidebar">
+                <i class="ri-menu-line ri-lg min-w-[24px]"></i>
+                <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 border-b border-gray-200 bg-white flex items-center justify-between px-6">
+            <h1 class="text-xl font-semibold text-gray-800">Settings</h1>
+
+            <div class="flex items-center">
+                <div class="relative">
+                    <button class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100" onclick="toggleUserMenu()">
+                        <i class="ri-user-line text-gray-600"></i>
+                    </button>
+                    <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                        <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
+                        <a href="{{ url_for('auth.logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Settings Content -->
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Settings Tabs -->
+            <div class="mb-6">
+                <div class="flex border-b border-gray-200">
+                    <button class="settings-tab active px-6 py-3 text-sm font-medium border-b-2 border-blue-500 text-blue-600" data-tab="general">
+                        <i class="ri-settings-line mr-2"></i>General
+                    </button>
+                    <button class="settings-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="scanning">
+                        <i class="ri-radar-line mr-2"></i>Scanning
+                    </button>
+                    <button class="settings-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="notifications">
+                        <i class="ri-notification-line mr-2"></i>Notifications
+                    </button>
+                    <button class="settings-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="users">
+                        <i class="ri-team-line mr-2"></i>Users
+                    </button>
+                    <button class="settings-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="data">
+                        <i class="ri-database-line mr-2"></i>Data
+                    </button>
+                    <button class="settings-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="integrations">
+                        <i class="ri-plug-line mr-2"></i>Integrations
+                    </button>
+                    <button class="settings-tab px-6 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="licensing">
+                        <i class="ri-vip-crown-line mr-2"></i>Licensing
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="settings-content">
+                <!-- General Settings Tab -->
+                <div id="general-tab" class="tab-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Organization Details -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-building-line mr-2"></i>Organization Details
+                            </h3>
+                            <form id="organization-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Organization Name</label>
+                                    <input type="text" id="org-name" value="{{ organization.name }}" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Primary Domain</label>
+                                    <input type="text" id="primary-domain" placeholder="example.com" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                    <textarea id="org-description" rows="3" placeholder="Organization description..." 
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Organization Details
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Interface Preferences -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-palette-line mr-2"></i>Interface Preferences
+                            </h3>
+                            <form id="interface-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Default View</label>
+                                    <select id="default-view" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="dashboard">Dashboard</option>
+                                        <option value="assets">Assets</option>
+                                        <option value="vulnerabilities">Vulnerabilities</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Theme</label>
+                                    <select id="theme" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="auto">Auto</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Items per Page</label>
+                                    <select id="items-per-page" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="10">10</option>
+                                        <option value="25" selected>25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="sidebar-expanded" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="sidebar-expanded" class="ml-2 block text-sm text-gray-700">Keep sidebar expanded by default</label>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Interface Preferences
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scanning Configuration Tab -->
+                <div id="scanning-tab" class="tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Auto-scan Settings -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-timer-line mr-2"></i>Auto-scan Configuration
+                            </h3>
+                            <form id="autoscan-form" class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="auto-scan-enabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="auto-scan-enabled" class="ml-2 block text-sm text-gray-700">Enable auto-scan for new assets</label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Scan Frequency</label>
+                                    <select id="scan-frequency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly" selected>Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Scan Time</label>
+                                    <input type="time" id="scan-time" value="02:00"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="deep-scan" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="deep-scan" class="ml-2 block text-sm text-gray-700">Enable deep scanning (slower but more thorough)</label>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Auto-scan Settings
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Technology Detection -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-stack-line mr-2"></i>Technology Detection
+                            </h3>
+                            <form id="tech-detection-form" class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="tech-detection-enabled" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="tech-detection-enabled" class="ml-2 block text-sm text-gray-700">Enable technology detection</label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Detection Tools</label>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="wappalyzer" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            <label for="wappalyzer" class="ml-2 block text-sm text-gray-700">Wappalyzer</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="httpx" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            <label for="httpx" class="ml-2 block text-sm text-gray-700">httpx</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="nuclei-tech" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            <label for="nuclei-tech" class="ml-2 block text-sm text-gray-700">Nuclei (tech detection)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Update Frequency</label>
+                                    <select id="tech-update-frequency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly" selected>Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Technology Settings
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Scan Performance -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-speed-line mr-2"></i>Scan Performance
+                            </h3>
+                            <form id="performance-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Concurrent Scans</label>
+                                    <input type="range" id="concurrent-scans" min="1" max="10" value="3"
+                                           class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                        <span>1</span>
+                                        <span id="concurrent-value">3</span>
+                                        <span>10</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Timeout (seconds)</label>
+                                    <input type="number" id="scan-timeout" value="300" min="60" max="3600"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Rate Limit (requests/sec)</label>
+                                    <input type="number" id="rate-limit" value="100" min="10" max="1000"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Performance Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications Tab -->
+                <div id="notifications-tab" class="tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Email Notifications -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-mail-line mr-2"></i>Email Notifications
+                            </h3>
+                            <form id="email-notifications-form" class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="email-enabled" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="email-enabled" class="ml-2 block text-sm text-gray-700">Enable email notifications</label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Notification Email</label>
+                                    <input type="email" id="notification-email" value="{{ current_user.email }}"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Additional Recipients</label>
+                                    <textarea id="additional-emails" rows="3" placeholder="email1@example.com, email2@example.com"
+                                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Digest Frequency</label>
+                                    <select id="digest-frequency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="immediate">Immediate</option>
+                                        <option value="hourly">Hourly</option>
+                                        <option value="daily" selected>Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Email Settings
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Alert Thresholds -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-alarm-warning-line mr-2"></i>Alert Severity Thresholds
+                            </h3>
+                            <form id="alert-thresholds-form" class="space-y-4">
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="critical-alerts" checked class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                                            <label for="critical-alerts" class="ml-2 block text-sm text-gray-700">Critical</label>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Immediate</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="high-alerts" checked class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded">
+                                            <label for="high-alerts" class="ml-2 block text-sm text-gray-700">High</label>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">Immediate</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="medium-alerts" checked class="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded">
+                                            <label for="medium-alerts" class="ml-2 block text-sm text-gray-700">Medium</label>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Daily</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="low-alerts" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            <label for="low-alerts" class="ml-2 block text-sm text-gray-700">Low</label>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">Weekly</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="info-alerts" class="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded">
+                                            <label for="info-alerts" class="ml-2 block text-sm text-gray-700">Info</label>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">Weekly</span>
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Alert Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Tab -->
+                <div id="users-tab" class="tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- User Management -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-user-settings-line mr-2"></i>User Management
+                            </h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                                            <i class="ri-user-line text-white text-sm"></i>
+                                        </div>
+                                        <div class="ml-3">
+                                            <p class="text-sm font-medium text-gray-900">{{ current_user.username }}</p>
+                                            <p class="text-xs text-gray-500">{{ current_user.email }}</p>
+                                        </div>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Owner</span>
+                                </div>
+                                <button class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="ri-user-add-line mr-2"></i>Invite Team Member
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Permissions -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-shield-user-line mr-2"></i>Default Permissions
+                            </h3>
+                            <form id="permissions-form" class="space-y-4">
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <label class="text-sm text-gray-700">View Assets</label>
+                                        <input type="checkbox" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <label class="text-sm text-gray-700">Add Assets</label>
+                                        <input type="checkbox" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <label class="text-sm text-gray-700">Run Scans</label>
+                                        <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <label class="text-sm text-gray-700">View Reports</label>
+                                        <input type="checkbox" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <label class="text-sm text-gray-700">Manage Settings</label>
+                                        <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Permissions
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Activity Logs -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-history-line mr-2"></i>Recent Activity
+                            </h3>
+                            <div class="space-y-3 max-h-64 overflow-y-auto">
+                                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                        <i class="ri-login-circle-line text-green-600 text-sm"></i>
+                                    </div>
+                                    <div class="ml-3 flex-1">
+                                        <p class="text-sm text-gray-900">User logged in</p>
+                                        <p class="text-xs text-gray-500">{{ current_user.username }} • Just now</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <i class="ri-settings-line text-blue-600 text-sm"></i>
+                                    </div>
+                                    <div class="ml-3 flex-1">
+                                        <p class="text-sm text-gray-900">Settings accessed</p>
+                                        <p class="text-xs text-gray-500">{{ current_user.username }} • 2 minutes ago</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Management Tab -->
+                <div id="data-tab" class="tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Data Retention -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-time-line mr-2"></i>Data Retention Policies
+                            </h3>
+                            <form id="retention-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Scan Results Retention</label>
+                                    <select id="scan-retention" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="30">30 days</option>
+                                        <option value="90" selected>90 days</option>
+                                        <option value="180">6 months</option>
+                                        <option value="365">1 year</option>
+                                        <option value="0">Never delete</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Vulnerability Data Retention</label>
+                                    <select id="vuln-retention" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="90">90 days</option>
+                                        <option value="180">6 months</option>
+                                        <option value="365" selected>1 year</option>
+                                        <option value="730">2 years</option>
+                                        <option value="0">Never delete</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Alert History Retention</label>
+                                    <select id="alert-retention" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="30">30 days</option>
+                                        <option value="90" selected>90 days</option>
+                                        <option value="180">6 months</option>
+                                        <option value="365">1 year</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Retention Policies
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Export/Import -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-download-cloud-line mr-2"></i>Export/Import Data
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Export Data</label>
+                                    <div class="space-y-2">
+                                        <button class="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                                            <i class="ri-file-excel-line mr-2"></i>Export to CSV
+                                        </button>
+                                        <button class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                            <i class="ri-file-code-line mr-2"></i>Export to JSON
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Import Data</label>
+                                    <input type="file" id="import-file" accept=".csv,.json"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <button class="w-full mt-2 bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 transition-colors">
+                                        <i class="ri-upload-cloud-line mr-2"></i>Import Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Database Backup -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-database-2-line mr-2"></i>Database Backup
+                            </h3>
+                            <form id="backup-form" class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="auto-backup" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="auto-backup" class="ml-2 block text-sm text-gray-700">Enable automatic backups</label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Backup Frequency</label>
+                                    <select id="backup-frequency" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="daily" selected>Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Backup Retention</label>
+                                    <select id="backup-retention" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="7">7 days</option>
+                                        <option value="30" selected>30 days</option>
+                                        <option value="90">90 days</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors">
+                                    <i class="ri-download-line mr-2"></i>Create Backup Now
+                                </button>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Backup Settings
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Asset Cleanup -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-delete-bin-line mr-2"></i>Asset Cleanup Rules
+                            </h3>
+                            <form id="cleanup-form" class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="auto-cleanup" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="auto-cleanup" class="ml-2 block text-sm text-gray-700">Enable automatic cleanup</label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Remove inactive assets after</label>
+                                    <select id="inactive-threshold" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="30">30 days</option>
+                                        <option value="90" selected>90 days</option>
+                                        <option value="180">6 months</option>
+                                        <option value="365">1 year</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="cleanup-resolved" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="cleanup-resolved" class="ml-2 block text-sm text-gray-700">Remove resolved vulnerabilities after 90 days</label>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Cleanup Rules
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Integrations Tab -->
+                <div id="integrations-tab" class="tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- API Settings -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-code-line mr-2"></i>API Configuration
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+                                    <div class="flex">
+                                        <input type="password" id="api-key" value="sk-1234567890abcdef" readonly
+                                               class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <button type="button" onclick="toggleApiKey()" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg hover:bg-gray-200">
+                                            <i class="ri-eye-line"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                        <i class="ri-refresh-line mr-2"></i>Regenerate
+                                    </button>
+                                    <button class="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
+                                        <i class="ri-file-copy-line mr-2"></i>Copy
+                                    </button>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Rate Limit</label>
+                                    <select id="api-rate-limit" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="100">100 requests/hour</option>
+                                        <option value="500" selected>500 requests/hour</option>
+                                        <option value="1000">1000 requests/hour</option>
+                                        <option value="unlimited">Unlimited</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Webhook Settings -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-webhook-line mr-2"></i>Webhook Configuration
+                            </h3>
+                            <form id="webhook-form" class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="webhooks-enabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                    <label for="webhooks-enabled" class="ml-2 block text-sm text-gray-700">Enable webhooks</label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Webhook URL</label>
+                                    <input type="url" id="webhook-url" placeholder="https://your-app.com/webhook"
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Events</label>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="webhook-new-vuln" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            <label for="webhook-new-vuln" class="ml-2 block text-sm text-gray-700">New vulnerability discovered</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="webhook-scan-complete" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            <label for="webhook-scan-complete" class="ml-2 block text-sm text-gray-700">Scan completed</label>
+                                        </div>
+                                        <div class="flex items-center">
+                                            <input type="checkbox" id="webhook-new-asset" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                            <label for="webhook-new-asset" class="ml-2 block text-sm text-gray-700">New asset discovered</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Save Webhook Settings
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Third-party Integrations -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6 lg:col-span-2">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-links-line mr-2"></i>Third-party Integrations
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="p-4 border border-gray-200 rounded-lg">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center">
+                                            <i class="ri-slack-line text-2xl text-purple-600 mr-3"></i>
+                                            <span class="font-medium">Slack</span>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">Not Connected</span>
+                                    </div>
+                                    <button class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors">
+                                        Connect
+                                    </button>
+                                </div>
+                                <div class="p-4 border border-gray-200 rounded-lg">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center">
+                                            <i class="ri-microsoft-line text-2xl text-blue-600 mr-3"></i>
+                                            <span class="font-medium">Teams</span>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded-full">Not Connected</span>
+                                    </div>
+                                    <button class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                        Connect
+                                    </button>
+                                </div>
+                                <div class="p-4 border border-gray-200 rounded-lg">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center">
+                                            <i class="ri-mail-line text-2xl text-red-600 mr-3"></i>
+                                            <span class="font-medium">Email</span>
+                                        </div>
+                                        <span class="px-2 py-1 text-xs bg-green-100 text-green-600 rounded-full">Connected</span>
+                                    </div>
+                                    <button class="w-full bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors">
+                                        Configure
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Licensing Tab -->
+                <div id="licensing-tab" class="tab-content hidden">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Current Plan -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-vip-crown-line mr-2"></i>Current Plan
+                            </h3>
+                            <div class="space-y-4">
+                                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h4 class="text-lg font-semibold text-blue-900">Professional</h4>
+                                        <span class="px-3 py-1 bg-blue-600 text-white text-sm rounded-full">Active</span>
+                                    </div>
+                                    <p class="text-blue-700 text-sm mb-3">Advanced attack surface monitoring with unlimited scans</p>
+                                    <div class="text-2xl font-bold text-blue-900">$99<span class="text-sm font-normal">/month</span></div>
+                                </div>
+                                <div class="space-y-2">
+                                    <div class="flex items-center text-sm text-gray-600">
+                                        <i class="ri-check-line text-green-500 mr-2"></i>
+                                        Unlimited assets
+                                    </div>
+                                    <div class="flex items-center text-sm text-gray-600">
+                                        <i class="ri-check-line text-green-500 mr-2"></i>
+                                        Advanced vulnerability scanning
+                                    </div>
+                                    <div class="flex items-center text-sm text-gray-600">
+                                        <i class="ri-check-line text-green-500 mr-2"></i>
+                                        API access
+                                    </div>
+                                    <div class="flex items-center text-sm text-gray-600">
+                                        <i class="ri-check-line text-green-500 mr-2"></i>
+                                        Priority support
+                                    </div>
+                                </div>
+                                <button class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                                    Manage Subscription
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Usage Statistics -->
+                        <div class="card bg-white rounded shadow-sm border border-gray-100 p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="ri-bar-chart-line mr-2"></i>Usage Statistics
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">Assets</span>
+                                        <span class="text-gray-900">{{ user_count or 0 }}/Unlimited</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-blue-500 h-2 rounded-full" style="width: 15%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">API Calls (this month)</span>
+                                        <span class="text-gray-900">1,247/Unlimited</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-green-500 h-2 rounded-full" style="width: 25%"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">Scans (this month)</span>
+                                        <span class="text-gray-900">89/Unlimited</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                        <div class="bg-purple-500 h-2 rounded-full" style="width: 18%"></div>
+                                    </div>
+                                </div>
+                                <div class="pt-4 border-t border-gray-200">
+                                    <p class="text-sm text-gray-600">Next billing date: <span class="font-medium text-gray-900">March 15, 2024</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let sidebarExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    initializeSidebar();
+    initializeTabSwitching();
+    initializeFormHandlers();
+    initializeSliders();
+
+    // Add click events to navigation items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            const section = this.getAttribute('data-section');
+            if (section === 'dashboard') {
+                window.location.href = '/dashboard';
+            } else if (section === 'assets') {
+                window.location.href = '/assets';
+            } else if (section === 'vulnerabilities') {
+                window.location.href = '/vulnerabilities';
+            } else if (section === 'alerts') {
+                window.location.href = '/alerts';
+            } else if (section === 'reports') {
+                window.location.href = '/reports';
+            }
+        });
+    });
+});
+
+// Sidebar functionality
+function initializeSidebar() {
+    if (sidebarExpanded) {
+        expandSidebar();
+    } else {
+        collapseSidebar();
+    }
+
+    document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+}
+
+function expandSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleIcon = document.querySelector('#sidebar-toggle i');
+    const toggleText = document.getElementById('toggle-text');
+
+    sidebar.classList.remove('w-16');
+    sidebar.classList.add('w-64');
+
+    setTimeout(() => {
+        logoText.classList.remove('opacity-0');
+        logoText.classList.add('opacity-100');
+        navTexts.forEach(text => {
+            text.classList.remove('opacity-0');
+            text.classList.add('opacity-100');
+        });
+    }, 150);
+
+    toggleIcon.classList.remove('ri-menu-line');
+    toggleIcon.classList.add('ri-menu-fold-line');
+    toggleText.textContent = 'Collapse';
+
+    sidebarExpanded = true;
+    localStorage.setItem('sidebarExpanded', 'true');
+}
+
+function collapseSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoText = document.getElementById('logo-text');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleIcon = document.querySelector('#sidebar-toggle i');
+    const toggleText = document.getElementById('toggle-text');
+
+    logoText.classList.remove('opacity-100');
+    logoText.classList.add('opacity-0');
+    navTexts.forEach(text => {
+        text.classList.remove('opacity-100');
+        text.classList.add('opacity-0');
+    });
+
+    setTimeout(() => {
+        sidebar.classList.remove('w-64');
+        sidebar.classList.add('w-16');
+    }, 150);
+
+    toggleIcon.classList.remove('ri-menu-fold-line');
+    toggleIcon.classList.add('ri-menu-line');
+    toggleText.textContent = 'Expand';
+
+    sidebarExpanded = false;
+    localStorage.setItem('sidebarExpanded', 'false');
+}
+
+function toggleSidebar() {
+    if (sidebarExpanded) {
+        collapseSidebar();
+    } else {
+        expandSidebar();
+    }
+}
+
+function toggleUserMenu() {
+    const menu = document.getElementById('userMenu');
+    menu.classList.toggle('hidden');
+}
+
+// Close user menu when clicking outside
+document.addEventListener('click', function(event) {
+    const menu = document.getElementById('userMenu');
+    const button = event.target.closest('button');
+    if (!button || !button.onclick) {
+        menu.classList.add('hidden');
+    }
+});
+
+// Tab switching functionality
+function initializeTabSwitching() {
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            switchTab(tabName);
+        });
+    });
+}
+
+function switchTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.classList.remove('active', 'border-blue-500', 'text-blue-600');
+        tab.classList.add('border-transparent', 'text-gray-500');
+    });
+
+    const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
+    if (activeTab) {
+        activeTab.classList.add('active', 'border-blue-500', 'text-blue-600');
+        activeTab.classList.remove('border-transparent', 'text-gray-500');
+    }
+
+    // Show/hide tab content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+    });
+
+    const activeContent = document.getElementById(`${tabName}-tab`);
+    if (activeContent) {
+        activeContent.classList.remove('hidden');
+    }
+}
+
+// Form handlers
+function initializeFormHandlers() {
+    // Organization form
+    document.getElementById('organization-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveOrganizationSettings();
+    });
+
+    // Interface form
+    document.getElementById('interface-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveInterfaceSettings();
+    });
+
+    // Auto-scan form
+    document.getElementById('autoscan-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveAutoscanSettings();
+    });
+
+    // Add more form handlers as needed
+}
+
+// Slider functionality
+function initializeSliders() {
+    const concurrentSlider = document.getElementById('concurrent-scans');
+    const concurrentValue = document.getElementById('concurrent-value');
+
+    if (concurrentSlider && concurrentValue) {
+        concurrentSlider.addEventListener('input', function() {
+            concurrentValue.textContent = this.value;
+        });
+    }
+}
+
+// Settings save functions
+function saveOrganizationSettings() {
+    const orgName = document.getElementById('org-name').value;
+    const primaryDomain = document.getElementById('primary-domain').value;
+    const orgDescription = document.getElementById('org-description').value;
+
+    // Show success message
+    showNotification('Organization settings saved successfully!', 'success');
+}
+
+function saveInterfaceSettings() {
+    const defaultView = document.getElementById('default-view').value;
+    const theme = document.getElementById('theme').value;
+    const itemsPerPage = document.getElementById('items-per-page').value;
+    const sidebarExpanded = document.getElementById('sidebar-expanded').checked;
+
+    // Save to localStorage
+    localStorage.setItem('defaultView', defaultView);
+    localStorage.setItem('theme', theme);
+    localStorage.setItem('itemsPerPage', itemsPerPage);
+    localStorage.setItem('sidebarExpanded', sidebarExpanded);
+
+    showNotification('Interface preferences saved successfully!', 'success');
+}
+
+function saveAutoscanSettings() {
+    const autoScanEnabled = document.getElementById('auto-scan-enabled').checked;
+    const scanFrequency = document.getElementById('scan-frequency').value;
+    const scanTime = document.getElementById('scan-time').value;
+    const deepScan = document.getElementById('deep-scan').checked;
+
+    showNotification('Auto-scan settings saved successfully!', 'success');
+}
+
+// Utility functions
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+        type === 'success' ? 'bg-green-100 text-green-700 border border-green-300' :
+        type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' :
+        'bg-blue-100 text-blue-700 border border-blue-300'
+    }`;
+
+    notification.innerHTML = `
+        <div class="flex items-center justify-between">
+            <span>${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-lg font-bold">&times;</button>
+        </div>
+    `;
+
+    document.body.appendChild(notification);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+function toggleApiKey() {
+    const apiKeyInput = document.getElementById('api-key');
+    const eyeIcon = document.querySelector('#api-key').nextElementSibling.querySelector('i');
+
+    if (apiKeyInput.type === 'password') {
+        apiKeyInput.type = 'text';
+        eyeIcon.classList.remove('ri-eye-line');
+        eyeIcon.classList.add('ri-eye-off-line');
+    } else {
+        apiKeyInput.type = 'password';
+        eyeIcon.classList.remove('ri-eye-off-line');
+        eyeIcon.classList.add('ri-eye-line');
+    }
+}
+</script>
+{% endblock %}

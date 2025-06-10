@@ -159,6 +159,22 @@ def create_app(config_name=None):
         """Large-scale scanning page with Celery background tasks"""
         return render_template('large_scale_scanning.html')
 
+    @app.route('/settings')
+    @login_required
+    def settings():
+        """Settings and configuration page"""
+        org = Organization.query.filter_by(user_id=current_user.id).first()
+        if not org:
+            flash('Organization not found', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Get current user count for the organization
+        user_count = User.query.join(Organization).filter(Organization.id == org.id).count()
+
+        return render_template('settings.html',
+                             organization=org,
+                             user_count=user_count)
+
     @app.route('/assets')
     @login_required
     def assets():

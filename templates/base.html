@@ -2,14 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>{% block title %}Attack Surface Monitoring{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com/3.4.16"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: { primary: "#3b82f6", secondary: "#64748b" },
+                    colors: { primary: "#4ade80", secondary: "#6366f1" },
                     borderRadius: {
                         none: "0px",
                         sm: "4px",
@@ -36,24 +38,56 @@
         :where([class^="ri-"])::before { content: "\f3c2"; }
 
         body {
+            background-color: #0f172a;
+            color: #f8fafc;
             font-family: 'Inter', sans-serif;
-            background-color: #f9fafb;
         }
 
         .sidebar-icon {
-            transition: all 0.2s ease;
+            transition: all 0.2s;
         }
 
         .sidebar-icon:hover {
-            background-color: rgba(59, 130, 246, 0.1);
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-icon.active {
+            border-left: 3px solid #4ade80;
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .wave-bg {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='rgba(255, 255, 255, 0.05)' fill-opacity='1' d='M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,250.7C672,235,768,181,864,181.3C960,181,1056,235,1152,234.7C1248,235,1344,181,1392,154.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+            background-size: cover;
+            background-position: bottom;
+            background-repeat: no-repeat;
         }
 
         .card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
             transition: all 0.3s ease;
         }
 
         .card:hover {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-circle {
+            stroke-dasharray: 283;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
 
         input[type="search"]::-webkit-search-decoration,
@@ -70,7 +104,6 @@
         /* Sidebar specific styles */
         #sidebar {
             min-height: 100vh;
-            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
         }
 
         .nav-item {
@@ -83,8 +116,13 @@
         }
 
         .nav-item.active {
-            background-color: rgba(59, 130, 246, 0.2);
-            border-left: 3px solid #3b82f6;
+            background-color: rgba(74, 222, 128, 0.2);
+            border-left: 3px solid #4ade80;
+        }
+
+        /* Dark theme nav item hover */
+        .nav-item:hover {
+            background-color: rgba(71, 85, 105, 0.5);
         }
 
         .nav-text {
@@ -111,7 +149,7 @@
         }
 
         #sidebar::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.1);
+            background: rgba(30, 41, 59, 0.3);
         }
 
         #sidebar::-webkit-scrollbar-thumb {
@@ -130,8 +168,8 @@
             left: 100%;
             top: 50%;
             transform: translateY(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
+            background: rgba(30, 41, 59, 0.95);
+            color: #f8fafc;
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 14px;
@@ -141,6 +179,7 @@
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s ease-in-out;
+            border: 1px solid rgba(74, 222, 128, 0.3);
         }
 
         /* Only show tooltips when sidebar is collapsed */
@@ -162,6 +201,198 @@
             justify-content: center;
             font-size: 11px;
             font-weight: 600;
+        }
+
+        /* Mobile-first responsive design */
+
+        /* Touch targets for mobile */
+        .touch-target {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        /* Mobile sidebar overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Mobile sidebar positioning */
+        @media (max-width: 768px) {
+            #sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                z-index: 50;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                width: 280px !important;
+                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+            }
+
+            #sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            #sidebar .nav-text {
+                opacity: 1 !important;
+            }
+
+            /* Mobile header adjustments */
+            .mobile-header {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            /* Mobile menu button */
+            .mobile-menu-btn {
+                display: block;
+                width: 44px;
+                height: 44px;
+                background: rgba(30, 41, 59, 0.8);
+                border: 1px solid rgba(74, 222, 128, 0.3);
+                border-radius: 8px;
+                color: #4ade80;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .mobile-menu-btn:hover {
+                background: rgba(30, 41, 59, 1);
+                border-color: #4ade80;
+            }
+
+            /* Hide desktop toggle on mobile */
+            #sidebar-toggle {
+                display: none;
+            }
+
+            /* Mobile card adjustments */
+            .card {
+                margin-bottom: 1rem;
+            }
+
+            /* Mobile grid adjustments */
+            .mobile-grid-1 {
+                grid-template-columns: 1fr;
+            }
+
+            .mobile-grid-2 {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem;
+            }
+
+            /* Mobile text sizing */
+            .mobile-text-sm {
+                font-size: 0.875rem;
+            }
+
+            .mobile-text-xs {
+                font-size: 0.75rem;
+            }
+
+            /* Mobile padding adjustments */
+            .mobile-p-4 {
+                padding: 1rem;
+            }
+
+            .mobile-p-6 {
+                padding: 1.5rem;
+            }
+
+            /* Mobile chart height */
+            .mobile-chart-sm {
+                height: 200px;
+            }
+
+            .mobile-chart-md {
+                height: 250px;
+            }
+        }
+
+        /* Tablet styles */
+        @media (min-width: 768px) and (max-width: 1024px) {
+            .tablet-grid-2 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .tablet-grid-3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            /* Tablet sidebar auto-collapse */
+            #sidebar {
+                width: 4rem;
+            }
+
+            #sidebar .nav-text {
+                opacity: 0;
+            }
+
+            .mobile-menu-btn {
+                display: none;
+            }
+        }
+
+        /* Desktop styles */
+        @media (min-width: 1024px) {
+            .mobile-menu-btn {
+                display: none;
+            }
+
+            /* Large screen optimizations */
+            @media (min-width: 1440px) {
+                .container {
+                    max-width: 1400px;
+                    margin: 0 auto;
+                }
+            }
+
+            @media (min-width: 1920px) {
+                .container {
+                    max-width: 1800px;
+                }
+            }
+        }
+
+        /* Chart responsiveness */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Responsive text scaling */
+        @media (max-width: 480px) {
+            .responsive-text-lg {
+                font-size: 1.125rem;
+            }
+
+            .responsive-text-xl {
+                font-size: 1.25rem;
+            }
+
+            .responsive-text-2xl {
+                font-size: 1.5rem;
+            }
+
+            .responsive-text-4xl {
+                font-size: 2rem;
+            }
         }
     </style>
     {% block extra_head %}{% endblock %}
