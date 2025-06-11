@@ -7,6 +7,12 @@ import enum
 db = SQLAlchemy()
 bcrypt = Bcrypt()
 
+class UserRole(enum.Enum):
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
+    VIEWER = "viewer"
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -14,29 +20,37 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
-    
+    is_email_verified = db.Column(db.Boolean, default=False)
+
     # Relationships
     organizations = db.relationship('Organization', backref='owner', lazy=True)
-    
+    organization_memberships = db.relationship('OrganizationUser', backref='user', lazy=True)
+    invitations = db.relationship('UserInvitation', backref='user', lazy=True)
+
     def set_password(self, password):
         self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
-    
+
     def check_password(self, password):
         return bcrypt.check_password_hash(self.password_hash, password)
-    
+
     def __repr__(self):
         return f'<User {self.username}>'
 
 class Organization(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    primary_domain = db.Column(db.String(255))
+    description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Note: updated_at column will be added manually if needed
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     # Relationships
     assets = db.relationship('Asset', backref='organization', lazy=True, cascade='all, delete-orphan')
     vulnerabilities = db.relationship('Vulnerability', backref='organization', lazy=True, cascade='all, delete-orphan')
     alerts = db.relationship('Alert', backref='organization', lazy=True, cascade='all, delete-orphan')
+    users = db.relationship('OrganizationUser', backref='organization', lazy=True, cascade='all, delete-orphan')
+    email_config = db.relationship('EmailConfiguration', backref='organization', uselist=False, cascade='all, delete-orphan')
 
 class AssetType(enum.Enum):
     DOMAIN = "domain"
@@ -119,7 +133,123 @@ class ScanResult(db.Model):
     completed_at = db.Column(db.DateTime)
     status = db.Column(db.String(20), default='running')  # running, completed, failed
     results = db.Column(db.JSON)
-    
+
     # Foreign keys
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=True)
+
+class OrganizationUser(db.Model):
+    """Many-to-many relationship between users and organizations with roles"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
+    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.MEMBER)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True)
+
+    # Permissions
+    can_view_assets = db.Column(db.Boolean, default=True)
+    can_add_assets = db.Column(db.Boolean, default=True)
+    can_run_scans = db.Column(db.Boolean, default=False)
+    can_view_reports = db.Column(db.Boolean, default=True)
+    can_manage_settings = db.Column(db.Boolean, default=False)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'organization_id'),)
+
+class UserInvitation(db.Model):
+    """User invitations for organizations"""
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), nullable=False)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
+    invited_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.MEMBER)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    accepted_at = db.Column(db.DateTime)
+    is_accepted = db.Column(db.Boolean, default=False)
+
+    # Permissions for the invited user
+    can_view_assets = db.Column(db.Boolean, default=True)
+    can_add_assets = db.Column(db.Boolean, default=True)
+    can_run_scans = db.Column(db.Boolean, default=False)
+    can_view_reports = db.Column(db.Boolean, default=True)
+    can_manage_settings = db.Column(db.Boolean, default=False)
+
+    # Relationships
+    invited_by = db.relationship('User', foreign_keys=[invited_by_id], overlaps="invitations,user")
+    organization = db.relationship('Organization')
+
+class EmailConfiguration(db.Model):
+    """Email configuration for organizations"""
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
+
+    # SMTP Configuration
+    smtp_host = db.Column(db.String(255))
+    smtp_port = db.Column(db.Integer, default=587)
+    smtp_username = db.Column(db.String(255))
+    smtp_password = db.Column(db.String(255))  # Should be encrypted
+    smtp_use_tls = db.Column(db.Boolean, default=True)
+    smtp_use_ssl = db.Column(db.Boolean, default=False)
+
+    # Email Settings
+    from_email = db.Column(db.String(255))
+    from_name = db.Column(db.String(255))
+    reply_to = db.Column(db.String(255))
+
+    # Configuration status
+    is_configured = db.Column(db.Boolean, default=False)
+    is_verified = db.Column(db.Boolean, default=False)
+    last_test_at = db.Column(db.DateTime)
+    last_test_status = db.Column(db.String(50))  # success, failed
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class EmailTemplate(db.Model):
+    """Email templates for different event types"""
+    id = db.Column(db.Integer, primary_key=True)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
+
+    # Template details
+    name = db.Column(db.String(100), nullable=False)
+    event_type = db.Column(db.String(50), nullable=False)  # invitation, alert, report, scan_complete
+    subject = db.Column(db.String(255), nullable=False)
+    body_html = db.Column(db.Text)
+    body_text = db.Column(db.Text)
+
+    # Template status
+    is_active = db.Column(db.Boolean, default=True)
+    is_default = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    organization = db.relationship('Organization')
+
+class EmailNotificationSettings(db.Model):
+    """Email notification preferences for users"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
+
+    # Notification preferences
+    notify_new_vulnerabilities = db.Column(db.Boolean, default=True)
+    notify_scan_completion = db.Column(db.Boolean, default=True)
+    notify_new_assets = db.Column(db.Boolean, default=False)
+    notify_user_activity = db.Column(db.Boolean, default=False)
+    notify_reports = db.Column(db.Boolean, default=True)
+
+    # Digest settings
+    digest_frequency = db.Column(db.String(20), default='daily')  # immediate, hourly, daily, weekly
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = db.relationship('User')
+    organization = db.relationship('Organization')
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'organization_id'),)

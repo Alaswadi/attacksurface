@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_migrate import Migrate
 from config import config
-from models import db, User, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, AlertType
+from models import db, User, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, AlertType, OrganizationUser, UserInvitation, EmailConfiguration, EmailTemplate, EmailNotificationSettings
 from sqlalchemy import or_
 from forms import LoginForm, RegisterForm
 import os

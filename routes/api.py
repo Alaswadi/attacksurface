@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, make_response, Response
 from flask_login import login_required, current_user
-from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, User
+from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, User, OrganizationUser, UserInvitation, EmailConfiguration
 from datetime import datetime, timedelta
 import json
 import uuid
@@ -1714,9 +1714,10 @@ def organization_settings():
         try:
             if 'name' in data:
                 org.name = data['name']
-
-            # Note: primary_domain and description would need to be added to the Organization model
-            # For now, we'll just update the name
+            if 'primary_domain' in data:
+                org.primary_domain = data['primary_domain']
+            if 'description' in data:
+                org.description = data['description']
 
             db.session.commit()
             return jsonify({'success': True, 'message': 'Organization settings updated successfully'})
@@ -1914,3 +1915,309 @@ def regenerate_api_key():
 
     except Exception as e:
         return jsonify({'error': f'Failed to regenerate API key: {str(e)}'}), 500
+
+# User Management API Endpoints
+@api_bp.route('/settings/users', methods=['GET'])
+@login_required
+def get_organization_users():
+    """Get all users in the organization"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    try:
+        # Get organization members
+        members = db.session.query(User, OrganizationUser).join(
+            OrganizationUser, User.id == OrganizationUser.user_id
+        ).filter(OrganizationUser.organization_id == org.id).all()
+
+        users_data = []
+        for user, membership in members:
+            users_data.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': membership.role.value,
+                'joined_at': membership.joined_at.isoformat(),
+                'is_active': membership.is_active,
+                'permissions': {
+                    'can_view_assets': membership.can_view_assets,
+                    'can_add_assets': membership.can_add_assets,
+                    'can_run_scans': membership.can_run_scans,
+                    'can_view_reports': membership.can_view_reports,
+                    'can_manage_settings': membership.can_manage_settings
+                }
+            })
+
+        # Get pending invitations
+        pending_invitations = UserInvitation.query.filter_by(
+            organization_id=org.id,
+            is_accepted=False
+        ).all()
+
+        invitations_data = []
+        for invitation in pending_invitations:
+            invitations_data.append({
+                'id': invitation.id,
+                'email': invitation.email,
+                'role': invitation.role.value,
+                'created_at': invitation.created_at.isoformat(),
+                'expires_at': invitation.expires_at.isoformat(),
+                'invited_by': invitation.invited_by.username
+            })
+
+        return jsonify({
+            'users': users_data,
+            'pending_invitations': invitations_data
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to get users: {str(e)}'}), 500
+
+@api_bp.route('/settings/users/invite', methods=['POST'])
+@login_required
+def invite_user():
+    """Invite a user to the organization"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    try:
+        from services.email_service import EmailService, generate_invitation_token
+        from models import UserInvitation, UserRole
+        from datetime import timedelta
+
+        # Validate required fields
+        email = data.get('email')
+        role = data.get('role', 'member')
+
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+
+        # Check if user already exists and is a member
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            existing_membership = OrganizationUser.query.filter_by(
+                user_id=existing_user.id,
+                organization_id=org.id
+            ).first()
+            if existing_membership:
+                return jsonify({'error': 'User is already a member of this organization'}), 400
+
+        # Check for pending invitation
+        pending_invitation = UserInvitation.query.filter_by(
+            email=email,
+            organization_id=org.id,
+            is_accepted=False
+        ).first()
+        if pending_invitation:
+            return jsonify({'error': 'An invitation has already been sent to this email'}), 400
+
+        # Create invitation
+        invitation = UserInvitation(
+            email=email,
+            organization_id=org.id,
+            invited_by_id=current_user.id,
+            role=UserRole(role),
+            token=generate_invitation_token(),
+            expires_at=datetime.utcnow() + timedelta(days=7),
+            can_view_assets=data.get('can_view_assets', True),
+            can_add_assets=data.get('can_add_assets', True),
+            can_run_scans=data.get('can_run_scans', False),
+            can_view_reports=data.get('can_view_reports', True),
+            can_manage_settings=data.get('can_manage_settings', False)
+        )
+
+        db.session.add(invitation)
+        db.session.commit()
+
+        # Send invitation email
+        email_service = EmailService(org.id)
+        if email_service.is_configured():
+            result = email_service.send_user_invitation(invitation)
+            if not result['success']:
+                return jsonify({'error': f'Failed to send invitation email: {result["error"]}'}), 500
+
+        return jsonify({
+            'success': True,
+            'message': 'User invitation sent successfully',
+            'invitation_id': invitation.id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to invite user: {str(e)}'}), 500
+
+@api_bp.route('/settings/users/<int:user_id>', methods=['PUT', 'DELETE'])
+@login_required
+def manage_user(user_id):
+    """Update or remove a user from the organization"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    membership = OrganizationUser.query.filter_by(
+        user_id=user_id,
+        organization_id=org.id
+    ).first()
+
+    if not membership:
+        return jsonify({'error': 'User not found in organization'}), 404
+
+    if request.method == 'PUT':
+        # Update user permissions
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        try:
+            if 'role' in data:
+                membership.role = UserRole(data['role'])
+            if 'can_view_assets' in data:
+                membership.can_view_assets = data['can_view_assets']
+            if 'can_add_assets' in data:
+                membership.can_add_assets = data['can_add_assets']
+            if 'can_run_scans' in data:
+                membership.can_run_scans = data['can_run_scans']
+            if 'can_view_reports' in data:
+                membership.can_view_reports = data['can_view_reports']
+            if 'can_manage_settings' in data:
+                membership.can_manage_settings = data['can_manage_settings']
+            if 'is_active' in data:
+                membership.is_active = data['is_active']
+
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'User updated successfully'})
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to update user: {str(e)}'}), 500
+
+    elif request.method == 'DELETE':
+        # Remove user from organization
+        try:
+            db.session.delete(membership)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'User removed from organization'})
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to remove user: {str(e)}'}), 500
+
+# Email Configuration API Endpoints
+@api_bp.route('/settings/email/config', methods=['GET', 'POST'])
+@login_required
+def email_configuration():
+    """Get or update email configuration"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    if request.method == 'GET':
+        config = EmailConfiguration.query.filter_by(organization_id=org.id).first()
+        if not config:
+            return jsonify({
+                'is_configured': False,
+                'is_verified': False
+            })
+
+        return jsonify({
+            'is_configured': config.is_configured,
+            'is_verified': config.is_verified,
+            'smtp_host': config.smtp_host,
+            'smtp_port': config.smtp_port,
+            'smtp_username': config.smtp_username,
+            'smtp_use_tls': config.smtp_use_tls,
+            'smtp_use_ssl': config.smtp_use_ssl,
+            'from_email': config.from_email,
+            'from_name': config.from_name,
+            'reply_to': config.reply_to,
+            'last_test_at': config.last_test_at.isoformat() if config.last_test_at else None,
+            'last_test_status': config.last_test_status
+        })
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        try:
+            config = EmailConfiguration.query.filter_by(organization_id=org.id).first()
+            if not config:
+                config = EmailConfiguration(organization_id=org.id)
+                db.session.add(config)
+
+            # Update configuration
+            config.smtp_host = data.get('smtp_host', config.smtp_host)
+            config.smtp_port = data.get('smtp_port', config.smtp_port)
+            config.smtp_username = data.get('smtp_username', config.smtp_username)
+            if 'smtp_password' in data and data['smtp_password']:
+                config.smtp_password = data['smtp_password']  # In production, encrypt this
+            config.smtp_use_tls = data.get('smtp_use_tls', config.smtp_use_tls)
+            config.smtp_use_ssl = data.get('smtp_use_ssl', config.smtp_use_ssl)
+            config.from_email = data.get('from_email', config.from_email)
+            config.from_name = data.get('from_name', config.from_name)
+            config.reply_to = data.get('reply_to', config.reply_to)
+
+            # Mark as configured if all required fields are present
+            config.is_configured = all([
+                config.smtp_host,
+                config.smtp_port,
+                config.smtp_username,
+                config.smtp_password,
+                config.from_email
+            ])
+
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Email configuration saved successfully',
+                'is_configured': config.is_configured
+            })
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to save email configuration: {str(e)}'}), 500
+
+@api_bp.route('/settings/email/test', methods=['POST'])
+@login_required
+def test_email_configuration():
+    """Test email configuration"""
+    org = Organization.query.filter_by(user_id=current_user.id).first()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    data = request.get_json()
+    if not data or 'test_email' not in data:
+        return jsonify({'error': 'Test email address is required'}), 400
+
+    try:
+        from services.email_service import EmailService
+
+        email_service = EmailService(org.id)
+        if not email_service.is_configured():
+            return jsonify({'error': 'Email not configured'}), 400
+
+        # Test connection first
+        test_result = email_service.test_connection()
+        if not test_result['success']:
+            return jsonify({'error': test_result['error']}), 400
+
+        # Send test email
+        result = email_service.send_test_email(data['test_email'])
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': f'Test email sent successfully to {data["test_email"]}'
+            })
+        else:
+            return jsonify({'error': result['error']}), 500
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to test email: {str(e)}'}), 500
