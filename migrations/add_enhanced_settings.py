@@ -2,12 +2,13 @@
 """
 Database migration script for enhanced settings functionality
 Adds user management, email configuration, and organization enhancements
+Works with both SQLite and PostgreSQL
 """
 
 import os
 import sys
 from flask import Flask
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 
 # Add the parent directory to the path so we can import our models
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,6 +29,57 @@ def create_app():
     
     return app
 
+def get_database_type():
+    """Detect database type from connection string"""
+    try:
+        engine = db.get_engine()
+        return engine.dialect.name
+    except:
+        return 'unknown'
+
+def column_exists_postgres(table_name, column_name):
+    """Check if column exists in PostgreSQL"""
+    try:
+        result = db.session.execute(text("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = :table_name AND column_name = :column_name
+        """), {'table_name': table_name, 'column_name': column_name})
+        return result.fetchone() is not None
+    except Exception as e:
+        print(f"Error checking column {column_name} in {table_name}: {e}")
+        return False
+
+def column_exists_sqlite(table_name, column_name):
+    """Check if column exists in SQLite"""
+    try:
+        result = db.session.execute(text(f"PRAGMA table_info({table_name})"))
+        columns = [row[1] for row in result.fetchall()]
+        return column_name in columns
+    except Exception as e:
+        print(f"Error checking column {column_name} in {table_name}: {e}")
+        return False
+
+def table_exists(table_name):
+    """Check if table exists"""
+    try:
+        db_type = get_database_type()
+        if db_type == 'postgresql':
+            result = db.session.execute(text("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_name = :table_name
+            """), {'table_name': table_name})
+        else:  # SQLite
+            result = db.session.execute(text("""
+                SELECT name FROM sqlite_master
+                WHERE type='table' AND name = :table_name
+            """), {'table_name': table_name})
+        return result.fetchone() is not None
+    except Exception as e:
+        print(f"Error checking table {table_name}: {e}")
+        return False
+
 def run_migration():
     """Run the database migration"""
     app = create_app()
@@ -36,17 +88,15 @@ def run_migration():
         try:
             print("🔄 Starting enhanced settings migration...")
 
-            # Check current schema
-            print("🔍 Checking current database schema...")
+            # Detect database type
+            db_type = get_database_type()
+            print(f"🔍 Detected database type: {db_type}")
 
-            # Check if columns already exist
-            def column_exists(table_name, column_name):
-                try:
-                    result = db.session.execute(text(f"PRAGMA table_info({table_name})"))
-                    columns = [row[1] for row in result.fetchall()]
-                    return column_name in columns
-                except:
-                    return False
+            # Choose appropriate column check function
+            if db_type == 'postgresql':
+                column_exists = column_exists_postgres
+            else:
+                column_exists = column_exists_sqlite
 
             # Add new columns to Organization table
             print("📝 Adding new columns to Organization table...")
@@ -73,22 +123,14 @@ def run_migration():
             else:
                 print("⚠️  description column already exists")
 
-            if not column_exists('organization', 'updated_at'):
-                try:
-                    db.session.execute(text("ALTER TABLE organization ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
-                    db.session.commit()
-                    print("✅ Added updated_at column")
-                except Exception as e:
-                    print(f"❌ Error adding updated_at: {e}")
-                    db.session.rollback()
-            else:
-                print("⚠️  updated_at column already exists")
-
             # Add new columns to User table
             print("📝 Adding new columns to User table...")
             if not column_exists('user', 'is_email_verified'):
                 try:
-                    db.session.execute(text("ALTER TABLE user ADD COLUMN is_email_verified BOOLEAN DEFAULT 0"))
+                    if db_type == 'postgresql':
+                        db.session.execute(text('ALTER TABLE "user" ADD COLUMN is_email_verified BOOLEAN DEFAULT FALSE'))
+                    else:
+                        db.session.execute(text("ALTER TABLE user ADD COLUMN is_email_verified BOOLEAN DEFAULT 0"))
                     db.session.commit()
                     print("✅ Added is_email_verified column")
                 except Exception as e:
@@ -115,18 +157,50 @@ def run_migration():
             ]
 
             for table in tables_to_check:
-                try:
-                    result = db.session.execute(text(f"SELECT COUNT(*) FROM {table}"))
-                    count = result.scalar()
-                    print(f"✅ Table '{table}' exists with {count} records")
-                except Exception as e:
-                    print(f"❌ Table '{table}' verification failed: {e}")
+                if table_exists(table):
+                    try:
+                        if db_type == 'postgresql':
+                            result = db.session.execute(text(f'SELECT COUNT(*) FROM "{table}"'))
+                        else:
+                            result = db.session.execute(text(f"SELECT COUNT(*) FROM {table}"))
+                        count = result.scalar()
+                        print(f"✅ Table '{table}' exists with {count} records")
+                    except Exception as e:
+                        print(f"❌ Table '{table}' verification failed: {e}")
+                else:
+                    print(f"❌ Table '{table}' does not exist")
 
             # Verify organization table columns
             print("🔍 Verifying organization table columns...")
-            result = db.session.execute(text("PRAGMA table_info(organization)"))
-            columns = [row[1] for row in result.fetchall()]
+            if db_type == 'postgresql':
+                result = db.session.execute(text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'organization'
+                    ORDER BY ordinal_position
+                """))
+                columns = [row[0] for row in result.fetchall()]
+            else:
+                result = db.session.execute(text("PRAGMA table_info(organization)"))
+                columns = [row[1] for row in result.fetchall()]
+
             print(f"Organization table columns: {columns}")
+
+            # Verify user table columns
+            print("🔍 Verifying user table columns...")
+            if db_type == 'postgresql':
+                result = db.session.execute(text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'user'
+                    ORDER BY ordinal_position
+                """))
+                columns = [row[0] for row in result.fetchall()]
+            else:
+                result = db.session.execute(text("PRAGMA table_info(user)"))
+                columns = [row[1] for row in result.fetchall()]
+
+            print(f"User table columns: {columns}")
 
             print("🎉 Enhanced settings migration completed successfully!")
 

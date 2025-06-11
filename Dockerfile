@@ -10,12 +10,13 @@ ENV FLASK_ENV=production
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies and security tools
+# Install system dependencies and security tools (SQLite instead of PostgreSQL)
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
         g++ \
-        libpq-dev \
+        sqlite3 \
+        libsqlite3-dev \
         curl \
         wget \
         unzip \
@@ -77,10 +78,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make scripts executable and create entrypoint
+# Make scripts executable and create entrypoint for SQLite
 RUN chmod +x init_db.py && \
+    chmod +x init_sqlite_docker.py && \
     echo '#!/bin/bash\n\
-echo "🚀 Starting Attack Surface Discovery..."\n\
+echo "🚀 Starting Attack Surface Discovery with SQLite..."\n\
 echo "🔧 Initializing security tools..."\n\
 echo "📥 Downloading Nuclei templates..."\n\
 nuclei -update-templates -silent || {\n\
@@ -90,11 +92,11 @@ nuclei -update-templates -silent || {\n\
     }\n\
 }\n\
 echo "✅ Nuclei template download completed"\n\
-echo "⏳ Waiting for database..."\n\
-sleep 15\n\
-echo "🔄 Initializing database..."\n\
-python init_db.py\n\
-echo "✅ Database initialized"\n\
+echo "📁 Creating database directory..."\n\
+mkdir -p /app/database\n\
+echo "🔄 Initializing SQLite database..."\n\
+python init_sqlite_docker.py\n\
+echo "✅ SQLite database initialized"\n\
 echo "🌐 Starting web server..."\n\
 exec gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 "app:create_app()"\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh

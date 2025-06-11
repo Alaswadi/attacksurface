@@ -48,7 +48,8 @@ class DevelopmentConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///attacksurface.db'
+    # Use SQLite for production (Docker) - consistent with development
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///database/attacksurface.db'
 
 class TestingConfig(Config):
     TESTING = True

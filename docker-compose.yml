@@ -1,25 +1,8 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  db:
-    image: postgres:15-alpine
-    container_name: attacksurface_db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: attacksurface
-      POSTGRES_USER: attacksurface_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_change_me}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
-    networks:
-      - attacksurface_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U attacksurface_user -d attacksurface"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # Note: Using SQLite instead of PostgreSQL for consistency with local development
+  # SQLite database will be stored in a volume for persistence
 
   # Redis for Caching and Session Storage
   redis:
@@ -47,15 +30,15 @@ services:
     environment:
       - FLASK_CONFIG=production
       - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
-      - DATABASE_URL=postgresql://attacksurface_user:${DB_PASSWORD:-secure_password_change_me}@db:5432/attacksurface
+      # Using SQLite instead of PostgreSQL for consistency
+      # - DATABASE_URL=sqlite:///data/attacksurface.db (will use default from config.py)
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
     volumes:
       - app_data:/app/data
+      - sqlite_data:/app/database  # SQLite database storage
       - ./logs:/app/logs
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
@@ -123,26 +106,26 @@ services:
     environment:
       - FLASK_CONFIG=production
       - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
-      - DATABASE_URL=postgresql://attacksurface_user:${DB_PASSWORD:-secure_password_change_me}@db:5432/attacksurface
+      # Using SQLite instead of PostgreSQL for consistency
+      # - DATABASE_URL=sqlite:///data/attacksurface.db (will use default from config.py)
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
     volumes:
       - app_data:/app/data
+      - sqlite_data:/app/database  # SQLite database storage
       - ./logs:/app/logs
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - attacksurface_network
 
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   app_data:
+    driver: local
+  sqlite_data:
     driver: local
 
 networks:
