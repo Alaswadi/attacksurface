@@ -50,6 +50,10 @@ fi
 echo "📋 Recent logs:"
 docker-compose logs --tail=20
 
+# Install email_validator if needed
+echo "📦 Ensuring email_validator is installed..."
+docker-compose exec web pip install email-validator==2.1.0 || echo "⚠️  email_validator may already be installed"
+
 echo ""
 echo "🎉 Migration to SQLite completed!"
 echo ""
