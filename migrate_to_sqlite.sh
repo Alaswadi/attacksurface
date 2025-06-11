@@ -30,6 +30,10 @@ docker-compose up -d
 echo "⏳ Waiting for services to start..."
 sleep 30
 
+# Test SQLite connection
+echo "🔗 Testing SQLite connection..."
+docker-compose exec web python test_sqlite_connection.py
+
 # Check service health
 echo "🔍 Checking service health..."
 docker-compose ps

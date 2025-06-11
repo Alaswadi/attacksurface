@@ -78,11 +78,17 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make scripts executable and create entrypoint for SQLite
-RUN chmod +x init_db.py && \
-    chmod +x init_sqlite_docker.py && \
-    echo '#!/bin/bash\n\
+# Create necessary directories and set permissions
+RUN mkdir -p /app/data /app/logs && \
+    chmod +x init_db.py && \
+    chmod +x init_sqlite_docker.py
+
+# Create entrypoint script for SQLite
+RUN echo '#!/bin/bash\n\
 echo "🚀 Starting Attack Surface Discovery with SQLite..."\n\
+echo "📁 Creating data directory..."\n\
+mkdir -p /app/data\n\
+chmod 755 /app/data\n\
 echo "🔧 Initializing security tools..."\n\
 echo "📥 Downloading Nuclei templates..."\n\
 nuclei -update-templates -silent || {\n\
@@ -92,11 +98,12 @@ nuclei -update-templates -silent || {\n\
     }\n\
 }\n\
 echo "✅ Nuclei template download completed"\n\
-echo "📁 Creating database directory..."\n\
-mkdir -p /app/database\n\
 echo "🔄 Initializing SQLite database..."\n\
-python init_sqlite_docker.py\n\
-echo "✅ SQLite database initialized"\n\
+python init_sqlite_docker.py || {\n\
+    echo "⚠️  Database initialization failed, trying alternative..."\n\
+    python init_db.py\n\
+}\n\
+echo "✅ Database initialized"\n\
 echo "🌐 Starting web server..."\n\
 exec gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 "app:create_app()"\n\
 ' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
@@ -104,6 +111,7 @@ exec gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 "app:create_app()"\n
 # Create non-root user but keep root for nmap (requires raw sockets)
 RUN adduser --disabled-password --gecos '' appuser \
     && chown -R appuser:appuser /app \
+    && chmod 755 /app/data \
     && chmod +s /usr/local/bin/nmap
 
 # Expose port

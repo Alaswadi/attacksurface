@@ -35,8 +35,7 @@ services:
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
     volumes:
-      - app_data:/app/data
-      - sqlite_data:/app/database  # SQLite database storage
+      - app_data:/app/data  # SQLite database and app data storage
       - ./logs:/app/logs
     depends_on:
       redis:
@@ -111,8 +110,7 @@ services:
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:-redis_password_change_me}@redis:6379/0
     volumes:
-      - app_data:/app/data
-      - sqlite_data:/app/database  # SQLite database storage
+      - app_data:/app/data  # SQLite database and app data storage
       - ./logs:/app/logs
     depends_on:
       redis:
@@ -124,8 +122,6 @@ volumes:
   redis_data:
     driver: local
   app_data:
-    driver: local
-  sqlite_data:
     driver: local
 
 networks:

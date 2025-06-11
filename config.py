@@ -5,7 +5,20 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///attacksurface.db'
+
+    # Database configuration with proper path handling
+    @staticmethod
+    def get_database_uri():
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            return database_url
+
+        # Default SQLite path - ensure directory exists
+        db_dir = os.path.join(os.getcwd(), 'data')
+        os.makedirs(db_dir, exist_ok=True)
+        return f'sqlite:///{os.path.join(db_dir, "attacksurface.db")}'
+
+    SQLALCHEMY_DATABASE_URI = get_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Mail settings
@@ -44,12 +57,35 @@ class Config:
     
 class DevelopmentConfig(Config):
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL') or 'sqlite:///attacksurface_dev.db'
+
+    @staticmethod
+    def get_database_uri():
+        database_url = os.environ.get('DEV_DATABASE_URL')
+        if database_url:
+            return database_url
+
+        # Development SQLite path
+        db_dir = os.path.join(os.getcwd(), 'data')
+        os.makedirs(db_dir, exist_ok=True)
+        return f'sqlite:///{os.path.join(db_dir, "attacksurface_dev.db")}'
+
+    SQLALCHEMY_DATABASE_URI = get_database_uri()
 
 class ProductionConfig(Config):
     DEBUG = False
-    # Use SQLite for production (Docker) - consistent with development
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///database/attacksurface.db'
+
+    @staticmethod
+    def get_database_uri():
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            return database_url
+
+        # Production SQLite path - Docker-friendly
+        db_dir = '/app/data'
+        os.makedirs(db_dir, exist_ok=True)
+        return f'sqlite:///{os.path.join(db_dir, "attacksurface.db")}'
+
+    SQLALCHEMY_DATABASE_URI = get_database_uri()
 
 class TestingConfig(Config):
     TESTING = True
