@@ -51,6 +51,14 @@
                 </div>
             </div>
 
+            <!-- Graph -->
+            <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/graph'" title="Network Graph">
+                <div class="flex items-center">
+                    <i class="ri-node-tree ri-lg min-w-[24px]"></i>
+                    <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Graph</span>
+                </div>
+            </div>
+
             <!-- Reports -->
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/reports'" title="Reports">
                 <div class="flex items-center">
@@ -288,19 +296,54 @@
 
                 <div class="lg:col-span-1 bg-slate-800/50 rounded-lg p-4 md:p-6 mobile-p-4 card">
                     <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-medium responsive-text-lg">Health</h2>
-                        <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-700/50 touch-target">
-                            <i class="ri-information-line text-slate-400"></i>
+                        <h2 class="text-lg font-medium responsive-text-lg">Visualization</h2>
+                        <button id="refresh-visualization" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-700/50 touch-target">
+                            <i class="ri-refresh-line text-slate-400"></i>
                         </button>
                     </div>
-                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                        <div class="text-center">
-                            <div class="text-2xl md:text-3xl font-bold mb-2 responsive-text-4xl">8<span class="text-slate-400">/10</span></div>
-                            <div class="text-sm text-slate-400 mobile-text-sm">Overall</div>
+
+                    <!-- Network Visualization Container -->
+                    <div class="relative">
+                        <div id="network-visualization" class="w-full h-64 bg-slate-900 rounded-lg border border-slate-700 relative overflow-hidden">
+                            <!-- Loading state -->
+                            <div id="viz-loading" class="absolute inset-0 flex items-center justify-center">
+                                <div class="text-slate-400 text-sm">Loading network map...</div>
+                            </div>
+
+                            <!-- Cytoscape container -->
+                            <div id="cy-dashboard" class="w-full h-full"></div>
                         </div>
-                        <div class="w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
-                            <canvas id="health-chart" class="w-full h-full"></canvas>
+
+                        <!-- Legend -->
+                        <div id="viz-legend" class="absolute top-2 left-2 bg-slate-800/90 backdrop-blur-sm rounded-lg p-2 text-xs z-10 hidden">
+                            <div class="flex items-center mb-1">
+                                <div class="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                                <span class="text-slate-300">Domain</span>
+                            </div>
+                            <div class="flex items-center mb-1">
+                                <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                                <span class="text-slate-300">Subdomain</span>
+                            </div>
+                            <div class="flex items-center mb-1">
+                                <div class="w-2 h-2 bg-amber-500 rounded-full mr-2"></div>
+                                <span class="text-slate-300">Technology</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                                <span class="text-slate-300">Vulnerability</span>
+                            </div>
                         </div>
+
+                        <!-- Stats overlay -->
+                        <div id="viz-stats" class="absolute bottom-2 right-2 bg-slate-800/90 backdrop-blur-sm rounded-lg p-2 text-xs text-slate-300 hidden">
+                            <div id="viz-node-count">Nodes: 0</div>
+                            <div id="viz-edge-count">Edges: 0</div>
+                        </div>
+                    </div>
+
+                    <!-- Tooltip -->
+                    <div id="viz-tooltip" class="absolute bg-slate-800 text-white p-2 rounded-lg text-xs pointer-events-none z-20 hidden shadow-lg border border-slate-600">
+                        <div id="tooltip-content"></div>
                     </div>
                 </div>
             </div>
@@ -632,6 +675,8 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     timelineChart.setOption(timelineOption);
 
+    // Initialize Network Visualization
+    initializeNetworkVisualization();
 
     // Handle window resize for charts and responsive behavior
     window.addEventListener('resize', function() {
@@ -871,6 +916,294 @@ document.addEventListener('DOMContentLoaded', function() {
     }, false);
 });
 
+// Network Visualization Functions
+let networkCy = null;
+
+function initializeNetworkVisualization() {
+    loadNetworkData();
+
+    // Set up refresh button
+    const refreshBtn = document.getElementById('refresh-visualization');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            refreshBtn.querySelector('i').classList.add('animate-spin');
+            loadNetworkData().finally(() => {
+                refreshBtn.querySelector('i').classList.remove('animate-spin');
+            });
+        });
+    }
+}
+
+async function loadNetworkData() {
+    const loadingEl = document.getElementById('viz-loading');
+    const legendEl = document.getElementById('viz-legend');
+    const statsEl = document.getElementById('viz-stats');
+
+    try {
+        loadingEl.style.display = 'flex';
+        legendEl.classList.add('hidden');
+        statsEl.classList.add('hidden');
+
+        const response = await fetch('/api/visualization/network-data');
+        const data = await response.json();
+
+        if (data.success) {
+            createNetworkVisualization(data.nodes, data.edges);
+            updateVisualizationStats(data.stats);
+            legendEl.classList.remove('hidden');
+            statsEl.classList.remove('hidden');
+        } else {
+            console.error('Failed to load network data:', data.error);
+            showVisualizationError(data.error);
+        }
+    } catch (error) {
+        console.error('Error loading network data:', error);
+        showVisualizationError('Failed to load network data');
+    } finally {
+        loadingEl.style.display = 'none';
+    }
+}
+
+function createNetworkVisualization(nodes, edges) {
+    const container = document.getElementById('cy-dashboard');
+
+    // Destroy existing instance
+    if (networkCy) {
+        networkCy.destroy();
+    }
+
+    // Create new Cytoscape instance
+    networkCy = cytoscape({
+        container: container,
+        elements: {
+            nodes: nodes,
+            edges: edges
+        },
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'color': '#ffffff',
+                    'font-size': '10px',
+                    'width': '20px',
+                    'height': '20px',
+                    'text-outline-width': 1,
+                    'text-outline-color': '#000000'
+                }
+            },
+            {
+                selector: 'node[type="domain"]',
+                style: {
+                    'background-color': '#3b82f6',
+                    'label': 'data(label)',
+                    'width': '30px',
+                    'height': '30px',
+                    'font-size': '12px'
+                }
+            },
+            {
+                selector: 'node[type="subdomain"]',
+                style: {
+                    'background-color': '#10b981',
+                    'label': 'data(label)',
+                    'width': '25px',
+                    'height': '25px'
+                }
+            },
+            {
+                selector: 'node[type="port"]',
+                style: {
+                    'background-color': '#f59e0b',
+                    'label': 'data(label)',
+                    'width': '15px',
+                    'height': '15px',
+                    'font-size': '8px'
+                }
+            },
+            {
+                selector: 'node[type="technology"]',
+                style: {
+                    'background-color': '#f59e0b',
+                    'label': 'data(label)',
+                    'width': '18px',
+                    'height': '18px',
+                    'font-size': '9px'
+                }
+            },
+            {
+                selector: 'node[type="vulnerability"]',
+                style: {
+                    'background-color': '#dc2626',
+                    'label': 'data(label)',
+                    'width': '22px',
+                    'height': '22px',
+                    'font-size': '10px'
+                }
+            },
+            {
+                selector: 'node[type="ip"]',
+                style: {
+                    'background-color': '#6366f1',
+                    'label': 'data(label)',
+                    'width': '20px',
+                    'height': '20px'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 1,
+                    'line-color': '#64748b',
+                    'target-arrow-color': '#64748b',
+                    'target-arrow-shape': 'triangle',
+                    'target-arrow-size': '6px',
+                    'curve-style': 'bezier',
+                    'opacity': 0.6
+                }
+            },
+            {
+                selector: 'edge[type="has_vulnerability"]',
+                style: {
+                    'line-color': '#dc2626',
+                    'target-arrow-color': '#dc2626',
+                    'width': 2
+                }
+            },
+            {
+                selector: 'edge[type="parent_domain"]',
+                style: {
+                    'line-color': '#3b82f6',
+                    'target-arrow-color': '#3b82f6',
+                    'width': 2
+                }
+            }
+        ],
+        layout: {
+            name: 'cose',
+            animate: true,
+            animationDuration: 1000,
+            nodeRepulsion: 8000,
+            idealEdgeLength: 50,
+            edgeElasticity: 100,
+            nestingFactor: 1.2,
+            gravity: 1,
+            numIter: 1000,
+            initialTemp: 200,
+            coolingFactor: 0.95,
+            minTemp: 1.0
+        },
+        wheelSensitivity: 0.2,
+        minZoom: 0.3,
+        maxZoom: 3
+    });
+
+    // Add event listeners for interactivity
+    setupNetworkInteractivity();
+}
+
+function setupNetworkInteractivity() {
+    const tooltip = document.getElementById('viz-tooltip');
+    const tooltipContent = document.getElementById('tooltip-content');
+
+    // Mouse over events
+    networkCy.on('mouseover', 'node', function(evt) {
+        const node = evt.target;
+        const data = node.data();
+
+        let content = `<strong>${data.label}</strong><br>`;
+        content += `Type: ${data.type}<br>`;
+
+        if (data.type === 'vulnerability') {
+            content += `Severity: ${data.severity}<br>`;
+            if (data.cve_id) content += `CVE: ${data.cve_id}<br>`;
+        } else if (data.type === 'port') {
+            content += `Service: ${data.service || 'Unknown'}<br>`;
+        } else if (data.description) {
+            content += `Description: ${data.description}<br>`;
+        }
+
+        tooltipContent.innerHTML = content;
+        tooltip.classList.remove('hidden');
+    });
+
+    networkCy.on('mouseout', 'node', function() {
+        tooltip.classList.add('hidden');
+    });
+
+    // Mouse move for tooltip positioning
+    networkCy.on('mousemove', function(e) {
+        const container = document.getElementById('network-visualization');
+        const rect = container.getBoundingClientRect();
+        tooltip.style.left = (e.originalEvent.clientX - rect.left + 10) + 'px';
+        tooltip.style.top = (e.originalEvent.clientY - rect.top - 10) + 'px';
+    });
+
+    // Click events for node selection
+    networkCy.on('tap', 'node', function(evt) {
+        const node = evt.target;
+
+        // Highlight connected nodes
+        const connectedNodes = node.neighborhood().nodes();
+        const connectedEdges = node.neighborhood().edges();
+
+        // Reset all styles
+        networkCy.elements().removeClass('highlighted dimmed');
+
+        // Highlight selected node and connected elements
+        node.addClass('highlighted');
+        connectedNodes.addClass('highlighted');
+        connectedEdges.addClass('highlighted');
+
+        // Dim non-connected elements
+        networkCy.elements().not(node).not(connectedNodes).not(connectedEdges).addClass('dimmed');
+    });
+
+    // Click on background to reset
+    networkCy.on('tap', function(evt) {
+        if (evt.target === networkCy) {
+            networkCy.elements().removeClass('highlighted dimmed');
+        }
+    });
+}
+
+function updateVisualizationStats(stats) {
+    document.getElementById('viz-node-count').textContent = `Nodes: ${stats.total_nodes}`;
+    document.getElementById('viz-edge-count').textContent = `Edges: ${stats.total_edges}`;
+}
+
+function showVisualizationError(message) {
+    const container = document.getElementById('cy-dashboard');
+    container.innerHTML = `
+        <div class="flex items-center justify-center h-full text-slate-400 text-sm">
+            <div class="text-center">
+                <i class="ri-error-warning-line text-2xl mb-2"></i><br>
+                ${message}
+            </div>
+        </div>
+    `;
+}
 
 </script>
+
+<!-- Add custom styles for network visualization -->
+<style>
+#cy-dashboard .highlighted {
+    opacity: 1 !important;
+}
+
+#cy-dashboard .dimmed {
+    opacity: 0.3 !important;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
 {% endblock %}

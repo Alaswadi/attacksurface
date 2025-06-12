@@ -1,0 +1,174 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Attack Surface Map</title>
+  <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #111827;
+      color: #fff;
+    }
+
+    #legend {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background-color: #1f2937;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 10;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      margin-right: 8px;
+      border-radius: 50%;
+    }
+
+    #cy {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    .cy-tooltip {
+      position: absolute;
+      background-color: #1f2937;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      pointer-events: none;
+      display: none;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+
+<div id="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#3b82f6;"></div>Domain</div>
+  <div class="legend-item"><div class="legend-color" style="background:#10b981;"></div>Subdomain</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f59e0b;"></div>Port</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f43f5e;"></div>Scan Finding</div>
+  <div class="legend-item"><div class="legend-color" style="background:#6366f1;"></div>IP Address</div>
+</div>
+
+<div id="cy"></div>
+<div id="tooltip" class="cy-tooltip"></div>
+
+<script>
+  const cy = cytoscape({
+    container: document.getElementById('cy'),
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'color': '#ffffff',
+          'font-size': '12px'
+        }
+      },
+      {
+        selector: 'node[type="domain"]',
+        style: {
+          'background-color': '#3b82f6',
+          'label': 'data(label)'
+        }
+      },
+      {
+        selector: 'node[type="subdomain"]',
+        style: {
+          'background-color': '#10b981',
+          'label': 'data(label)'
+        }
+      },
+      {
+        selector: 'node[type="port"]',
+        style: {
+          'background-color': '#f59e0b',
+          'label': 'data(label)'
+        }
+      },
+      {
+        selector: 'node[type="scan"]',
+        style: {
+          'background-color': '#f43f5e',
+          'label': 'data(label)'
+        }
+      },
+      {
+        selector: 'node[type="ip"]',
+        style: {
+          'background-color': '#6366f1',
+          'label': 'data(label)'
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 2,
+          'line-color': '#9ca3af',
+          'target-arrow-color': '#9ca3af',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier'
+        }
+      }
+    ],
+    elements: {
+      nodes: [
+        { data: { id: 'domain', label: 'example.com', type: 'domain' } },
+        { data: { id: 'sub1', label: 'api.example.com', type: 'subdomain' } },
+        { data: { id: 'sub2', label: 'mail.example.com', type: 'subdomain' } },
+        { data: { id: 'p80', label: '80', type: 'port' } },
+        { data: { id: 'p443', label: '443', type: 'port' } },
+        { data: { id: 'scan1', label: 'Missing X-Frame Header', type: 'scan' } },
+        { data: { id: 'ip1', label: '93.184.216.34', type: 'ip' } }
+      ],
+      edges: [
+        { data: { source: 'domain', target: 'sub1' } },
+        { data: { source: 'domain', target: 'sub2' } },
+        { data: { source: 'sub1', target: 'p80' } },
+        { data: { source: 'sub1', target: 'p443' } },
+        { data: { source: 'p80', target: 'scan1' } },
+        { data: { source: 'sub1', target: 'ip1' } }
+      ]
+    },
+    layout: {
+      name: 'cose',
+      animate: true
+    }
+  });
+
+  const tooltip = document.getElementById('tooltip');
+
+  cy.on('mouseover', 'node', function(evt){
+    const node = evt.target;
+    tooltip.textContent = node.data('label');
+    tooltip.style.display = 'block';
+  });
+
+  cy.on('mouseout', 'node', function(){
+    tooltip.style.display = 'none';
+  });
+
+  cy.on('mousemove', function(e){
+    tooltip.style.left = e.originalEvent.pageX + 15 + 'px';
+    tooltip.style.top = e.originalEvent.pageY + 'px';
+  });
+</script>
+
+</body>
+</html>

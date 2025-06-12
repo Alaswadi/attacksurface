@@ -1,0 +1,690 @@
+{% extends "base.html" %}
+
+{% block title %}Network Graph - Attack Surface Management{% endblock %}
+
+{% block content %}
+<!-- Mobile sidebar overlay -->
+<div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+<div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <div id="sidebar" class="bg-slate-900 border-r border-slate-800 flex flex-col text-white transition-all duration-300 ease-in-out w-16">
+        <!-- Logo Section -->
+        <div class="flex items-center justify-center py-6 mb-6">
+            <!-- Expanded text only -->
+            <div id="logo-expanded" class="opacity-0 transition-opacity duration-300 flex items-center justify-center w-full px-4">
+                <span class="text-white font-bold text-lg whitespace-nowrap">AttackSurfacePro</span>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="flex-1 px-2 space-y-2">
+            <!-- Dashboard -->
+            <a href="/dashboard" class="nav-item flex items-center px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors duration-200 group">
+                <i class="ri-dashboard-line text-xl flex-shrink-0"></i>
+                <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Dashboard</span>
+            </a>
+
+            <!-- Assets -->
+            <a href="/assets" class="nav-item flex items-center px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors duration-200 group">
+                <i class="ri-shield-line text-xl flex-shrink-0"></i>
+                <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Assets</span>
+            </a>
+
+            <!-- Vulnerabilities -->
+            <a href="/vulnerabilities" class="nav-item flex items-center px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors duration-200 group">
+                <i class="ri-bug-line text-xl flex-shrink-0"></i>
+                <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Vulnerabilities</span>
+            </a>
+
+            <!-- Technologies -->
+            <a href="/technologies" class="nav-item flex items-center px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors duration-200 group">
+                <i class="ri-stack-line text-xl flex-shrink-0"></i>
+                <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Technologies</span>
+            </a>
+
+            <!-- Graph (Active) -->
+            <a href="/graph" class="nav-item flex items-center px-3 py-3 rounded-lg text-white bg-primary/20 border border-primary/30 transition-colors duration-200 group">
+                <i class="ri-node-tree text-xl flex-shrink-0 text-primary"></i>
+                <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Graph</span>
+            </a>
+
+            <!-- Reports -->
+            <a href="/reports" class="nav-item flex items-center px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors duration-200 group">
+                <i class="ri-file-chart-line text-xl flex-shrink-0"></i>
+                <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Reports</span>
+            </a>
+
+            <!-- Settings -->
+            <a href="/settings" class="nav-item flex items-center px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors duration-200 group">
+                <i class="ri-settings-line text-xl flex-shrink-0"></i>
+                <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
+            </a>
+        </nav>
+
+        <!-- Sidebar Toggle -->
+        <div class="p-2 border-t border-slate-800">
+            <button id="sidebar-toggle" class="nav-item flex items-center px-3 py-3 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors duration-200 group w-full">
+                <i class="ri-menu-line text-xl flex-shrink-0"></i>
+                <span id="toggle-text" class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Expand</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col min-w-0">
+        <!-- Mobile Header -->
+        <div class="md:hidden bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+            <button id="mobile-menu-btn" class="text-white p-2 rounded-lg hover:bg-slate-800 touch-target">
+                <i class="ri-menu-line text-xl"></i>
+            </button>
+            <h1 class="text-white font-semibold">Network Graph</h1>
+            <div class="w-10"></div> <!-- Spacer for centering -->
+        </div>
+
+        <!-- Main Dashboard -->
+        <div class="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
+            <!-- Title -->
+            <div class="mb-4 md:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold responsive-text-2xl">Network Graph</h1>
+                    <p class="text-slate-400 text-sm mt-1 mobile-text-sm">Interactive Attack Surface Visualization</p>
+                </div>
+                <div class="flex items-center gap-2 md:gap-3 flex-wrap">
+                    <button id="refresh-graph" class="flex items-center gap-2 px-3 py-2 bg-primary/20 text-primary border border-primary/30 rounded-lg hover:bg-primary/30 transition-colors duration-200 touch-target">
+                        <i class="ri-refresh-line"></i>
+                        <span class="hidden sm:inline">Refresh</span>
+                    </button>
+                    <button id="reset-zoom" class="flex items-center gap-2 px-3 py-2 bg-slate-800 text-slate-300 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors duration-200 touch-target">
+                        <i class="ri-zoom-out-line"></i>
+                        <span class="hidden sm:inline">Reset Zoom</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Network Visualization Container -->
+            <div class="bg-slate-800/50 rounded-lg p-4 md:p-6 mobile-p-4 card">
+                <div class="relative">
+                    <div id="network-visualization" class="w-full h-96 md:h-[600px] bg-slate-900 rounded-lg border border-slate-700 relative overflow-hidden">
+                        <!-- Loading state -->
+                        <div id="viz-loading" class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-slate-400 text-sm">Loading network map...</div>
+                        </div>
+                        
+                        <!-- Cytoscape container -->
+                        <div id="cy-graph" class="w-full h-full"></div>
+                    </div>
+                    
+                    <!-- Legend -->
+                    <div id="viz-legend" class="absolute top-4 left-4 bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 text-sm z-10 hidden">
+                        <h3 class="text-white font-medium mb-2">Legend</h3>
+                        <div class="space-y-2">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+                                <span class="text-slate-300">Domain</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                                <span class="text-slate-300">Subdomain</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-amber-500 rounded-full mr-3"></div>
+                                <span class="text-slate-300">Technology</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
+                                <span class="text-slate-300">Port</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
+                                <span class="text-slate-300">Vulnerability</span>
+                            </div>
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 bg-purple-500 rounded-full mr-3"></div>
+                                <span class="text-slate-300">IP Address</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats overlay -->
+                    <div id="viz-stats" class="absolute top-4 right-4 bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 text-sm text-slate-300 hidden">
+                        <h3 class="text-white font-medium mb-2">Statistics</h3>
+                        <div id="viz-node-count">Nodes: 0</div>
+                        <div id="viz-edge-count">Edges: 0</div>
+                        <div id="viz-assets-count">Assets: 0</div>
+                        <div id="viz-vulns-count">Vulnerabilities: 0</div>
+                    </div>
+                    
+                    <!-- Controls -->
+                    <div id="viz-controls" class="absolute bottom-4 left-4 bg-slate-800/90 backdrop-blur-sm rounded-lg p-3 text-sm z-10 hidden">
+                        <h3 class="text-white font-medium mb-2">Controls</h3>
+                        <div class="space-y-1 text-slate-300 text-xs">
+                            <div>• Click node to highlight connections</div>
+                            <div>• Drag to pan, scroll to zoom</div>
+                            <div>• Hover for details</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tooltip -->
+                <div id="viz-tooltip" class="absolute bg-slate-800 text-white p-3 rounded-lg text-sm pointer-events-none z-20 hidden shadow-lg border border-slate-600">
+                    <div id="tooltip-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Network Visualization Functions
+let networkCy = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Network Visualization
+    initializeNetworkVisualization();
+    
+    // Initialize sidebar
+    initializeSidebar();
+});
+
+function initializeNetworkVisualization() {
+    loadNetworkData();
+    
+    // Set up refresh button
+    const refreshBtn = document.getElementById('refresh-graph');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            refreshBtn.querySelector('i').classList.add('animate-spin');
+            loadNetworkData().finally(() => {
+                refreshBtn.querySelector('i').classList.remove('animate-spin');
+            });
+        });
+    }
+    
+    // Set up reset zoom button
+    const resetZoomBtn = document.getElementById('reset-zoom');
+    if (resetZoomBtn) {
+        resetZoomBtn.addEventListener('click', function() {
+            if (networkCy) {
+                networkCy.fit();
+                networkCy.center();
+            }
+        });
+    }
+}
+
+async function loadNetworkData() {
+    const loadingEl = document.getElementById('viz-loading');
+    const legendEl = document.getElementById('viz-legend');
+    const statsEl = document.getElementById('viz-stats');
+    const controlsEl = document.getElementById('viz-controls');
+    
+    try {
+        loadingEl.style.display = 'flex';
+        legendEl.classList.add('hidden');
+        statsEl.classList.add('hidden');
+        controlsEl.classList.add('hidden');
+        
+        const response = await fetch('/api/visualization/network-data');
+        const data = await response.json();
+        
+        if (data.success) {
+            createNetworkVisualization(data.nodes, data.edges);
+            updateVisualizationStats(data.stats);
+            legendEl.classList.remove('hidden');
+            statsEl.classList.remove('hidden');
+            controlsEl.classList.remove('hidden');
+        } else {
+            console.error('Failed to load network data:', data.error);
+            showVisualizationError(data.error);
+        }
+    } catch (error) {
+        console.error('Error loading network data:', error);
+        showVisualizationError('Failed to load network data');
+    } finally {
+        loadingEl.style.display = 'none';
+    }
+}
+
+function createNetworkVisualization(nodes, edges) {
+    const container = document.getElementById('cy-graph');
+
+    // Destroy existing instance
+    if (networkCy) {
+        networkCy.destroy();
+    }
+
+    // Create new Cytoscape instance
+    networkCy = cytoscape({
+        container: container,
+        elements: {
+            nodes: nodes,
+            edges: edges
+        },
+        style: [
+            {
+                selector: 'node',
+                style: {
+                    'text-valign': 'center',
+                    'text-halign': 'center',
+                    'color': '#ffffff',
+                    'font-size': '12px',
+                    'width': '25px',
+                    'height': '25px',
+                    'text-outline-width': 1,
+                    'text-outline-color': '#000000',
+                    'text-wrap': 'wrap',
+                    'text-max-width': '80px'
+                }
+            },
+            {
+                selector: 'node[type="domain"]',
+                style: {
+                    'background-color': '#3b82f6',
+                    'label': 'data(label)',
+                    'width': '40px',
+                    'height': '40px',
+                    'font-size': '14px',
+                    'font-weight': 'bold'
+                }
+            },
+            {
+                selector: 'node[type="subdomain"]',
+                style: {
+                    'background-color': '#10b981',
+                    'label': 'data(label)',
+                    'width': '35px',
+                    'height': '35px',
+                    'font-size': '12px'
+                }
+            },
+            {
+                selector: 'node[type="port"]',
+                style: {
+                    'background-color': '#f59e0b',
+                    'label': 'data(label)',
+                    'width': '20px',
+                    'height': '20px',
+                    'font-size': '10px'
+                }
+            },
+            {
+                selector: 'node[type="technology"]',
+                style: {
+                    'background-color': '#f59e0b',
+                    'label': 'data(label)',
+                    'width': '25px',
+                    'height': '25px',
+                    'font-size': '10px'
+                }
+            },
+            {
+                selector: 'node[type="vulnerability"]',
+                style: {
+                    'background-color': '#dc2626',
+                    'label': 'data(label)',
+                    'width': '30px',
+                    'height': '30px',
+                    'font-size': '11px'
+                }
+            },
+            {
+                selector: 'node[type="ip"]',
+                style: {
+                    'background-color': '#6366f1',
+                    'label': 'data(label)',
+                    'width': '30px',
+                    'height': '30px',
+                    'font-size': '11px'
+                }
+            },
+            {
+                selector: 'edge',
+                style: {
+                    'width': 2,
+                    'line-color': '#64748b',
+                    'target-arrow-color': '#64748b',
+                    'target-arrow-shape': 'triangle',
+                    'target-arrow-size': '8px',
+                    'curve-style': 'bezier',
+                    'opacity': 0.7
+                }
+            },
+            {
+                selector: 'edge[type="has_vulnerability"]',
+                style: {
+                    'line-color': '#dc2626',
+                    'target-arrow-color': '#dc2626',
+                    'width': 3,
+                    'opacity': 0.8
+                }
+            },
+            {
+                selector: 'edge[type="parent_domain"]',
+                style: {
+                    'line-color': '#3b82f6',
+                    'target-arrow-color': '#3b82f6',
+                    'width': 3,
+                    'opacity': 0.8
+                }
+            },
+            {
+                selector: '.highlighted',
+                style: {
+                    'opacity': 1,
+                    'z-index': 999
+                }
+            },
+            {
+                selector: '.dimmed',
+                style: {
+                    'opacity': 0.2
+                }
+            }
+        ],
+        layout: {
+            name: 'cose',
+            animate: true,
+            animationDuration: 1500,
+            nodeRepulsion: 12000,
+            idealEdgeLength: 80,
+            edgeElasticity: 200,
+            nestingFactor: 1.2,
+            gravity: 1,
+            numIter: 1000,
+            initialTemp: 200,
+            coolingFactor: 0.95,
+            minTemp: 1.0
+        },
+        wheelSensitivity: 0.3,
+        minZoom: 0.2,
+        maxZoom: 4
+    });
+
+    // Add event listeners for interactivity
+    setupNetworkInteractivity();
+}
+
+function setupNetworkInteractivity() {
+    const tooltip = document.getElementById('viz-tooltip');
+    const tooltipContent = document.getElementById('tooltip-content');
+
+    // Mouse over events
+    networkCy.on('mouseover', 'node', function(evt) {
+        const node = evt.target;
+        const data = node.data();
+
+        let content = `<div class="font-medium text-white mb-1">${data.label}</div>`;
+        content += `<div class="text-slate-300 text-xs mb-2">Type: ${data.type}</div>`;
+
+        if (data.type === 'vulnerability') {
+            content += `<div class="text-xs">`;
+            content += `<div class="text-slate-300">Severity: <span class="text-red-400">${data.severity}</span></div>`;
+            if (data.cve_id) content += `<div class="text-slate-300">CVE: ${data.cve_id}</div>`;
+            if (data.template_name) content += `<div class="text-slate-300">Template: ${data.template_name}</div>`;
+            content += `</div>`;
+        } else if (data.type === 'port') {
+            content += `<div class="text-xs text-slate-300">Service: ${data.service || 'Unknown'}</div>`;
+        } else if (data.type === 'domain' || data.type === 'subdomain') {
+            if (data.ports_count > 0) content += `<div class="text-xs text-slate-300">Ports: ${data.ports_count}</div>`;
+            if (data.technologies_count > 0) content += `<div class="text-xs text-slate-300">Technologies: ${data.technologies_count}</div>`;
+        }
+
+        if (data.description && data.description !== data.label) {
+            content += `<div class="text-xs text-slate-400 mt-1">${data.description}</div>`;
+        }
+
+        tooltipContent.innerHTML = content;
+        tooltip.classList.remove('hidden');
+    });
+
+    networkCy.on('mouseout', 'node', function() {
+        tooltip.classList.add('hidden');
+    });
+
+    // Mouse move for tooltip positioning
+    networkCy.on('mousemove', function(e) {
+        const container = document.getElementById('network-visualization');
+        const rect = container.getBoundingClientRect();
+        tooltip.style.left = (e.originalEvent.clientX - rect.left + 15) + 'px';
+        tooltip.style.top = (e.originalEvent.clientY - rect.top - 10) + 'px';
+    });
+
+    // Click events for node selection
+    networkCy.on('tap', 'node', function(evt) {
+        const node = evt.target;
+
+        // Highlight connected nodes
+        const connectedNodes = node.neighborhood().nodes();
+        const connectedEdges = node.neighborhood().edges();
+
+        // Reset all styles
+        networkCy.elements().removeClass('highlighted dimmed');
+
+        // Highlight selected node and connected elements
+        node.addClass('highlighted');
+        connectedNodes.addClass('highlighted');
+        connectedEdges.addClass('highlighted');
+
+        // Dim non-connected elements
+        networkCy.elements().not(node).not(connectedNodes).not(connectedEdges).addClass('dimmed');
+    });
+
+    // Click on background to reset
+    networkCy.on('tap', function(evt) {
+        if (evt.target === networkCy) {
+            networkCy.elements().removeClass('highlighted dimmed');
+        }
+    });
+}
+
+function updateVisualizationStats(stats) {
+    document.getElementById('viz-node-count').textContent = `Nodes: ${stats.total_nodes}`;
+    document.getElementById('viz-edge-count').textContent = `Edges: ${stats.total_edges}`;
+    document.getElementById('viz-assets-count').textContent = `Assets: ${stats.assets_count}`;
+    document.getElementById('viz-vulns-count').textContent = `Vulnerabilities: ${stats.vulnerabilities_count}`;
+}
+
+function showVisualizationError(message) {
+    const container = document.getElementById('cy-graph');
+    container.innerHTML = `
+        <div class="flex items-center justify-center h-full text-slate-400 text-sm">
+            <div class="text-center">
+                <i class="ri-error-warning-line text-4xl mb-4 text-red-400"></i><br>
+                <div class="text-lg mb-2">Failed to Load Network Data</div>
+                <div>${message}</div>
+            </div>
+        </div>
+    `;
+}
+
+// Sidebar functionality (copied from dashboard)
+let sidebarExpanded = localStorage.getItem('sidebarExpanded') === 'true';
+let isMobile = window.innerWidth < 768;
+
+function checkMobile() {
+    isMobile = window.innerWidth < 768;
+    return isMobile;
+}
+
+function initializeSidebar() {
+    if (checkMobile()) {
+        initializeMobileSidebar();
+        return;
+    }
+
+    const sidebar = document.getElementById('sidebar');
+    const logoExpanded = document.getElementById('logo-expanded');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleButton = document.getElementById('sidebar-toggle');
+
+    if (!toggleButton) return;
+
+    if (sidebarExpanded) {
+        expandSidebar();
+    } else {
+        collapseSidebar();
+    }
+}
+
+function expandSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoExpanded = document.getElementById('logo-expanded');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleButton = document.getElementById('sidebar-toggle');
+    const toggleIcon = toggleButton.querySelector('i');
+    const toggleText = document.getElementById('toggle-text');
+
+    sidebar.classList.remove('w-16');
+    sidebar.classList.add('w-64');
+
+    setTimeout(() => {
+        logoExpanded.classList.remove('opacity-0');
+        logoExpanded.classList.add('opacity-100');
+        navTexts.forEach(text => {
+            text.classList.remove('opacity-0');
+            text.classList.add('opacity-100');
+        });
+    }, 150);
+
+    toggleIcon.classList.remove('ri-menu-line');
+    toggleIcon.classList.add('ri-menu-fold-line');
+    toggleText.textContent = 'Collapse';
+
+    sidebarExpanded = true;
+    localStorage.setItem('sidebarExpanded', 'true');
+}
+
+function collapseSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const logoExpanded = document.getElementById('logo-expanded');
+    const navTexts = document.querySelectorAll('.nav-text');
+    const toggleButton = document.getElementById('sidebar-toggle');
+    const toggleIcon = toggleButton.querySelector('i');
+    const toggleText = document.getElementById('toggle-text');
+
+    logoExpanded.classList.remove('opacity-100');
+    logoExpanded.classList.add('opacity-0');
+    navTexts.forEach(text => {
+        text.classList.remove('opacity-100');
+        text.classList.add('opacity-0');
+    });
+
+    setTimeout(() => {
+        sidebar.classList.remove('w-64');
+        sidebar.classList.add('w-16');
+    }, 150);
+
+    toggleIcon.classList.remove('ri-menu-fold-line');
+    toggleIcon.classList.add('ri-menu-line');
+    toggleText.textContent = 'Expand';
+
+    sidebarExpanded = false;
+    localStorage.setItem('sidebarExpanded', 'false');
+}
+
+function toggleSidebar() {
+    if (sidebarExpanded) {
+        collapseSidebar();
+    } else {
+        expandSidebar();
+    }
+}
+
+function initializeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', toggleMobileSidebar);
+    }
+
+    if (overlay) {
+        overlay.addEventListener('click', closeMobileSidebar);
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            if (isMobile) {
+                closeMobileSidebar();
+            }
+        });
+    });
+}
+
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    if (sidebar.classList.contains('mobile-open')) {
+        closeMobileSidebar();
+    } else {
+        openMobileSidebar();
+    }
+}
+
+function openMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    sidebar.classList.add('mobile-open');
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    sidebar.classList.remove('mobile-open');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Add click event to desktop toggle button
+const toggleButton = document.getElementById('sidebar-toggle');
+if (toggleButton) {
+    toggleButton.addEventListener('click', toggleSidebar);
+}
+
+// Handle window resize
+window.addEventListener('resize', function() {
+    const wasMobile = isMobile;
+    checkMobile();
+
+    if (wasMobile !== isMobile) {
+        if (isMobile) {
+            closeMobileSidebar();
+            initializeMobileSidebar();
+        } else {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+            document.body.style.overflow = '';
+            initializeSidebar();
+        }
+    }
+
+    // Resize network visualization
+    if (networkCy) {
+        networkCy.resize();
+    }
+});
+</script>
+
+<!-- Add custom styles for network visualization -->
+<style>
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}

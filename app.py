@@ -356,6 +356,24 @@ def create_app(config_name=None):
 
         return render_template('reports.html', organization=org)
 
+    @app.route('/graph')
+    @login_required
+    def graph():
+        """Network graph visualization page"""
+        from utils.permissions import can_view_assets, get_user_organization
+
+        if not can_view_assets():
+            flash('You do not have permission to view the network graph.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Get user's organization (either as owner or member)
+        org = get_user_organization()
+        if not org:
+            flash('You are not associated with any organization. Please contact your administrator.', 'error')
+            return redirect(url_for('dashboard'))
+
+        return render_template('graph.html')
+
     # Authentication routes
     from routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -397,8 +415,8 @@ if __name__ == '__main__':
         db.create_all()
         
         # Create sample data if no users exist (commented out for production)
-        # if User.query.count() == 0:
-        #     create_sample_data()
+        if User.query.count() == 0:
+            create_sample_data()
     
     app.run(debug=True)
 

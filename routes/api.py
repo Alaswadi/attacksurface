@@ -296,19 +296,19 @@ def get_dashboard_stats():
     org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
-    
+
     # Get counts
     total_assets = Asset.query.filter_by(organization_id=org.id, is_active=True).count()
     critical_vulns = Vulnerability.query.filter_by(
-        organization_id=org.id, 
-        severity=SeverityLevel.CRITICAL, 
+        organization_id=org.id,
+        severity=SeverityLevel.CRITICAL,
         is_resolved=False
     ).count()
     active_alerts = Alert.query.filter_by(
-        organization_id=org.id, 
+        organization_id=org.id,
         is_resolved=False
     ).count()
-    
+
     # Asset breakdown
     assets = Asset.query.filter_by(organization_id=org.id, is_active=True).all()
     asset_counts = {
@@ -317,13 +317,186 @@ def get_dashboard_stats():
         'ip_addresses': len([a for a in assets if a.asset_type == AssetType.IP_ADDRESS]),
         'cloud_resources': len([a for a in assets if a.asset_type == AssetType.CLOUD_RESOURCE])
     }
-    
+
     return jsonify({
         'total_assets': total_assets,
         'critical_vulnerabilities': critical_vulns,
         'active_alerts': active_alerts,
         'asset_breakdown': asset_counts
     })
+
+@api_bp.route('/visualization/network-data', methods=['GET'])
+@login_required
+def get_network_visualization_data():
+    """Get network visualization data for interactive attack surface map"""
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    try:
+        # Get all active assets for the organization
+        assets = Asset.query.filter_by(organization_id=org.id, is_active=True).all()
+        vulnerabilities = Vulnerability.query.filter_by(organization_id=org.id, is_resolved=False).all()
+
+        nodes = []
+        edges = []
+
+        # Create nodes for assets
+        for asset in assets:
+            # Determine node type and color based on asset type
+            if asset.asset_type == AssetType.DOMAIN:
+                node_type = 'domain'
+                color = '#3b82f6'  # Blue
+            elif asset.asset_type == AssetType.SUBDOMAIN:
+                node_type = 'subdomain'
+                color = '#10b981'  # Green
+            elif asset.asset_type == AssetType.IP_ADDRESS:
+                node_type = 'ip'
+                color = '#6366f1'  # Purple
+            else:
+                node_type = 'asset'
+                color = '#64748b'  # Gray
+
+            # Get asset metadata for additional information
+            metadata = asset.asset_metadata or {}
+            ports = metadata.get('ports', [])
+            http_probe = metadata.get('http_probe', {})
+            technologies = http_probe.get('technologies', [])
+
+            # Create asset node
+            nodes.append({
+                'data': {
+                    'id': f'asset_{asset.id}',
+                    'label': asset.name,
+                    'type': node_type,
+                    'asset_id': asset.id,
+                    'description': asset.description or '',
+                    'last_scanned': asset.last_scanned.isoformat() if asset.last_scanned else None,
+                    'ports_count': len(ports),
+                    'technologies_count': len(technologies)
+                }
+            })
+
+            # Create nodes for ports if they exist
+            for port_info in ports:
+                port_id = f'port_{asset.id}_{port_info.get("port", "unknown")}'
+                nodes.append({
+                    'data': {
+                        'id': port_id,
+                        'label': str(port_info.get('port', 'Unknown')),
+                        'type': 'port',
+                        'service': port_info.get('service', ''),
+                        'asset_id': asset.id
+                    }
+                })
+
+                # Create edge from asset to port
+                edges.append({
+                    'data': {
+                        'source': f'asset_{asset.id}',
+                        'target': port_id,
+                        'type': 'has_port'
+                    }
+                })
+
+            # Create nodes for technologies if they exist
+            for tech in technologies:
+                tech_id = f'tech_{asset.id}_{tech.replace(" ", "_").replace(".", "_")}'
+                # Check if technology node already exists
+                existing_tech = next((n for n in nodes if n['data']['id'] == tech_id), None)
+                if not existing_tech:
+                    nodes.append({
+                        'data': {
+                            'id': tech_id,
+                            'label': tech,
+                            'type': 'technology',
+                            'asset_id': asset.id
+                        }
+                    })
+
+                # Create edge from asset to technology
+                edges.append({
+                    'data': {
+                        'source': f'asset_{asset.id}',
+                        'target': tech_id,
+                        'type': 'uses_technology'
+                    }
+                })
+
+        # Create nodes for vulnerabilities and connect them to assets
+        for vuln in vulnerabilities:
+            vuln_id = f'vuln_{vuln.id}'
+
+            # Determine vulnerability color based on severity
+            severity_colors = {
+                SeverityLevel.CRITICAL: '#dc2626',  # Red
+                SeverityLevel.HIGH: '#ea580c',      # Orange
+                SeverityLevel.MEDIUM: '#d97706',    # Amber
+                SeverityLevel.LOW: '#65a30d',       # Lime
+                SeverityLevel.INFO: '#0891b2'       # Cyan
+            }
+
+            nodes.append({
+                'data': {
+                    'id': vuln_id,
+                    'label': vuln.title[:30] + ('...' if len(vuln.title) > 30 else ''),
+                    'type': 'vulnerability',
+                    'severity': vuln.severity.value,
+                    'full_title': vuln.title,
+                    'description': vuln.description or '',
+                    'cve_id': vuln.cve_id,
+                    'template_name': vuln.template_name,
+                    'discovered_at': vuln.discovered_at.isoformat()
+                }
+            })
+
+            # Create edge from asset to vulnerability
+            if vuln.asset:
+                edges.append({
+                    'data': {
+                        'source': f'asset_{vuln.asset.id}',
+                        'target': vuln_id,
+                        'type': 'has_vulnerability'
+                    }
+                })
+
+        # Create relationships between domains and subdomains
+        domains = [a for a in assets if a.asset_type == AssetType.DOMAIN]
+        subdomains = [a for a in assets if a.asset_type == AssetType.SUBDOMAIN]
+
+        for subdomain in subdomains:
+            # Find parent domain
+            for domain in domains:
+                if subdomain.name.endswith('.' + domain.name):
+                    edges.append({
+                        'data': {
+                            'source': f'asset_{domain.id}',
+                            'target': f'asset_{subdomain.id}',
+                            'type': 'parent_domain'
+                        }
+                    })
+                    break
+
+        return jsonify({
+            'success': True,
+            'nodes': nodes,
+            'edges': edges,
+            'stats': {
+                'total_nodes': len(nodes),
+                'total_edges': len(edges),
+                'assets_count': len(assets),
+                'vulnerabilities_count': len(vulnerabilities)
+            }
+        })
+
+    except Exception as e:
+        logging.error(f"Failed to generate network visualization data: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @api_bp.route('/assets-stats', methods=['GET'])
 @login_required
