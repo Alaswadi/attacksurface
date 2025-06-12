@@ -60,7 +60,8 @@ def generate_html_report():
     """Generate and download HTML compliance report (no dependencies required)"""
     try:
         # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import get_user_organization
+        org = get_user_organization()
         if not org:
             return jsonify({'error': 'Organization not found'}), 404
 

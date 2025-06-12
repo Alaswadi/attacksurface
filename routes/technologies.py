@@ -224,9 +224,10 @@ def filter_technologies():
     """Filter technologies based on criteria"""
     try:
         data = request.get_json()
-        
+
         # Get user's organization
-        organization = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import get_user_organization
+        organization = get_user_organization()
         if not organization:
             return jsonify({
                 'success': False,

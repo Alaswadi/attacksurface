@@ -329,7 +329,9 @@ def get_dashboard_stats():
 @login_required
 def get_assets_stats():
     """Get dashboard statistics for assets page"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -365,12 +367,12 @@ def get_assets_stats():
 @login_required
 def start_scan():
     """Start an attack surface discovery scan"""
-    from utils.permissions import can_run_scans
+    from utils.permissions import can_run_scans, get_user_organization
 
     if not can_run_scans():
         return jsonify({'error': 'Insufficient permissions to run scans'}), 403
 
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -444,7 +446,9 @@ def get_scan_results(scan_id):
 @login_required
 def scan_assets_subdomain():
     """Scan for subdomains and store them as assets"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -1571,7 +1575,9 @@ def progressive_scan_updates_stream(task_id):
 @login_required
 def start_large_scale_scan_progressive():
     """Start a large-scale scan with progressive real-time updates"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
