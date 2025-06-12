@@ -1,0 +1,60 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Invitation to join {{ organization_name }} - AttackSurfacePro{% endblock %}
+
+{% block content %}
+<h2 class="content-title">You're invited to join {{ organization_name }}</h2>
+
+<p class="content-text">
+    <strong>{{ invited_by_name }}</strong> has invited you to join <strong>{{ organization_name }}</strong> on AttackSurfacePro, 
+    our enterprise attack surface management platform.
+</p>
+
+<div class="alert-box">
+    <p class="content-text" style="margin: 0;">
+        <strong>Your Role:</strong> {{ role }}<br>
+        <strong>Organization:</strong> {{ organization_name }}<br>
+        <strong>Invited by:</strong> {{ invited_by_name }}
+    </p>
+</div>
+
+<p class="content-text">
+    AttackSurfacePro helps organizations discover, monitor, and secure their digital attack surface through:
+</p>
+
+<ul style="color: #e2e8f0; font-size: 16px; line-height: 1.6; margin: 0 0 20px 20px;">
+    <li>Automated subdomain discovery and asset inventory</li>
+    <li>Continuous vulnerability scanning and monitoring</li>
+    <li>Real-time security alerts and notifications</li>
+    <li>Comprehensive compliance reporting</li>
+    <li>Advanced threat intelligence and analysis</li>
+</ul>
+
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ invitation_url }}" class="button-primary">Accept Invitation</a>
+</div>
+
+<hr class="divider">
+
+<p class="content-text-muted">
+    <strong>Important:</strong> This invitation expires on <strong>{{ expires_at }}</strong>. 
+    Please accept the invitation before this date to join the organization.
+</p>
+
+<p class="content-text-muted">
+    If you don't want to join this organization, you can safely ignore this email. 
+    The invitation will expire automatically.
+</p>
+
+<p class="content-text-muted">
+    If you're having trouble with the button above, copy and paste the following URL into your browser:
+    <br><a href="{{ invitation_url }}" style="color: #4ade80; word-break: break-all;">{{ invitation_url }}</a>
+</p>
+
+<div class="alert-box" style="margin-top: 30px;">
+    <p class="content-text-muted" style="margin: 0;">
+        <strong>Security Note:</strong> This invitation was sent to {{ recipient_email }}. 
+        If you did not expect this invitation, please contact the sender or ignore this email.
+    </p>
+</div>
+{% endblock %}

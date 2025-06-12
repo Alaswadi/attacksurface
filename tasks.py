@@ -293,6 +293,50 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                 try:
                     db.session.commit()
                     logger.info(f"📊 NUCLEI ASYNC: Stored {vulnerabilities_stored} vulnerabilities for {main_domain}")
+
+                    # Send security alert emails for critical/high vulnerabilities
+                    if vulnerabilities_stored > 0:
+                        try:
+                            # Count vulnerabilities by severity
+                            critical_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'critical')
+                            high_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'high')
+                            medium_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'medium')
+                            low_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'low')
+
+                            # Send alert if critical or high severity vulnerabilities found
+                            if critical_count > 0 or high_count > 0:
+                                alert_data = {
+                                    'title': f'{critical_count + high_count} Critical/High Severity Vulnerabilities Detected',
+                                    'description': f'Nuclei vulnerability scan discovered {critical_count} critical and {high_count} high severity vulnerabilities on {main_domain}.',
+                                    'severity': 'critical' if critical_count > 0 else 'high',
+                                    'asset_name': main_domain,
+                                    'vulnerability_details': {
+                                        'total_found': len(vulnerability_results),
+                                        'critical_count': critical_count,
+                                        'high_count': high_count,
+                                        'medium_count': medium_count,
+                                        'low_count': low_count
+                                    },
+                                    'recommendations': [
+                                        'Review and prioritize critical and high severity vulnerabilities immediately',
+                                        'Implement security patches and updates for affected services',
+                                        'Consider temporarily disabling vulnerable services if patches are not available',
+                                        'Monitor for exploitation attempts and unusual activity'
+                                    ],
+                                    'summary': {
+                                        'total_vulnerabilities': len(vulnerability_results),
+                                        'critical_high_count': critical_count + high_count
+                                    },
+                                    'alert_id': f"vuln_{main_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                }
+
+                                # Send security alert email asynchronously
+                                send_security_alert_email_task.delay(alert_data, organization_id)
+                                logger.info(f"📧 Security alert email queued for {critical_count + high_count} critical/high vulnerabilities on {main_domain}")
+
+                        except Exception as email_error:
+                            logger.warning(f"⚠️ Failed to send security alert email: {str(email_error)}")
+
                 except Exception as e:
                     logger.error(f"❌ NUCLEI ASYNC: Database commit failed: {str(e)}")
                     db.session.rollback()
@@ -868,6 +912,48 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
         )
 
         logger.info(f"🎉 Large-scale scan orchestration completed for {domain}")
+
+        # Send scan completion email notification
+        try:
+            # Calculate scan duration
+            start_time = datetime.now()  # This should be captured at the beginning, but using current time as fallback
+            scan_duration = "Completed"  # Simplified for now
+
+            # Count vulnerabilities by severity (if any were found)
+            vulnerabilities_found = {
+                'total': 0,
+                'critical': 0,
+                'high': 0,
+                'medium': 0,
+                'low': 0,
+                'info': 0
+            }
+
+            # Prepare scan completion data for email
+            scan_completion_data = {
+                'target': domain,
+                'scan_type': f'{scan_type.title()} Scan',
+                'duration': scan_duration,
+                'started_at': start_time.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'completed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'assets_discovered': {
+                    'subdomains': len(subdomains),
+                    'live_hosts': len(alive_hosts),
+                    'open_ports': sum(len(ports) for ports in port_results.values()),
+                    'services': sum(len([p for p in ports if isinstance(p, dict) and p.get('service')]) for ports in port_results.values()),
+                    'technologies': sum(len(http_info.get('tech', [])) for http_info in http_data.values())
+                },
+                'vulnerabilities_found': vulnerabilities_found,
+                'scan_id': f"scan_{domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                'initiated_by': 'Large-Scale Scanner'
+            }
+
+            # Send email notification asynchronously
+            send_scan_completion_email_task.delay(scan_completion_data, organization_id)
+            logger.info(f"📧 Scan completion email notification queued for {domain}")
+
+        except Exception as email_error:
+            logger.warning(f"⚠️ Failed to send scan completion email: {str(email_error)}")
 
         return {
             'success': True,
@@ -1595,21 +1681,21 @@ def cleanup_old_data_task(self, days_old=30):
 def send_notification_task(self, user_id, message, notification_type='info'):
     """
     Background task to send notifications
-    
+
     Args:
         user_id (int): User ID to send notification to
         message (str): Notification message
         notification_type (str): Type of notification (info, warning, error)
-    
+
     Returns:
         dict: Notification result
     """
     try:
         logger.info(f"Sending {notification_type} notification to user {user_id}: {message}")
-        
+
         # Here you would implement actual notification sending
         # For now, just log the notification
-        
+
         return {
             'success': True,
             'user_id': user_id,
@@ -1617,9 +1703,91 @@ def send_notification_task(self, user_id, message, notification_type='info'):
             'type': notification_type,
             'sent_at': datetime.utcnow().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to send notification: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+@celery.task(bind=True)
+def send_scan_completion_email_task(self, scan_data, organization_id):
+    """
+    Background task to send scan completion email notifications
+
+    Args:
+        scan_data (dict): Scan completion data
+        organization_id (int): Organization ID
+
+    Returns:
+        dict: Email sending result
+    """
+    try:
+        logger.info(f"Sending scan completion email for organization {organization_id}")
+
+        from services.email_service import EmailService
+
+        # Initialize email service
+        email_service = EmailService(organization_id)
+
+        if not email_service.is_configured():
+            logger.warning(f"Email not configured for organization {organization_id}")
+            return {'success': False, 'error': 'Email not configured'}
+
+        # Send scan completion email
+        result = email_service.send_scan_completion(scan_data)
+
+        if result['success']:
+            logger.info(f"Scan completion email sent successfully for organization {organization_id}")
+        else:
+            logger.error(f"Failed to send scan completion email: {result.get('error')}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to send scan completion email: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+@celery.task(bind=True)
+def send_security_alert_email_task(self, alert_data, organization_id):
+    """
+    Background task to send security alert email notifications
+
+    Args:
+        alert_data (dict): Security alert data
+        organization_id (int): Organization ID
+
+    Returns:
+        dict: Email sending result
+    """
+    try:
+        logger.info(f"Sending security alert email for organization {organization_id}")
+
+        from services.email_service import EmailService
+
+        # Initialize email service
+        email_service = EmailService(organization_id)
+
+        if not email_service.is_configured():
+            logger.warning(f"Email not configured for organization {organization_id}")
+            return {'success': False, 'error': 'Email not configured'}
+
+        # Send security alert email
+        result = email_service.send_security_alert(alert_data)
+
+        if result['success']:
+            logger.info(f"Security alert email sent successfully for organization {organization_id}")
+        else:
+            logger.error(f"Failed to send security alert email: {result.get('error')}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to send security alert email: {str(e)}")
         return {
             'success': False,
             'error': str(e)

@@ -1,0 +1,119 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Security Alert - {{ alert_title }} - AttackSurfacePro{% endblock %}
+
+{% block content %}
+<h2 class="content-title">🚨 Security Alert: {{ alert_title }}</h2>
+
+<div class="alert-box {% if severity == 'critical' %}error{% elif severity == 'high' %}warning{% endif %}">
+    <p class="content-text" style="margin: 0;">
+        <strong>Severity:</strong> 
+        <span class="stats-value {{ severity }}">{{ severity.upper() }}</span><br>
+        <strong>Detected:</strong> {{ detected_at }}<br>
+        <strong>Asset:</strong> {{ asset_name }}
+    </p>
+</div>
+
+<p class="content-text">
+    {{ alert_description }}
+</p>
+
+{% if vulnerability_details %}
+<div class="stats-container">
+    <h3 style="color: #ffffff; font-size: 18px; margin: 0 0 15px 0;">Vulnerability Details</h3>
+    
+    {% if vulnerability_details.cve_id %}
+    <div class="stats-row">
+        <span class="stats-label">CVE ID:</span>
+        <span class="stats-value">{{ vulnerability_details.cve_id }}</span>
+    </div>
+    {% endif %}
+    
+    {% if vulnerability_details.cvss_score %}
+    <div class="stats-row">
+        <span class="stats-label">CVSS Score:</span>
+        <span class="stats-value">{{ vulnerability_details.cvss_score }}</span>
+    </div>
+    {% endif %}
+    
+    {% if vulnerability_details.category %}
+    <div class="stats-row">
+        <span class="stats-label">Category:</span>
+        <span class="stats-value">{{ vulnerability_details.category }}</span>
+    </div>
+    {% endif %}
+    
+    {% if vulnerability_details.port %}
+    <div class="stats-row">
+        <span class="stats-label">Affected Port:</span>
+        <span class="stats-value">{{ vulnerability_details.port }}</span>
+    </div>
+    {% endif %}
+    
+    {% if vulnerability_details.service %}
+    <div class="stats-row">
+        <span class="stats-label">Service:</span>
+        <span class="stats-value">{{ vulnerability_details.service }}</span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if recommendations %}
+<h3 style="color: #ffffff; font-size: 18px; margin: 30px 0 15px 0;">Recommended Actions</h3>
+<ul style="color: #e2e8f0; font-size: 16px; line-height: 1.6; margin: 0 0 20px 20px;">
+    {% for recommendation in recommendations %}
+    <li>{{ recommendation }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ dashboard_url }}" class="button-primary">View in Dashboard</a>
+</div>
+
+<hr class="divider">
+
+<div class="stats-container">
+    <h3 style="color: #ffffff; font-size: 18px; margin: 0 0 15px 0;">Organization Security Summary</h3>
+    
+    <div class="stats-row">
+        <span class="stats-label">Total Assets:</span>
+        <span class="stats-value">{{ summary.total_assets or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Active Vulnerabilities:</span>
+        <span class="stats-value">{{ summary.total_vulnerabilities or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Critical/High Severity:</span>
+        <span class="stats-value critical">{{ summary.critical_high_count or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Last Scan:</span>
+        <span class="stats-value">{{ summary.last_scan_date or 'Never' }}</span>
+    </div>
+</div>
+
+<p class="content-text-muted">
+    This alert was generated automatically by AttackSurfacePro's continuous monitoring system. 
+    Please review the vulnerability details and take appropriate action to secure your infrastructure.
+</p>
+
+<p class="content-text-muted">
+    <strong>Need Help?</strong> Contact your security team or 
+    <a href="{{ support_url or '#' }}" style="color: #4ade80;">view our security documentation</a> 
+    for guidance on addressing this vulnerability.
+</p>
+
+<div class="alert-box" style="margin-top: 30px;">
+    <p class="content-text-muted" style="margin: 0;">
+        <strong>Alert ID:</strong> {{ alert_id }}<br>
+        <strong>Organization:</strong> {{ organization_name }}<br>
+        <strong>Generated:</strong> {{ generated_at }}
+    </p>
+</div>
+{% endblock %}

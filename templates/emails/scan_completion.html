@@ -1,0 +1,169 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Scan Complete - {{ scan_target }} - AttackSurfacePro{% endblock %}
+
+{% block content %}
+<h2 class="content-title">✅ Scan Complete: {{ scan_target }}</h2>
+
+<p class="content-text">
+    Your {{ scan_type }} scan for <strong>{{ scan_target }}</strong> has completed successfully. 
+    Here's a summary of what we discovered:
+</p>
+
+<div class="stats-container">
+    <h3 style="color: #ffffff; font-size: 18px; margin: 0 0 15px 0;">Scan Results Summary</h3>
+    
+    <div class="stats-row">
+        <span class="stats-label">Scan Type:</span>
+        <span class="stats-value">{{ scan_type }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Target:</span>
+        <span class="stats-value">{{ scan_target }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Duration:</span>
+        <span class="stats-value">{{ scan_duration }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Started:</span>
+        <span class="stats-value">{{ scan_started_at }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Completed:</span>
+        <span class="stats-value">{{ scan_completed_at }}</span>
+    </div>
+</div>
+
+{% if assets_discovered %}
+<div class="stats-container">
+    <h3 style="color: #ffffff; font-size: 18px; margin: 0 0 15px 0;">Assets Discovered</h3>
+    
+    <div class="stats-row">
+        <span class="stats-label">Subdomains:</span>
+        <span class="stats-value">{{ assets_discovered.subdomains or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Live Hosts:</span>
+        <span class="stats-value">{{ assets_discovered.live_hosts or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Open Ports:</span>
+        <span class="stats-value">{{ assets_discovered.open_ports or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Services:</span>
+        <span class="stats-value">{{ assets_discovered.services or 0 }}</span>
+    </div>
+    
+    {% if assets_discovered.technologies %}
+    <div class="stats-row">
+        <span class="stats-label">Technologies:</span>
+        <span class="stats-value">{{ assets_discovered.technologies or 0 }}</span>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if vulnerabilities_found %}
+<div class="stats-container">
+    <h3 style="color: #ffffff; font-size: 18px; margin: 0 0 15px 0;">Vulnerabilities Found</h3>
+    
+    <div class="stats-row">
+        <span class="stats-label">Total Vulnerabilities:</span>
+        <span class="stats-value">{{ vulnerabilities_found.total or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Critical:</span>
+        <span class="stats-value critical">{{ vulnerabilities_found.critical or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">High:</span>
+        <span class="stats-value high">{{ vulnerabilities_found.high or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Medium:</span>
+        <span class="stats-value medium">{{ vulnerabilities_found.medium or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Low:</span>
+        <span class="stats-value low">{{ vulnerabilities_found.low or 0 }}</span>
+    </div>
+    
+    <div class="stats-row">
+        <span class="stats-label">Info:</span>
+        <span class="stats-value">{{ vulnerabilities_found.info or 0 }}</span>
+    </div>
+</div>
+
+{% if vulnerabilities_found.critical > 0 or vulnerabilities_found.high > 0 %}
+<div class="alert-box error">
+    <p class="content-text" style="margin: 0;">
+        <strong>⚠️ Action Required:</strong> 
+        {{ vulnerabilities_found.critical + vulnerabilities_found.high }} critical/high severity vulnerabilities 
+        were discovered that require immediate attention.
+    </p>
+</div>
+{% endif %}
+{% endif %}
+
+{% if top_vulnerabilities %}
+<h3 style="color: #ffffff; font-size: 18px; margin: 30px 0 15px 0;">Top Vulnerabilities</h3>
+<ul style="color: #e2e8f0; font-size: 16px; line-height: 1.6; margin: 0 0 20px 20px;">
+    {% for vuln in top_vulnerabilities %}
+    <li>
+        <strong>{{ vuln.title }}</strong> 
+        <span class="stats-value {{ vuln.severity }}">{{ vuln.severity.upper() }}</span>
+        {% if vuln.asset %} - {{ vuln.asset }}{% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+<div style="text-align: center; margin: 30px 0;">
+    <a href="{{ dashboard_url }}" class="button-primary">View Full Results</a>
+</div>
+
+<hr class="divider">
+
+{% if scan_notes %}
+<h3 style="color: #ffffff; font-size: 18px; margin: 30px 0 15px 0;">Scan Notes</h3>
+<p class="content-text">{{ scan_notes }}</p>
+{% endif %}
+
+{% if next_scan_scheduled %}
+<p class="content-text-muted">
+    <strong>Next Scheduled Scan:</strong> {{ next_scan_scheduled }}
+</p>
+{% endif %}
+
+<p class="content-text-muted">
+    This scan was performed using AttackSurfacePro's automated security scanning tools including 
+    subdomain discovery, port scanning, and vulnerability assessment.
+</p>
+
+<p class="content-text-muted">
+    <strong>Need to modify scan settings?</strong> 
+    <a href="{{ settings_url or '#' }}" style="color: #4ade80;">Update your scan configuration</a> 
+    or contact your administrator.
+</p>
+
+<div class="alert-box" style="margin-top: 30px;">
+    <p class="content-text-muted" style="margin: 0;">
+        <strong>Scan ID:</strong> {{ scan_id }}<br>
+        <strong>Organization:</strong> {{ organization_name }}<br>
+        <strong>Initiated by:</strong> {{ initiated_by or 'Automated System' }}
+    </p>
+</div>
+{% endblock %}

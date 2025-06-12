@@ -2349,3 +2349,106 @@ def test_email_configuration():
 
     except Exception as e:
         return jsonify({'error': f'Failed to test email: {str(e)}'}), 500
+
+@api_bp.route('/settings/email/test-templates', methods=['POST'])
+@login_required
+def test_email_templates():
+    """Test email templates by sending sample emails"""
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    data = request.get_json()
+    if not data or 'template_type' not in data or 'test_email' not in data:
+        return jsonify({'error': 'Template type and test email are required'}), 400
+
+    template_type = data['template_type']
+    test_email = data['test_email']
+
+    try:
+        from services.email_service import EmailService
+        email_service = EmailService(org.id)
+
+        if not email_service.is_configured():
+            return jsonify({'error': 'Email not configured'}), 400
+
+        if template_type == 'security_alert':
+            # Send test security alert
+            alert_data = {
+                'title': 'Test Security Alert - SQL Injection Vulnerability',
+                'description': 'This is a test security alert to demonstrate the email template. A SQL injection vulnerability has been detected on your test domain.',
+                'severity': 'high',
+                'asset_name': 'test.example.com',
+                'vulnerability_details': {
+                    'cve_id': 'CVE-2023-12345',
+                    'cvss_score': '8.5',
+                    'category': 'SQL Injection',
+                    'port': '443',
+                    'service': 'HTTPS'
+                },
+                'recommendations': [
+                    'Update the web application to the latest version',
+                    'Implement input validation and parameterized queries',
+                    'Review and audit database access controls',
+                    'Monitor for suspicious database activity'
+                ],
+                'summary': {
+                    'total_assets': 25,
+                    'total_vulnerabilities': 8,
+                    'critical_high_count': 3,
+                    'last_scan_date': '2024-01-15'
+                },
+                'alert_id': 'test_alert_001'
+            }
+            result = email_service.send_security_alert(alert_data, [test_email])
+
+        elif template_type == 'scan_completion':
+            # Send test scan completion
+            scan_data = {
+                'target': 'example.com',
+                'scan_type': 'Deep Security Scan',
+                'duration': '45 minutes',
+                'started_at': '2024-01-15 10:00:00 UTC',
+                'completed_at': '2024-01-15 10:45:00 UTC',
+                'assets_discovered': {
+                    'subdomains': 15,
+                    'live_hosts': 12,
+                    'open_ports': 28,
+                    'services': 18,
+                    'technologies': 8
+                },
+                'vulnerabilities_found': {
+                    'total': 6,
+                    'critical': 1,
+                    'high': 2,
+                    'medium': 2,
+                    'low': 1,
+                    'info': 0
+                },
+                'top_vulnerabilities': [
+                    {'title': 'SQL Injection in Login Form', 'severity': 'critical', 'asset': 'app.example.com'},
+                    {'title': 'Cross-Site Scripting (XSS)', 'severity': 'high', 'asset': 'blog.example.com'},
+                    {'title': 'Outdated SSL Certificate', 'severity': 'medium', 'asset': 'api.example.com'}
+                ],
+                'scan_notes': 'Comprehensive security scan completed successfully. Several critical vulnerabilities require immediate attention.',
+                'scan_id': 'test_scan_001',
+                'initiated_by': 'Test User'
+            }
+            result = email_service.send_scan_completion(scan_data, [test_email])
+
+        else:
+            return jsonify({'error': 'Invalid template type. Use "security_alert" or "scan_completion"'}), 400
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': f'Test {template_type} email sent successfully to {test_email}'
+            })
+        else:
+            return jsonify({'error': result.get('error', 'Failed to send email')}), 500
+
+    except Exception as e:
+        logger.error(f"Failed to send test template email: {str(e)}")
+        return jsonify({'error': f'Failed to send test email: {str(e)}'}), 500

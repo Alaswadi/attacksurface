@@ -283,22 +283,6 @@
                                     <input type="checkbox" id="tech-detection-enabled" checked class="h-4 w-4 text-primary focus:ring-primary border-slate-600 bg-slate-700 rounded">
                                     <label for="tech-detection-enabled" class="ml-2 block text-sm text-slate-300">Enable technology detection</label>
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-slate-400 mb-2">Detection Tools</label>
-                                    <div class="space-y-2">
-                                        <div class="flex items-center">
-                                            <input type="checkbox" id="wappalyzer" checked class="h-4 w-4 text-primary focus:ring-primary border-slate-600 bg-slate-700 rounded">
-                                            <label for="wappalyzer" class="ml-2 block text-sm text-slate-300">Wappalyzer</label>
-                                        </div>
-                                        <div class="flex items-center">
-                                            <input type="checkbox" id="httpx" checked class="h-4 w-4 text-primary focus:ring-primary border-slate-600 bg-slate-700 rounded">
-                                            <label for="httpx" class="ml-2 block text-sm text-slate-300">httpx</label>
-                                        </div>
-                                        <div class="flex items-center">
-                                            <input type="checkbox" id="nuclei-tech" checked class="h-4 w-4 text-primary focus:ring-primary border-slate-600 bg-slate-700 rounded">
-                                            <label for="nuclei-tech" class="ml-2 block text-sm text-slate-300">Nuclei (tech detection)</label>
-                                        </div>
-                                    </div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-400 mb-2">Update Frequency</label>
@@ -784,18 +768,60 @@
                                     <h4 class="text-md font-semibold text-white mb-3">
                                         <i class="ri-file-text-line mr-2 text-primary"></i>Email Templates
                                     </h4>
-                                    <div class="space-y-2">
-                                        <div class="flex items-center justify-between p-2 bg-slate-700/50 rounded-lg">
-                                            <span class="text-sm text-slate-300">User Invitations</span>
-                                            <button class="text-primary hover:text-primary/80 text-sm">Edit</button>
+                                    <p class="text-slate-400 text-sm mb-4">
+                                        Test the professional email templates used for security alerts and scan completion notifications.
+                                    </p>
+                                    <div class="space-y-4">
+                                        <div id="template-test-status" class="hidden p-3 rounded-lg">
+                                            <!-- Template test status will be shown here -->
                                         </div>
-                                        <div class="flex items-center justify-between p-2 bg-slate-700/50 rounded-lg">
-                                            <span class="text-sm text-slate-300">Vulnerability Alerts</span>
-                                            <button class="text-primary hover:text-primary/80 text-sm">Edit</button>
-                                        </div>
-                                        <div class="flex items-center justify-between p-2 bg-slate-700/50 rounded-lg">
-                                            <span class="text-sm text-slate-300">Scan Reports</span>
-                                            <button class="text-primary hover:text-primary/80 text-sm">Edit</button>
+                                        <form id="template-test-form" class="space-y-4">
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-slate-400 mb-2">Template Type</label>
+                                                    <select id="template-type" required
+                                                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white">
+                                                        <option value="">Select template type</option>
+                                                        <option value="security_alert">Security Alert</option>
+                                                        <option value="scan_completion">Scan Completion</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-slate-400 mb-2">Test Email Address</label>
+                                                    <input type="email" id="template-test-email" required placeholder="test@example.com"
+                                                           class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-white placeholder-slate-400">
+                                                </div>
+                                            </div>
+                                            <button type="submit" id="send-template-test-btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <span class="btn-text">
+                                                    <i class="ri-mail-star-line mr-2"></i>Send Template Test
+                                                </span>
+                                                <span class="btn-loading hidden">
+                                                    <i class="ri-loader-4-line animate-spin mr-2"></i>Sending...
+                                                </span>
+                                            </button>
+                                        </form>
+
+                                        <!-- Template Descriptions -->
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                            <div class="bg-slate-700/50 rounded-lg p-3">
+                                                <h5 class="text-white font-medium mb-2 text-sm">
+                                                    <i class="ri-shield-cross-line mr-2 text-red-400"></i>Security Alert
+                                                </h5>
+                                                <p class="text-slate-400 text-xs">
+                                                    Sent when critical or high severity vulnerabilities are detected during scans.
+                                                    Includes vulnerability details, recommendations, and organization summary.
+                                                </p>
+                                            </div>
+                                            <div class="bg-slate-700/50 rounded-lg p-3">
+                                                <h5 class="text-white font-medium mb-2 text-sm">
+                                                    <i class="ri-check-double-line mr-2 text-green-400"></i>Scan Completion
+                                                </h5>
+                                                <p class="text-slate-400 text-xs">
+                                                    Sent when security scans complete successfully.
+                                                    Includes discovered assets, vulnerability counts, and scan statistics.
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1992,6 +2018,69 @@ function sendTestEmail() {
     });
 }
 
+function sendTemplateTest() {
+    const templateType = document.getElementById('template-type').value.trim();
+    const testEmail = document.getElementById('template-test-email').value.trim();
+
+    if (!templateType) {
+        showNotification('Please select a template type', 'error');
+        return;
+    }
+
+    if (!testEmail) {
+        showNotification('Please enter a test email address', 'error');
+        return;
+    }
+
+    if (!isValidEmail(testEmail)) {
+        showNotification('Please enter a valid email address', 'error');
+        return;
+    }
+
+    // Show loading state
+    setButtonLoading('send-template-test-btn', true);
+
+    // Clear previous status
+    const statusDiv = document.getElementById('template-test-status');
+    statusDiv.classList.add('hidden');
+
+    // Send template test email
+    fetch('/api/settings/email/test-templates', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            template_type: templateType,
+            test_email: testEmail
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(`${templateType.replace('_', ' ')} template test sent successfully!`, 'success');
+            statusDiv.className = 'p-3 rounded-lg bg-green-500/20 border border-green-500/30';
+            statusDiv.innerHTML = `<i class="ri-check-line text-green-400 mr-2"></i><span class="text-green-400">${templateType.replace('_', ' ')} template test sent successfully!</span>`;
+            statusDiv.classList.remove('hidden');
+        } else {
+            showNotification(data.error || 'Failed to send template test', 'error');
+            statusDiv.className = 'p-3 rounded-lg bg-red-500/20 border border-red-500/30';
+            statusDiv.innerHTML = `<i class="ri-error-warning-line text-red-400 mr-2"></i><span class="text-red-400">${data.error || 'Failed to send template test'}</span>`;
+            statusDiv.classList.remove('hidden');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Failed to send template test', 'error');
+        statusDiv.className = 'p-3 rounded-lg bg-red-500/20 border border-red-500/30';
+        statusDiv.innerHTML = '<i class="ri-error-warning-line text-red-400 mr-2"></i><span class="text-red-400">Failed to send template test</span>';
+        statusDiv.classList.remove('hidden');
+    })
+    .finally(() => {
+        setButtonLoading('send-template-test-btn', false);
+    });
+}
+
 // Initialize enhanced functionality when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Load initial data
@@ -2020,6 +2109,14 @@ document.addEventListener('DOMContentLoaded', function() {
         testEmailForm.addEventListener('submit', function(e) {
             e.preventDefault();
             sendTestEmail();
+        });
+    }
+
+    const templateTestForm = document.getElementById('template-test-form');
+    if (templateTestForm) {
+        templateTestForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            sendTemplateTest();
         });
     }
 

@@ -14,8 +14,8 @@ from datetime import datetime
 import secrets
 import string
 
-from models import EmailConfiguration, EmailTemplate, UserInvitation, User, Organization
-from flask import current_app, url_for, render_template_string
+from models import EmailConfiguration, EmailTemplate, UserInvitation, User, Organization, Asset, Vulnerability, EmailNotificationSettings
+from flask import current_app, url_for, render_template_string, render_template
 
 logger = logging.getLogger(__name__)
 
@@ -180,53 +180,138 @@ class EmailService:
                 is_active=True
             ).first()
             
+            # Prepare template context
+            context = {
+                'organization_name': org.name,
+                'invited_by_name': invited_by.username,
+                'invitation_url': invitation_url,
+                'role': invitation.role.value.title(),
+                'expires_at': invitation.expires_at.strftime('%Y-%m-%d'),
+                'recipient_email': invitation.email,
+                'current_year': datetime.utcnow().year,
+                'unsubscribe_url': url_for('settings', _external=True),
+                'settings_url': url_for('settings', _external=True)
+            }
+
             if template:
-                body_html = render_template_string(template.body_html,
-                    organization_name=org.name,
-                    invited_by_name=invited_by.username,
-                    invitation_url=invitation_url,
-                    role=invitation.role.value.title(),
-                    expires_at=invitation.expires_at.strftime('%Y-%m-%d')
-                )
-                body_text = render_template_string(template.body_text or "",
-                    organization_name=org.name,
-                    invited_by_name=invited_by.username,
-                    invitation_url=invitation_url,
-                    role=invitation.role.value.title(),
-                    expires_at=invitation.expires_at.strftime('%Y-%m-%d')
-                )
+                body_html = render_template_string(template.body_html, **context)
+                body_text = render_template_string(template.body_text or "", **context)
             else:
-                # Default template
-                body_html = f"""
-                <html>
-                <body>
-                    <h2>You're invited to join {org.name}</h2>
-                    <p>{invited_by.username} has invited you to join <strong>{org.name}</strong> on AttackSurfacePro.</p>
-                    <p>You will be added as a <strong>{invitation.role.value.title()}</strong>.</p>
-                    <p><a href="{invitation_url}" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Accept Invitation</a></p>
-                    <p>This invitation expires on {invitation.expires_at.strftime('%Y-%m-%d')}.</p>
-                    <p>If you don't want to join this organization, you can ignore this email.</p>
-                </body>
-                </html>
-                """
-                
+                # Use new professional template
+                body_html = render_template('emails/user_invitation.html', **context)
                 body_text = f"""
                 You're invited to join {org.name}
-                
+
                 {invited_by.username} has invited you to join {org.name} on AttackSurfacePro.
                 You will be added as a {invitation.role.value.title()}.
-                
+
                 Accept invitation: {invitation_url}
-                
+
                 This invitation expires on {invitation.expires_at.strftime('%Y-%m-%d')}.
                 If you don't want to join this organization, you can ignore this email.
                 """
-            
+
             return self.send_email([invitation.email], subject, body_html, body_text)
-            
+
         except Exception as e:
             logger.error(f"Failed to send invitation email: {str(e)}")
             return {'success': False, 'error': f'Failed to send invitation: {str(e)}'}
+
+    def send_security_alert(self, alert_data: Dict[str, Any], recipients: List[str] = None) -> Dict[str, Any]:
+        """Send security alert notification email"""
+        try:
+            if not recipients:
+                # Get users who want security alert notifications
+                notification_settings = EmailNotificationSettings.query.filter_by(
+                    organization_id=self.organization_id,
+                    notify_new_vulnerabilities=True
+                ).all()
+                recipients = [User.query.get(setting.user_id).email for setting in notification_settings]
+
+            if not recipients:
+                return {'success': False, 'error': 'No recipients configured for security alerts'}
+
+            # Get organization details
+            org = Organization.query.get(self.organization_id)
+
+            # Prepare template context
+            context = {
+                'alert_title': alert_data.get('title', 'Security Vulnerability Detected'),
+                'alert_description': alert_data.get('description', ''),
+                'severity': alert_data.get('severity', 'medium'),
+                'detected_at': alert_data.get('detected_at', datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')),
+                'asset_name': alert_data.get('asset_name', ''),
+                'vulnerability_details': alert_data.get('vulnerability_details', {}),
+                'recommendations': alert_data.get('recommendations', []),
+                'dashboard_url': url_for('dashboard', _external=True),
+                'organization_name': org.name,
+                'summary': alert_data.get('summary', {}),
+                'alert_id': alert_data.get('alert_id', ''),
+                'generated_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'current_year': datetime.utcnow().year,
+                'unsubscribe_url': url_for('settings', _external=True),
+                'settings_url': url_for('settings', _external=True)
+            }
+
+            subject = f"Security Alert: {alert_data.get('title', 'Vulnerability Detected')} - {org.name}"
+
+            # Render email template
+            body_html = render_template('emails/security_alert.html', **context)
+
+            return self.send_email(recipients, subject, body_html)
+
+        except Exception as e:
+            logger.error(f"Failed to send security alert email: {str(e)}")
+            return {'success': False, 'error': f'Failed to send security alert email: {str(e)}'}
+
+    def send_scan_completion(self, scan_data: Dict[str, Any], recipients: List[str] = None) -> Dict[str, Any]:
+        """Send scan completion notification email"""
+        try:
+            if not recipients:
+                # Get users who want scan completion notifications
+                notification_settings = EmailNotificationSettings.query.filter_by(
+                    organization_id=self.organization_id,
+                    notify_scan_completion=True
+                ).all()
+                recipients = [User.query.get(setting.user_id).email for setting in notification_settings]
+
+            if not recipients:
+                return {'success': False, 'error': 'No recipients configured for scan completion notifications'}
+
+            # Get organization details
+            org = Organization.query.get(self.organization_id)
+
+            # Prepare template context
+            context = {
+                'scan_target': scan_data.get('target', ''),
+                'scan_type': scan_data.get('scan_type', 'Security Scan'),
+                'scan_duration': scan_data.get('duration', ''),
+                'scan_started_at': scan_data.get('started_at', ''),
+                'scan_completed_at': scan_data.get('completed_at', ''),
+                'assets_discovered': scan_data.get('assets_discovered', {}),
+                'vulnerabilities_found': scan_data.get('vulnerabilities_found', {}),
+                'top_vulnerabilities': scan_data.get('top_vulnerabilities', []),
+                'scan_notes': scan_data.get('notes', ''),
+                'next_scan_scheduled': scan_data.get('next_scan_scheduled', ''),
+                'dashboard_url': url_for('dashboard', _external=True),
+                'settings_url': url_for('settings', _external=True),
+                'organization_name': org.name,
+                'scan_id': scan_data.get('scan_id', ''),
+                'initiated_by': scan_data.get('initiated_by', ''),
+                'current_year': datetime.utcnow().year,
+                'unsubscribe_url': url_for('settings', _external=True)
+            }
+
+            subject = f"Scan Complete: {scan_data.get('target', 'Security Scan')} - {org.name}"
+
+            # Render email template
+            body_html = render_template('emails/scan_completion.html', **context)
+
+            return self.send_email(recipients, subject, body_html)
+
+        except Exception as e:
+            logger.error(f"Failed to send scan completion email: {str(e)}")
+            return {'success': False, 'error': f'Failed to send scan completion email: {str(e)}'}
 
 def generate_invitation_token() -> str:
     """Generate a secure token for user invitations"""
@@ -236,7 +321,7 @@ def generate_invitation_token() -> str:
 def create_default_email_templates(organization_id: int):
     """Create default email templates for an organization"""
     from models import db, EmailTemplate
-    
+
     templates = [
         {
             'name': 'User Invitation',
@@ -260,18 +345,58 @@ def create_default_email_templates(organization_id: int):
             ''',
             'body_text': '''
             You're invited to join {{ organization_name }}
-            
+
             {{ invited_by_name }} has invited you to join {{ organization_name }} on AttackSurfacePro.
             You will be added as a {{ role }}.
-            
+
             Accept invitation: {{ invitation_url }}
-            
+
             This invitation expires on {{ expires_at }}.
             If you don't want to join this organization, you can ignore this email.
             '''
+        },
+        {
+            'name': 'Security Alert',
+            'event_type': 'security_alert',
+            'subject': 'Security Alert: {{ alert_title }} - {{ organization_name }}',
+            'body_html': 'Uses templates/emails/security_alert.html',
+            'body_text': '''
+            Security Alert: {{ alert_title }}
+
+            {{ alert_description }}
+
+            Severity: {{ severity }}
+            Asset: {{ asset_name }}
+            Detected: {{ detected_at }}
+
+            Please review this vulnerability and take appropriate action.
+
+            View in Dashboard: {{ dashboard_url }}
+            '''
+        },
+        {
+            'name': 'Scan Completion',
+            'event_type': 'scan_completion',
+            'subject': 'Scan Complete: {{ scan_target }} - {{ organization_name }}',
+            'body_html': 'Uses templates/emails/scan_completion.html',
+            'body_text': '''
+            Scan Complete: {{ scan_target }}
+
+            Your {{ scan_type }} scan has completed successfully.
+
+            Results Summary:
+            - Subdomains: {{ assets_discovered.subdomains }}
+            - Live Hosts: {{ assets_discovered.live_hosts }}
+            - Vulnerabilities: {{ vulnerabilities_found.total }}
+
+            Duration: {{ scan_duration }}
+            Completed: {{ scan_completed_at }}
+
+            View Full Results: {{ dashboard_url }}
+            '''
         }
     ]
-    
+
     for template_data in templates:
         template = EmailTemplate(
             organization_id=organization_id,
@@ -280,5 +405,5 @@ def create_default_email_templates(organization_id: int):
             is_default=True
         )
         db.session.add(template)
-    
+
     db.session.commit()
