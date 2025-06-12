@@ -8,9 +8,7 @@ db = SQLAlchemy()
 bcrypt = Bcrypt()
 
 class UserRole(enum.Enum):
-    OWNER = "owner"
     ADMIN = "admin"
-    MEMBER = "member"
     VIEWER = "viewer"
 
 class User(UserMixin, db.Model):
@@ -143,18 +141,40 @@ class OrganizationUser(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
-    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.MEMBER)
+    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.VIEWER)
     joined_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
 
-    # Permissions
-    can_view_assets = db.Column(db.Boolean, default=True)
-    can_add_assets = db.Column(db.Boolean, default=True)
-    can_run_scans = db.Column(db.Boolean, default=False)
-    can_view_reports = db.Column(db.Boolean, default=True)
-    can_manage_settings = db.Column(db.Boolean, default=False)
-
     __table_args__ = (db.UniqueConstraint('user_id', 'organization_id'),)
+
+    def has_permission(self, permission):
+        """Check if user has specific permission based on role"""
+        if self.role == UserRole.ADMIN:
+            return True
+        elif self.role == UserRole.VIEWER:
+            return permission in ['view_assets', 'view_vulnerabilities', 'view_technologies', 'view_reports']
+        return False
+
+    def can_view_assets(self):
+        return self.has_permission('view_assets')
+
+    def can_add_assets(self):
+        return self.has_permission('add_assets')
+
+    def can_run_scans(self):
+        return self.has_permission('run_scans')
+
+    def can_view_reports(self):
+        return self.has_permission('view_reports')
+
+    def can_manage_settings(self):
+        return self.has_permission('manage_settings')
+
+    def can_view_vulnerabilities(self):
+        return self.has_permission('view_vulnerabilities')
+
+    def can_view_technologies(self):
+        return self.has_permission('view_technologies')
 
 class UserInvitation(db.Model):
     """User invitations for organizations"""
@@ -162,19 +182,14 @@ class UserInvitation(db.Model):
     email = db.Column(db.String(120), nullable=False)
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
     invited_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.MEMBER)
+    role = db.Column(db.Enum(UserRole), nullable=False, default=UserRole.VIEWER)
     token = db.Column(db.String(255), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     expires_at = db.Column(db.DateTime, nullable=False)
     accepted_at = db.Column(db.DateTime)
     is_accepted = db.Column(db.Boolean, default=False)
 
-    # Permissions for the invited user
-    can_view_assets = db.Column(db.Boolean, default=True)
-    can_add_assets = db.Column(db.Boolean, default=True)
-    can_run_scans = db.Column(db.Boolean, default=False)
-    can_view_reports = db.Column(db.Boolean, default=True)
-    can_manage_settings = db.Column(db.Boolean, default=False)
+
 
     # Relationships
     invited_by = db.relationship('User', foreign_keys=[invited_by_id], overlaps="invitations,user")

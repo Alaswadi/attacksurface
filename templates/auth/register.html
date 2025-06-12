@@ -13,17 +13,43 @@
                      class="h-20 w-auto object-contain">
             </div>
             <div class="mb-6">
+                {% if invitation %}
+                <h2 class="text-xl font-semibold text-white mb-2">
+                    Join {{ invitation.organization.name }}
+                </h2>
+                <p class="text-sm text-slate-400">
+                    You've been invited to join {{ invitation.organization.name }} as a {{ invitation.role.value.title() }}
+                </p>
+                {% else %}
                 <h2 class="text-xl font-semibold text-white mb-2">
                     Create your account
                 </h2>
                 <p class="text-sm text-slate-400">
                     Start monitoring your attack surface today
                 </p>
+                {% endif %}
             </div>
         </div>
 
         <!-- Registration Form -->
         <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-lg p-8 shadow-xl">
+            {% if invitation %}
+            <!-- Invitation Info Banner -->
+            <div class="mb-6 p-4 bg-primary/10 border border-primary/30 rounded-lg">
+                <div class="flex items-center">
+                    <i class="ri-mail-line text-primary mr-3"></i>
+                    <div>
+                        <p class="text-sm font-medium text-white">Invitation Details</p>
+                        <p class="text-xs text-slate-400">
+                            Invited by {{ invitation.invited_by.username }} •
+                            Role: {{ invitation.role.value.title() }} •
+                            Expires: {{ invitation.expires_at.strftime('%B %d, %Y') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <form class="space-y-6" method="POST">
                 {{ form.hidden_tag() }}
 
@@ -46,7 +72,14 @@
                 <!-- Email Field -->
                 <div>
                     {{ form.email.label(class="block text-sm font-medium text-slate-300 mb-2") }}
+                    {% if invitation %}
+                    {{ form.email(class="w-full px-4 py-3 bg-slate-700 border border-slate-500 rounded-lg text-slate-300 cursor-not-allowed", readonly=true, title="Email address is pre-filled from invitation") }}
+                    <p class="mt-1 text-xs text-slate-400">
+                        <i class="ri-lock-line mr-1"></i>Email address is pre-filled from your invitation
+                    </p>
+                    {% else %}
                     {{ form.email(class="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors", placeholder="Enter your email address") }}
+                    {% endif %}
                     {% if form.email.errors %}
                         <div class="mt-2 text-red-400 text-sm">
                             {% for error in form.email.errors %}

@@ -60,12 +60,14 @@
             </div>
 
             <!-- Settings -->
+            {% if can_manage_settings() %}
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/settings'" title="Settings">
                 <div class="flex items-center">
                     <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
                 </div>
             </div>
+            {% endif %}
         </nav>
 
         <!-- Toggle Button -->
@@ -99,11 +101,13 @@
                 </div>
 
                 <!-- Add Asset Button -->
+                {% if can_modify_assets() %}
                 <button id="add-asset-btn" class="bg-primary hover:bg-primary/90 text-slate-900 px-3 md:px-4 py-2 rounded-lg transition-all duration-200 flex items-center touch-target font-medium shadow-lg hover:shadow-xl hover:scale-105">
                     <i class="ri-add-line mr-1 md:mr-2"></i>
                     <span class="hidden sm:inline">Add Asset</span>
                     <span class="sm:hidden">Add</span>
                 </button>
+                {% endif %}
 
                 <!-- User Menu -->
                 <div class="flex items-center gap-2">
@@ -331,10 +335,14 @@
                 <div id="empty-state" class="p-8 text-center hidden">
                     <i class="ri-computer-line text-4xl text-slate-400 mb-4"></i>
                     <h3 class="text-lg font-medium text-white mb-2">No assets found</h3>
+                    {% if can_modify_assets() %}
                     <p class="text-slate-400 mb-4">Get started by adding your first asset or running a scan.</p>
                     <button id="empty-add-asset-btn" class="bg-primary hover:bg-primary/90 text-slate-900 px-4 py-2 rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl hover:scale-105">
                         <i class="ri-add-line mr-2"></i>Add Asset
                     </button>
+                    {% else %}
+                    <p class="text-slate-400 mb-4">No assets have been added to this organization yet.</p>
+                    {% endif %}
                 </div>
             </div>
         </div>

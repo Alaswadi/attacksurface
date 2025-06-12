@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, make_response, Response
 from flask_login import login_required, current_user
-from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, User, OrganizationUser, UserInvitation, EmailConfiguration
+from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, User, OrganizationUser, UserInvitation, EmailConfiguration, UserRole
 from datetime import datetime, timedelta
 import json
 import uuid
@@ -52,7 +52,12 @@ progressive_scan_clients = {}  # Store SSE clients by task_id
 @login_required
 def get_assets():
     """Get all assets for the current user's organization with filtering support"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import can_view_assets, get_user_organization
+
+    if not can_view_assets():
+        return jsonify({'error': 'Insufficient permissions to view assets'}), 403
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -124,7 +129,12 @@ def get_assets():
 @login_required
 def create_asset():
     """Create a new asset"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import can_modify_assets, get_user_organization
+
+    if not can_modify_assets():
+        return jsonify({'error': 'Insufficient permissions to create assets'}), 403
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
     
@@ -164,7 +174,12 @@ def create_asset():
 @login_required
 def delete_asset(asset_id):
     """Delete an asset and optionally its related subdomains"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import can_modify_assets, get_user_organization
+
+    if not can_modify_assets():
+        return jsonify({'error': 'Insufficient permissions to delete assets'}), 403
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -213,7 +228,12 @@ def delete_asset(asset_id):
 @login_required
 def get_vulnerabilities():
     """Get all vulnerabilities for the current user's organization"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import can_view_vulnerabilities, get_user_organization
+
+    if not can_view_vulnerabilities():
+        return jsonify({'error': 'Insufficient permissions to view vulnerabilities'}), 403
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
     
@@ -244,7 +264,9 @@ def get_vulnerabilities():
 @login_required
 def get_alerts():
     """Get all alerts for the current user's organization"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
     
@@ -269,7 +291,9 @@ def get_alerts():
 @login_required
 def get_dashboard_stats():
     """Get dashboard statistics"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
     
@@ -341,6 +365,11 @@ def get_assets_stats():
 @login_required
 def start_scan():
     """Start an attack surface discovery scan"""
+    from utils.permissions import can_run_scans
+
+    if not can_run_scans():
+        return jsonify({'error': 'Insufficient permissions to run scans'}), 403
+
     org = Organization.query.filter_by(user_id=current_user.id).first()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
@@ -943,13 +972,11 @@ def start_large_domain_scan():
                 'error': 'Invalid scan type. Must be: quick, deep, or full'
             }), 400
 
-        # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        # Get user's organization (either as owner or member)
+        from utils.permissions import get_user_organization
+        org = get_user_organization()
         if not org:
-            # Create default organization for user
-            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
-            db.session.add(org)
-            db.session.commit()
+            return jsonify({'error': 'You are not associated with any organization. Please contact your administrator.'}), 403
 
         # Check Redis availability for Celery
         redis_available, redis_error = check_redis_availability()
@@ -1603,9 +1630,14 @@ def start_large_scale_scan_progressive():
 @login_required
 def resolve_vulnerability(vuln_id):
     """Mark a vulnerability as resolved"""
+    from utils.permissions import can_modify_assets, get_user_organization
+
+    if not can_modify_assets():
+        return jsonify({'success': False, 'error': 'Insufficient permissions to modify vulnerabilities'}), 403
+
     try:
         # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        org = get_user_organization()
         if not org:
             return jsonify({'success': False, 'error': 'Organization not found'}), 404
 
@@ -1633,9 +1665,14 @@ def resolve_vulnerability(vuln_id):
 @login_required
 def reopen_vulnerability(vuln_id):
     """Reopen a resolved vulnerability"""
+    from utils.permissions import can_modify_assets, get_user_organization
+
+    if not can_modify_assets():
+        return jsonify({'success': False, 'error': 'Insufficient permissions to modify vulnerabilities'}), 403
+
     try:
         # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        org = get_user_organization()
         if not org:
             return jsonify({'success': False, 'error': 'Organization not found'}), 404
 
@@ -1663,9 +1700,14 @@ def reopen_vulnerability(vuln_id):
 @login_required
 def delete_vulnerability(vuln_id):
     """Delete a vulnerability"""
+    from utils.permissions import can_modify_assets, get_user_organization
+
+    if not can_modify_assets():
+        return jsonify({'success': False, 'error': 'Insufficient permissions to delete vulnerabilities'}), 403
+
     try:
         # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        org = get_user_organization()
         if not org:
             return jsonify({'success': False, 'error': 'Organization not found'}), 404
 
@@ -1693,7 +1735,9 @@ def delete_vulnerability(vuln_id):
 @login_required
 def organization_settings():
     """Get or update organization settings"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -1832,7 +1876,9 @@ def save_backup_settings():
 @login_required
 def export_data():
     """Export organization data"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -1921,7 +1967,12 @@ def regenerate_api_key():
 @login_required
 def get_organization_users():
     """Get all users in the organization"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import can_manage_users, get_user_organization
+
+    if not can_manage_users():
+        return jsonify({'error': 'Insufficient permissions to view users'}), 403
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -1941,11 +1992,11 @@ def get_organization_users():
                 'joined_at': membership.joined_at.isoformat(),
                 'is_active': membership.is_active,
                 'permissions': {
-                    'can_view_assets': membership.can_view_assets,
-                    'can_add_assets': membership.can_add_assets,
-                    'can_run_scans': membership.can_run_scans,
-                    'can_view_reports': membership.can_view_reports,
-                    'can_manage_settings': membership.can_manage_settings
+                    'can_view_assets': membership.can_view_assets(),
+                    'can_add_assets': membership.can_add_assets(),
+                    'can_run_scans': membership.can_run_scans(),
+                    'can_view_reports': membership.can_view_reports(),
+                    'can_manage_settings': membership.can_manage_settings()
                 }
             })
 
@@ -1978,7 +2029,13 @@ def get_organization_users():
 @login_required
 def invite_user():
     """Invite a user to the organization"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import can_manage_users, get_user_organization
+
+    if not can_manage_users():
+        return jsonify({'error': 'Insufficient permissions to invite users'}), 403
+
+    # Get the admin's organization (either as owner or admin member)
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -2024,12 +2081,7 @@ def invite_user():
             invited_by_id=current_user.id,
             role=UserRole(role),
             token=generate_invitation_token(),
-            expires_at=datetime.utcnow() + timedelta(days=7),
-            can_view_assets=data.get('can_view_assets', True),
-            can_add_assets=data.get('can_add_assets', True),
-            can_run_scans=data.get('can_run_scans', False),
-            can_view_reports=data.get('can_view_reports', True),
-            can_manage_settings=data.get('can_manage_settings', False)
+            expires_at=datetime.utcnow() + timedelta(days=7)
         )
 
         db.session.add(invitation)
@@ -2056,7 +2108,12 @@ def invite_user():
 @login_required
 def manage_user(user_id):
     """Update or remove a user from the organization"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import can_manage_users, get_user_organization
+
+    if not can_manage_users():
+        return jsonify({'error': 'Insufficient permissions to manage users'}), 403
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -2077,16 +2134,6 @@ def manage_user(user_id):
         try:
             if 'role' in data:
                 membership.role = UserRole(data['role'])
-            if 'can_view_assets' in data:
-                membership.can_view_assets = data['can_view_assets']
-            if 'can_add_assets' in data:
-                membership.can_add_assets = data['can_add_assets']
-            if 'can_run_scans' in data:
-                membership.can_run_scans = data['can_run_scans']
-            if 'can_view_reports' in data:
-                membership.can_view_reports = data['can_view_reports']
-            if 'can_manage_settings' in data:
-                membership.can_manage_settings = data['can_manage_settings']
             if 'is_active' in data:
                 membership.is_active = data['is_active']
 
@@ -2108,12 +2155,85 @@ def manage_user(user_id):
             db.session.rollback()
             return jsonify({'error': f'Failed to remove user: {str(e)}'}), 500
 
+@api_bp.route('/settings/invitations/<int:invitation_id>', methods=['DELETE'])
+@login_required
+def cancel_invitation(invitation_id):
+    """Cancel a pending invitation"""
+    from utils.permissions import can_manage_users, get_user_organization
+
+    if not can_manage_users():
+        return jsonify({'error': 'Insufficient permissions to manage invitations'}), 403
+
+    org = get_user_organization()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    invitation = UserInvitation.query.filter_by(
+        id=invitation_id,
+        organization_id=org.id,
+        is_accepted=False
+    ).first()
+
+    if not invitation:
+        return jsonify({'error': 'Invitation not found or already accepted'}), 404
+
+    try:
+        db.session.delete(invitation)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Invitation cancelled successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to cancel invitation: {str(e)}'}), 500
+
+@api_bp.route('/settings/invitations/<int:invitation_id>/resend', methods=['POST'])
+@login_required
+def resend_invitation(invitation_id):
+    """Resend an invitation email"""
+    from utils.permissions import can_manage_users, get_user_organization
+    from services.email_service import EmailService
+
+    if not can_manage_users():
+        return jsonify({'error': 'Insufficient permissions to manage invitations'}), 403
+
+    org = get_user_organization()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
+
+    invitation = UserInvitation.query.filter_by(
+        id=invitation_id,
+        organization_id=org.id,
+        is_accepted=False
+    ).first()
+
+    if not invitation:
+        return jsonify({'error': 'Invitation not found or already accepted'}), 404
+
+    # Check if invitation has expired
+    if invitation.expires_at < datetime.utcnow():
+        return jsonify({'error': 'Cannot resend expired invitation. Please create a new one.'}), 400
+
+    try:
+        # Send invitation email
+        email_service = EmailService(org.id)
+        if email_service.is_configured():
+            result = email_service.send_user_invitation(invitation)
+            if not result['success']:
+                return jsonify({'error': f'Failed to send invitation email: {result["error"]}'}), 500
+        else:
+            return jsonify({'error': 'Email service is not configured'}), 500
+
+        return jsonify({'success': True, 'message': 'Invitation resent successfully'})
+    except Exception as e:
+        return jsonify({'error': f'Failed to resend invitation: {str(e)}'}), 500
+
 # Email Configuration API Endpoints
 @api_bp.route('/settings/email/config', methods=['GET', 'POST'])
 @login_required
 def email_configuration():
     """Get or update email configuration"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 
@@ -2188,7 +2308,9 @@ def email_configuration():
 @login_required
 def test_email_configuration():
     """Test email configuration"""
-    org = Organization.query.filter_by(user_id=current_user.id).first()
+    from utils.permissions import get_user_organization
+
+    org = get_user_organization()
     if not org:
         return jsonify({'error': 'Organization not found'}), 404
 

@@ -192,7 +192,8 @@ def get_technologies_overview():
     """Get overview of all discovered technologies"""
     try:
         # Get user's organization
-        organization = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import get_user_organization
+        organization = get_user_organization()
         if not organization:
             return jsonify({
                 'success': False,
@@ -290,7 +291,8 @@ def get_assets_by_technology(technology):
     """Get all assets using a specific technology"""
     try:
         # Get user's organization
-        organization = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import get_user_organization
+        organization = get_user_organization()
         if not organization:
             return jsonify({
                 'success': False,

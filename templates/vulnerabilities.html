@@ -57,12 +57,14 @@
             </div>
 
             <!-- Settings -->
+            {% if can_manage_settings() %}
             <div class="nav-item mb-2 p-3 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors relative" onclick="window.location.href='/settings'" title="Settings">
                 <div class="flex items-center">
                     <i class="ri-settings-3-line ri-lg min-w-[24px]"></i>
                     <span class="nav-text ml-3 opacity-0 transition-opacity duration-300 whitespace-nowrap">Settings</span>
                 </div>
             </div>
+            {% endif %}
         </nav>
 
         <!-- Toggle Button -->
@@ -308,6 +310,7 @@
                                     </div>
                                 </div>
 
+                                {% if can_modify_assets() %}
                                 <div class="flex flex-wrap gap-2 lg:flex-col lg:w-auto">
                                     {% if not vuln.is_resolved %}
                                     <button onclick="markResolved({{ vuln.id }})" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm transition-all duration-200 flex items-center font-medium shadow-lg hover:shadow-xl hover:scale-105">
@@ -328,6 +331,7 @@
                                         <span class="sm:hidden">Delete</span>
                                     </button>
                                 </div>
+                                {% endif %}
                             </div>
                         </div>
                         {% endfor %}

@@ -15,9 +15,10 @@ def generate_pdf_report():
     """Generate and download PDF compliance report"""
     try:
         from services.report_generator import ComplianceReportGenerator
+        from utils.permissions import get_user_organization
 
         # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        org = get_user_organization()
         if not org:
             return jsonify({'error': 'Organization not found'}), 404
 
@@ -216,7 +217,8 @@ def get_report_data():
     """Get comprehensive report data for the organization"""
     try:
         # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import get_user_organization
+        org = get_user_organization()
         if not org:
             return jsonify({'error': 'Organization not found'}), 404
 

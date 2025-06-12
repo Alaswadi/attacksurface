@@ -91,6 +91,25 @@ def create_app(config_name=None):
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
+
+    # Add context processor for permissions
+    @app.context_processor
+    def inject_permissions():
+        from utils.permissions import (
+            can_view_assets, can_modify_assets, can_run_scans,
+            can_view_vulnerabilities, can_view_technologies,
+            can_view_reports, can_manage_settings, get_user_role_display
+        )
+        return {
+            'can_view_assets': can_view_assets,
+            'can_modify_assets': can_modify_assets,
+            'can_run_scans': can_run_scans,
+            'can_view_vulnerabilities': can_view_vulnerabilities,
+            'can_view_technologies': can_view_technologies,
+            'can_view_reports': can_view_reports,
+            'can_manage_settings': can_manage_settings,
+            'user_role': get_user_role_display
+        }
     
     # Routes
     @app.route('/')
@@ -102,13 +121,13 @@ def create_app(config_name=None):
     @app.route('/dashboard')
     @login_required
     def dashboard():
-        # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import get_user_organization
+
+        # Get user's organization (either as owner or member)
+        org = get_user_organization()
         if not org:
-            # Create default organization for user
-            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
-            db.session.add(org)
-            db.session.commit()
+            flash('You are not associated with any organization. Please contact your administrator.', 'error')
+            return redirect(url_for('auth.logout'))
         
         # Get dashboard data
         assets = Asset.query.filter_by(organization_id=org.id, is_active=True).all()
@@ -151,6 +170,12 @@ def create_app(config_name=None):
     @login_required
     def technologies():
         """Technologies discovery and analysis page"""
+        from utils.permissions import can_view_technologies
+
+        if not can_view_technologies():
+            flash('You do not have permission to view technologies.', 'error')
+            return redirect(url_for('dashboard'))
+
         return render_template('technologies.html')
 
     @app.route('/large-scale-scanning')
@@ -163,7 +188,13 @@ def create_app(config_name=None):
     @login_required
     def settings():
         """Settings and configuration page"""
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import can_manage_settings, get_user_organization
+
+        if not can_manage_settings():
+            flash('You do not have permission to access settings.', 'error')
+            return redirect(url_for('dashboard'))
+
+        org = get_user_organization()
         if not org:
             flash('Organization not found', 'error')
             return redirect(url_for('dashboard'))
@@ -179,13 +210,17 @@ def create_app(config_name=None):
     @login_required
     def assets():
         """Assets management page"""
-        # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import can_view_assets, get_user_organization
+
+        if not can_view_assets():
+            flash('You do not have permission to view assets.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Get user's organization (either as owner or member)
+        org = get_user_organization()
         if not org:
-            # Create default organization for user
-            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
-            db.session.add(org)
-            db.session.commit()
+            flash('You are not associated with any organization. Please contact your administrator.', 'error')
+            return redirect(url_for('dashboard'))
 
         # Get asset statistics
         total_assets = Asset.query.filter_by(organization_id=org.id, is_active=True).count()
@@ -218,13 +253,17 @@ def create_app(config_name=None):
     @login_required
     def vulnerabilities():
         """Vulnerabilities management page"""
-        # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import can_view_vulnerabilities, get_user_organization
+
+        if not can_view_vulnerabilities():
+            flash('You do not have permission to view vulnerabilities.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Get user's organization (either as owner or member)
+        org = get_user_organization()
         if not org:
-            # Create default organization for user
-            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
-            db.session.add(org)
-            db.session.commit()
+            flash('You are not associated with any organization. Please contact your administrator.', 'error')
+            return redirect(url_for('dashboard'))
 
         # Get filter parameters
         severity_filter = request.args.get('severity', '')
@@ -303,13 +342,17 @@ def create_app(config_name=None):
     @login_required
     def reports():
         """Compliance reporting page"""
-        # Get user's organization
-        org = Organization.query.filter_by(user_id=current_user.id).first()
+        from utils.permissions import can_view_reports, get_user_organization
+
+        if not can_view_reports():
+            flash('You do not have permission to view reports.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Get user's organization (either as owner or member)
+        org = get_user_organization()
         if not org:
-            # Create default organization for user
-            org = Organization(name=f"{current_user.username}'s Organization", user_id=current_user.id)
-            db.session.add(org)
-            db.session.commit()
+            flash('You are not associated with any organization. Please contact your administrator.', 'error')
+            return redirect(url_for('dashboard'))
 
         return render_template('reports.html', organization=org)
 

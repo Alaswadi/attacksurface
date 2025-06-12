@@ -24,6 +24,11 @@ class RegisterForm(FlaskForm):
             raise ValidationError('Username already exists. Please choose a different one.')
     
     def validate_email(self, email):
+        # Skip validation if this is an invitation-based registration
+        from flask import request
+        if request.args.get('invitation'):
+            return
+
         user = User.query.filter_by(email=email.data).first()
         if user:
             raise ValidationError('Email already registered. Please choose a different one.')
@@ -68,17 +73,9 @@ class UserInvitationForm(FlaskForm):
     """Form for inviting users to organization"""
     email = StringField('Email Address', validators=[DataRequired(), Email()])
     role = SelectField('Role', choices=[
-        (UserRole.MEMBER.value, 'Member'),
         (UserRole.ADMIN.value, 'Admin'),
         (UserRole.VIEWER.value, 'Viewer')
     ], validators=[DataRequired()])
-
-    # Permissions
-    can_view_assets = BooleanField('View Assets', default=True)
-    can_add_assets = BooleanField('Add Assets', default=True)
-    can_run_scans = BooleanField('Run Scans', default=False)
-    can_view_reports = BooleanField('View Reports', default=True)
-    can_manage_settings = BooleanField('Manage Settings', default=False)
 
     submit = SubmitField('Send Invitation')
 
