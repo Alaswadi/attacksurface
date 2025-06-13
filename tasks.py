@@ -302,6 +302,7 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                             high_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'high')
                             medium_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'medium')
                             low_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'low')
+                            info_count = sum(1 for v in vulnerability_results if v.get('severity', '').lower() == 'info')
 
                             # Send alert if critical or high severity vulnerabilities found
                             if critical_count > 0 or high_count > 0:
@@ -333,6 +334,38 @@ def comprehensive_nuclei_scan_task(self, main_domain, organization_id, scan_type
                                 # Send security alert email asynchronously
                                 send_security_alert_email_task.delay(alert_data, organization_id)
                                 logger.info(f"📧 Security alert email queued for {critical_count + high_count} critical/high vulnerabilities on {main_domain}")
+
+                                # Also send scan completion email for Nuclei scan
+                                nuclei_scan_completion_data = {
+                                    'target': main_domain,
+                                    'scan_type': 'Nuclei Vulnerability Scan',
+                                    'duration': 'Completed',
+                                    'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+                                    'completed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+                                    'assets_discovered': {
+                                        'subdomains': 1,  # Main domain only
+                                        'live_hosts': 1,
+                                        'open_ports': 0,  # Not applicable for Nuclei
+                                        'services': 0,
+                                        'technologies': 0
+                                    },
+                                    'vulnerabilities_found': {
+                                        'total': len(vulnerability_results),
+                                        'critical': critical_count,
+                                        'high': high_count,
+                                        'medium': medium_count,
+                                        'low': low_count,
+                                        'info': info_count
+                                    },
+                                    'top_vulnerabilities': vulnerability_results[:5],  # Top 5 vulnerabilities
+                                    'scan_id': f"nuclei_scan_{main_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                                    'initiated_by': 'Nuclei Scanner',
+                                    'notes': f'Comprehensive Nuclei vulnerability scan completed for {main_domain}. Found {len(vulnerability_results)} vulnerabilities.'
+                                }
+
+                                # Send dual notifications for Nuclei scan completion
+                                send_dual_scan_notifications_task.delay(nuclei_scan_completion_data, organization_id)
+                                logger.info(f"📧 NUCLEI ASYNC: Dual scan notifications queued for {main_domain} Nuclei scan")
 
                         except Exception as email_error:
                             logger.warning(f"⚠️ Failed to send security alert email: {str(email_error)}")
@@ -2533,6 +2566,48 @@ def progressive_large_domain_scan_orchestrator(self, domain, organization_id, sc
         except Exception as e:
             logger.error(f"❌ Progressive completion failed: {str(e)}")
             db.session.rollback()
+
+        # Send scan completion email notification
+        try:
+            # Calculate scan duration
+            scan_duration = "Completed"  # Simplified for now
+
+            # Count vulnerabilities by severity (will be 0 for progressive scan, Nuclei runs async)
+            vulnerabilities_found = {
+                'total': 0,
+                'critical': 0,
+                'high': 0,
+                'medium': 0,
+                'low': 0,
+                'info': 0
+            }
+
+            # Prepare scan completion data for email
+            scan_completion_data = {
+                'target': domain,
+                'scan_type': f'{scan_type.title()} Progressive Scan',
+                'duration': scan_duration,
+                'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),  # Simplified
+                'completed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'assets_discovered': {
+                    'subdomains': len(subdomains),
+                    'live_hosts': len(alive_hosts),
+                    'open_ports': sum(len(asset.asset_metadata.get('ports', [])) for asset in Asset.query.filter_by(organization_id=organization_id).all() if asset.asset_metadata and asset.asset_metadata.get('ports')),
+                    'services': sum(len([p for p in asset.asset_metadata.get('ports', []) if isinstance(p, dict) and p.get('service')]) for asset in Asset.query.filter_by(organization_id=organization_id).all() if asset.asset_metadata),
+                    'technologies': sum(len(asset.asset_metadata.get('http_probe', {}).get('tech', [])) for asset in Asset.query.filter_by(organization_id=organization_id).all() if asset.asset_metadata)
+                },
+                'vulnerabilities_found': vulnerabilities_found,
+                'scan_id': f"progressive_scan_{domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                'initiated_by': 'Progressive Scanner',
+                'notes': f'Progressive scan completed. Nuclei vulnerability scan is running asynchronously (Task ID: {nuclei_task_id}). Vulnerability results will be available separately.'
+            }
+
+            # Send dual email notifications asynchronously (scan completion + security alerts)
+            send_dual_scan_notifications_task.delay(scan_completion_data, organization_id)
+            logger.info(f"📧 PROGRESSIVE: Dual scan notifications queued for {domain} (completion + security alerts)")
+
+        except Exception as email_error:
+            logger.warning(f"⚠️ PROGRESSIVE: Failed to send scan completion email: {str(email_error)}")
 
         # Final success update - Progressive scan completed, Nuclei running async
         self.update_state(
