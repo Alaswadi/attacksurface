@@ -4,6 +4,7 @@ Email service for sending notifications and invitations
 
 import smtplib
 import ssl
+import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -281,12 +282,26 @@ class EmailService:
             # Get organization details
             org = Organization.query.get(self.organization_id)
 
-            # Get base URL from configuration or use default
-            from flask import current_app
-            base_url = current_app.config.get('SERVER_NAME', 'localhost:5000')
-            if not base_url.startswith('http'):
-                scheme = current_app.config.get('PREFERRED_URL_SCHEME', 'http')
-                base_url = f"{scheme}://{base_url}"
+            # Get base URL dynamically for email links
+            from flask import current_app, request
+
+            # Try to get the base URL from the current request context
+            try:
+                if request:
+                    base_url = f"{request.scheme}://{request.host}"
+                else:
+                    raise RuntimeError("No request context")
+            except RuntimeError:
+                # Fallback to configuration or environment variables
+                server_name = current_app.config.get('SERVER_NAME') or os.environ.get('SERVER_NAME')
+                scheme = current_app.config.get('PREFERRED_URL_SCHEME', 'https')
+
+                if server_name:
+                    base_url = f"{scheme}://{server_name}"
+                else:
+                    # Final fallback - use a generic URL
+                    base_url = "https://your-domain.com"
+                    logger.warning(f"Using fallback base URL for email links: {base_url}")
 
             # Prepare template context
             context = {
