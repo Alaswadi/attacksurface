@@ -163,24 +163,43 @@ class EmailService:
     def send_user_invitation(self, invitation: UserInvitation) -> Dict[str, Any]:
         """Send user invitation email"""
         try:
+            # Get base URL dynamically for email links
+            from flask import current_app, request
+
+            # Try to get the base URL from the current request context
+            try:
+                if request:
+                    base_url = f"{request.scheme}://{request.host}"
+                else:
+                    raise RuntimeError("No request context")
+            except RuntimeError:
+                # Fallback to configuration or environment variables
+                server_name = current_app.config.get('SERVER_NAME') or os.environ.get('SERVER_NAME')
+                scheme = current_app.config.get('PREFERRED_URL_SCHEME', 'https')
+
+                if server_name:
+                    base_url = f"{scheme}://{server_name}"
+                else:
+                    # Final fallback - use a generic URL
+                    base_url = "https://your-domain.com"
+                    logger.warning(f"Using fallback base URL for invitation email links: {base_url}")
+
             # Generate invitation URL
-            invitation_url = url_for('auth.accept_invitation', 
-                                   token=invitation.token, 
-                                   _external=True)
-            
+            invitation_url = f"{base_url}/auth/accept_invitation?token={invitation.token}"
+
             # Get organization details
             org = Organization.query.get(invitation.organization_id)
             invited_by = User.query.get(invitation.invited_by_id)
-            
+
             subject = f"Invitation to join {org.name} on AttackSurfacePro"
-            
+
             # Get or create email template
             template = EmailTemplate.query.filter_by(
                 organization_id=self.organization_id,
                 event_type='invitation',
                 is_active=True
             ).first()
-            
+
             # Prepare template context
             context = {
                 'organization_name': org.name,
@@ -190,8 +209,8 @@ class EmailService:
                 'expires_at': invitation.expires_at.strftime('%Y-%m-%d'),
                 'recipient_email': invitation.email,
                 'current_year': datetime.utcnow().year,
-                'unsubscribe_url': url_for('settings', _external=True),
-                'settings_url': url_for('settings', _external=True)
+                'unsubscribe_url': f"{base_url}/settings",
+                'settings_url': f"{base_url}/settings"
             }
 
             if template:
@@ -235,6 +254,27 @@ class EmailService:
             # Get organization details
             org = Organization.query.get(self.organization_id)
 
+            # Get base URL dynamically for email links
+            from flask import current_app, request
+
+            # Try to get the base URL from the current request context
+            try:
+                if request:
+                    base_url = f"{request.scheme}://{request.host}"
+                else:
+                    raise RuntimeError("No request context")
+            except RuntimeError:
+                # Fallback to configuration or environment variables
+                server_name = current_app.config.get('SERVER_NAME') or os.environ.get('SERVER_NAME')
+                scheme = current_app.config.get('PREFERRED_URL_SCHEME', 'https')
+
+                if server_name:
+                    base_url = f"{scheme}://{server_name}"
+                else:
+                    # Final fallback - use a generic URL
+                    base_url = "https://your-domain.com"
+                    logger.warning(f"Using fallback base URL for security alert email links: {base_url}")
+
             # Prepare template context
             context = {
                 'alert_title': alert_data.get('title', 'Security Vulnerability Detected'),
@@ -244,14 +284,14 @@ class EmailService:
                 'asset_name': alert_data.get('asset_name', ''),
                 'vulnerability_details': alert_data.get('vulnerability_details', {}),
                 'recommendations': alert_data.get('recommendations', []),
-                'dashboard_url': url_for('dashboard', _external=True),
+                'dashboard_url': f"{base_url}/dashboard",
                 'organization_name': org.name,
                 'summary': alert_data.get('summary', {}),
                 'alert_id': alert_data.get('alert_id', ''),
                 'generated_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC'),
                 'current_year': datetime.utcnow().year,
-                'unsubscribe_url': url_for('settings', _external=True),
-                'settings_url': url_for('settings', _external=True)
+                'unsubscribe_url': f"{base_url}/settings",
+                'settings_url': f"{base_url}/settings"
             }
 
             subject = f"Security Alert: {alert_data.get('title', 'Vulnerability Detected')} - {org.name}"
