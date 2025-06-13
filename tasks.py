@@ -948,9 +948,9 @@ def large_domain_scan_orchestrator(self, domain: str, organization_id: int, scan
                 'initiated_by': 'Large-Scale Scanner'
             }
 
-            # Send email notification asynchronously
-            send_scan_completion_email_task.delay(scan_completion_data, organization_id)
-            logger.info(f"📧 Scan completion email notification queued for {domain}")
+            # Send dual email notifications asynchronously (scan completion + security alerts)
+            send_dual_scan_notifications_task.delay(scan_completion_data, organization_id)
+            logger.info(f"📧 Dual scan notifications queued for {domain} (completion + security alerts)")
 
         except Exception as email_error:
             logger.warning(f"⚠️ Failed to send scan completion email: {str(email_error)}")
@@ -1749,6 +1749,75 @@ def send_scan_completion_email_task(self, scan_data, organization_id):
         logger.error(f"Failed to send scan completion email: {str(e)}")
         return {
             'success': False,
+            'error': str(e)
+        }
+
+@celery.task(bind=True)
+def send_dual_scan_notifications_task(self, scan_data, organization_id):
+    """
+    Background task to send both scan completion and security alert emails
+
+    This task implements the dual email notification system:
+    1. Always sends scan completion email (if user enabled)
+    2. Conditionally sends security alert email (if vulnerabilities found AND user enabled)
+
+    Args:
+        scan_data (dict): Complete scan data including vulnerabilities
+        organization_id (int): Organization ID
+
+    Returns:
+        dict: Results of both email operations
+    """
+    try:
+        logger.info(f"📧 Starting dual scan notifications for organization {organization_id}")
+        logger.info(f"🎯 Target: {scan_data.get('target', 'unknown')}")
+        logger.info(f"🔍 Vulnerabilities: {scan_data.get('vulnerabilities_found', {}).get('total', 0)}")
+
+        from services.email_service import EmailService
+
+        # Initialize email service
+        email_service = EmailService(organization_id)
+
+        if not email_service.is_configured():
+            logger.warning(f"Email not configured for organization {organization_id}")
+            return {
+                'scan_completion': {'sent': False, 'success': False},
+                'security_alert': {'sent': False, 'success': False},
+                'overall_success': False,
+                'error': 'Email not configured'
+            }
+
+        # Send both types of emails based on scan results
+        result = email_service.send_dual_scan_notifications(scan_data)
+
+        # Log detailed results
+        if result['scan_completion']['sent']:
+            if result['scan_completion']['success']:
+                logger.info("✅ Scan completion email sent successfully")
+            else:
+                logger.error("❌ Scan completion email failed")
+
+        if result['security_alert']['sent']:
+            if result['security_alert']['success']:
+                logger.info("✅ Security alert email sent successfully")
+            else:
+                logger.error("❌ Security alert email failed")
+        else:
+            logger.info("ℹ️ Security alert email not sent (no vulnerabilities or user preference)")
+
+        if result['overall_success']:
+            logger.info(f"🎉 Dual scan notifications completed successfully for organization {organization_id}")
+        else:
+            logger.error(f"❌ Dual scan notifications failed for organization {organization_id}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Failed to send dual scan notifications: {str(e)}")
+        return {
+            'scan_completion': {'sent': False, 'success': False},
+            'security_alert': {'sent': False, 'success': False},
+            'overall_success': False,
             'error': str(e)
         }
 

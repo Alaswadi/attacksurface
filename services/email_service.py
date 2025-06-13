@@ -308,7 +308,7 @@ class EmailService:
             return {'success': False, 'error': f'Failed to send security alert email: {str(e)}'}
 
     def send_scan_completion(self, scan_data: Dict[str, Any], recipients: List[str] = None) -> Dict[str, Any]:
-        """Send scan completion notification email"""
+        """Send scan completion notification email (always sent after scans)"""
         try:
             if not recipients:
                 # Get users who want scan completion notifications
@@ -316,7 +316,16 @@ class EmailService:
                     organization_id=self.organization_id,
                     notify_scan_completion=True
                 ).all()
-                recipients = [User.query.get(setting.user_id).email for setting in notification_settings]
+
+                recipients = []
+                for setting in notification_settings:
+                    user = User.query.get(setting.user_id)
+                    if user:
+                        email = setting.notification_email or user.email
+                        recipients.append(email)
+                        if setting.additional_recipients:
+                            additional = [email.strip() for email in setting.additional_recipients.split(',') if email.strip()]
+                            recipients.extend(additional)
 
             if not recipients:
                 return {'success': False, 'error': 'No recipients configured for scan completion notifications'}
@@ -377,6 +386,158 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send scan completion email: {str(e)}")
             return {'success': False, 'error': f'Failed to send scan completion email: {str(e)}'}
+
+    def send_dual_scan_notifications(self, scan_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Send both scan completion and security alert emails based on scan results
+
+        Always sends:
+        1. Scan completion email (if user has notify_scan_completion=True)
+
+        Conditionally sends:
+        2. Security alert email (if vulnerabilities found AND user has notify_new_vulnerabilities=True)
+
+        Args:
+            scan_data (dict): Complete scan data including vulnerabilities
+
+        Returns:
+            dict: Results of both email operations
+        """
+        try:
+            results = {
+                'scan_completion': {'sent': False, 'success': False},
+                'security_alert': {'sent': False, 'success': False},
+                'overall_success': False
+            }
+
+            # 1. ALWAYS send scan completion email (regardless of vulnerabilities)
+            logger.info(f"📧 Sending scan completion email for {scan_data.get('target', 'unknown target')}")
+
+            scan_completion_result = self.send_scan_completion(scan_data)
+            results['scan_completion']['sent'] = True
+            results['scan_completion']['success'] = scan_completion_result['success']
+
+            if scan_completion_result['success']:
+                logger.info("✅ Scan completion email sent successfully")
+            else:
+                logger.warning(f"⚠️ Scan completion email failed: {scan_completion_result.get('error')}")
+
+            # 2. CONDITIONALLY send security alert email (only if vulnerabilities found)
+            vulnerabilities_found = scan_data.get('vulnerabilities_found', {})
+            total_vulns = vulnerabilities_found.get('total', 0)
+
+            if total_vulns > 0:
+                logger.info(f"🚨 {total_vulns} vulnerabilities detected - sending security alert email")
+
+                # Prepare security alert data from scan results
+                alert_data = self._prepare_security_alert_from_scan(scan_data)
+
+                security_alert_result = self.send_security_alert(alert_data)
+                results['security_alert']['sent'] = True
+                results['security_alert']['success'] = security_alert_result['success']
+
+                if security_alert_result['success']:
+                    logger.info("✅ Security alert email sent successfully")
+                else:
+                    logger.warning(f"⚠️ Security alert email failed: {security_alert_result.get('error')}")
+            else:
+                logger.info("✅ No vulnerabilities found - skipping security alert email")
+                results['security_alert']['sent'] = False
+                results['security_alert']['success'] = True  # Not sending is considered success
+
+            # Overall success if at least scan completion succeeded
+            results['overall_success'] = results['scan_completion']['success']
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Failed to send dual scan notifications: {str(e)}")
+            return {
+                'scan_completion': {'sent': False, 'success': False},
+                'security_alert': {'sent': False, 'success': False},
+                'overall_success': False,
+                'error': str(e)
+            }
+
+    def _prepare_security_alert_from_scan(self, scan_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convert scan completion data into security alert data format
+
+        Args:
+            scan_data (dict): Scan completion data
+
+        Returns:
+            dict: Security alert data format
+        """
+        vulnerabilities_found = scan_data.get('vulnerabilities_found', {})
+        top_vulnerabilities = scan_data.get('top_vulnerabilities', [])
+
+        # Count critical and high severity vulnerabilities
+        critical_count = vulnerabilities_found.get('critical', 0)
+        high_count = vulnerabilities_found.get('high', 0)
+        medium_count = vulnerabilities_found.get('medium', 0)
+        total_count = vulnerabilities_found.get('total', 0)
+
+        # Determine alert severity based on highest vulnerability severity
+        if critical_count > 0:
+            alert_severity = 'critical'
+            alert_title = f"Critical Security Vulnerabilities Detected on {scan_data.get('target', 'Target')}"
+        elif high_count > 0:
+            alert_severity = 'high'
+            alert_title = f"High Severity Vulnerabilities Detected on {scan_data.get('target', 'Target')}"
+        elif medium_count > 0:
+            alert_severity = 'medium'
+            alert_title = f"Medium Severity Vulnerabilities Detected on {scan_data.get('target', 'Target')}"
+        else:
+            alert_severity = 'low'
+            alert_title = f"Security Vulnerabilities Detected on {scan_data.get('target', 'Target')}"
+
+        # Create description
+        description_parts = [
+            f"A security scan of {scan_data.get('target', 'your target')} has detected {total_count} vulnerabilities."
+        ]
+
+        if critical_count > 0:
+            description_parts.append(f"⚠️ {critical_count} CRITICAL vulnerabilities require immediate attention.")
+        if high_count > 0:
+            description_parts.append(f"🔴 {high_count} HIGH severity vulnerabilities should be addressed promptly.")
+        if medium_count > 0:
+            description_parts.append(f"🟡 {medium_count} MEDIUM severity vulnerabilities should be reviewed.")
+
+        description_parts.append("Please review the detailed findings and take appropriate remediation actions.")
+
+        alert_data = {
+            'title': alert_title,
+            'description': ' '.join(description_parts),
+            'severity': alert_severity,
+            'detected_at': scan_data.get('completed_at', datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')),
+            'asset_name': scan_data.get('target', ''),
+            'vulnerability_details': {
+                'total_vulnerabilities': total_count,
+                'critical_count': critical_count,
+                'high_count': high_count,
+                'medium_count': medium_count,
+                'scan_type': scan_data.get('scan_type', 'Security Scan'),
+                'scan_duration': scan_data.get('duration', ''),
+                'top_vulnerabilities': top_vulnerabilities[:5]  # Limit to top 5
+            },
+            'recommendations': [
+                'Review all critical and high severity vulnerabilities immediately',
+                'Implement security patches and updates for affected services',
+                'Consider temporarily disabling vulnerable services if patches are not available',
+                'Monitor for exploitation attempts and unusual activity',
+                'Schedule regular security scans to detect new vulnerabilities'
+            ],
+            'summary': {
+                'total_vulnerabilities': total_count,
+                'critical_high_count': critical_count + high_count,
+                'scan_target': scan_data.get('target', ''),
+                'assets_scanned': scan_data.get('assets_discovered', {}).get('subdomains', 0)
+            },
+            'alert_id': f"vuln_{scan_data.get('target', 'scan')}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+        }
+
+        return alert_data
 
 def generate_invitation_token() -> str:
     """Generate a secure token for user invitations"""
