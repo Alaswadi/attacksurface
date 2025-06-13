@@ -210,7 +210,8 @@ class EmailService:
                 'recipient_email': invitation.email,
                 'current_year': datetime.utcnow().year,
                 'unsubscribe_url': f"{base_url}/settings",
-                'settings_url': f"{base_url}/settings"
+                'settings_url': f"{base_url}/settings",
+                'logo_url': f"{base_url}/static/img/attacksurfaceproFull.png"
             }
 
             if template:
@@ -291,7 +292,8 @@ class EmailService:
                 'generated_at': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC'),
                 'current_year': datetime.utcnow().year,
                 'unsubscribe_url': f"{base_url}/settings",
-                'settings_url': f"{base_url}/settings"
+                'settings_url': f"{base_url}/settings",
+                'logo_url': f"{base_url}/static/img/attacksurfaceproFull.png"
             }
 
             subject = f"Security Alert: {alert_data.get('title', 'Vulnerability Detected')} - {org.name}"
@@ -361,7 +363,8 @@ class EmailService:
                 'scan_id': scan_data.get('scan_id', ''),
                 'initiated_by': scan_data.get('initiated_by', ''),
                 'current_year': datetime.utcnow().year,
-                'unsubscribe_url': f"{base_url}/settings"
+                'unsubscribe_url': f"{base_url}/settings",
+                'logo_url': f"{base_url}/static/img/attacksurfaceproFull.png"
             }
 
             subject = f"Scan Complete: {scan_data.get('target', 'Security Scan')} - {org.name}"

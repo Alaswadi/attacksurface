@@ -265,7 +265,9 @@
     <div class="email-container">
         <!-- Header -->
         <div class="email-header">
-            <img src="{{ url_for('static', filename='img/attacksurfaceproFull.png', _external=True) }}" alt="AttackSurfacePro Logo" class="brand-logo">
+            {% if logo_url %}
+            <img src="{{ logo_url }}" alt="AttackSurfacePro Logo" class="brand-logo">
+            {% endif %}
             <h1 class="brand-title">AttackSurfacePro</h1>
             <p class="brand-subtitle">Enterprise Attack Surface Management</p>
         </div>
