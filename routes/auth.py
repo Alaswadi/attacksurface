@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
 from models import db, User, Organization, UserInvitation, OrganizationUser
-from forms import LoginForm, RegisterForm
+from forms import LoginForm, RegisterForm, UserProfileForm, ChangePasswordForm
 from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
@@ -305,5 +305,59 @@ def debug_invitation(token):
     # Return JSON response for easy debugging
     from flask import jsonify
     return jsonify(debug_info)
+
+@auth_bp.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    """User profile management page"""
+    import logging
+
+    profile_form = UserProfileForm(
+        original_email=current_user.email
+    )
+    password_form = ChangePasswordForm()
+
+    # Pre-populate the profile form
+    if request.method == 'GET':
+        profile_form.email.data = current_user.email
+
+    # Handle profile update
+    if request.method == 'POST' and 'update_profile' in request.form:
+        if profile_form.validate_on_submit():
+            try:
+                current_user.email = profile_form.email.data
+                db.session.commit()
+
+                logging.info(f"✅ User {current_user.id} updated profile successfully")
+                flash('Profile updated successfully!', 'success')
+                return redirect(url_for('auth.profile'))
+
+            except Exception as e:
+                db.session.rollback()
+                logging.error(f"❌ Failed to update profile for user {current_user.id}: {str(e)}")
+                flash('Failed to update profile. Please try again.', 'error')
+
+    # Handle password change
+    if request.method == 'POST' and 'change_password' in request.form:
+        if password_form.validate_on_submit():
+            if current_user.check_password(password_form.current_password.data):
+                try:
+                    current_user.set_password(password_form.new_password.data)
+                    db.session.commit()
+
+                    logging.info(f"✅ User {current_user.id} changed password successfully")
+                    flash('Password changed successfully!', 'success')
+                    return redirect(url_for('auth.profile'))
+
+                except Exception as e:
+                    db.session.rollback()
+                    logging.error(f"❌ Failed to change password for user {current_user.id}: {str(e)}")
+                    flash('Failed to change password. Please try again.', 'error')
+            else:
+                flash('Current password is incorrect.', 'error')
+
+    return render_template('profile.html',
+                         profile_form=profile_form,
+                         password_form=password_form)
 
 
