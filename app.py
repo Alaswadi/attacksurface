@@ -61,6 +61,13 @@ def create_app(config_name=None):
 
     app.config.from_object(config[config_name])
 
+    # Set SERVER_NAME for URL building in email templates
+    if not app.config.get('SERVER_NAME'):
+        # Use environment variable or default
+        server_name = os.environ.get('SERVER_NAME', 'localhost:5000')
+        app.config['SERVER_NAME'] = server_name
+        app.config['PREFERRED_URL_SCHEME'] = os.environ.get('PREFERRED_URL_SCHEME', 'http')
+
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)

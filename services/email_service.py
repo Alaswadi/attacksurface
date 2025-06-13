@@ -281,6 +281,13 @@ class EmailService:
             # Get organization details
             org = Organization.query.get(self.organization_id)
 
+            # Get base URL from configuration or use default
+            from flask import current_app
+            base_url = current_app.config.get('SERVER_NAME', 'localhost:5000')
+            if not base_url.startswith('http'):
+                scheme = current_app.config.get('PREFERRED_URL_SCHEME', 'http')
+                base_url = f"{scheme}://{base_url}"
+
             # Prepare template context
             context = {
                 'scan_target': scan_data.get('target', ''),
@@ -293,13 +300,13 @@ class EmailService:
                 'top_vulnerabilities': scan_data.get('top_vulnerabilities', []),
                 'scan_notes': scan_data.get('notes', ''),
                 'next_scan_scheduled': scan_data.get('next_scan_scheduled', ''),
-                'dashboard_url': url_for('dashboard', _external=True),
-                'settings_url': url_for('settings', _external=True),
+                'dashboard_url': f"{base_url}/dashboard",
+                'settings_url': f"{base_url}/settings",
                 'organization_name': org.name,
                 'scan_id': scan_data.get('scan_id', ''),
                 'initiated_by': scan_data.get('initiated_by', ''),
                 'current_year': datetime.utcnow().year,
-                'unsubscribe_url': url_for('settings', _external=True)
+                'unsubscribe_url': f"{base_url}/settings"
             }
 
             subject = f"Scan Complete: {scan_data.get('target', 'Security Scan')} - {org.name}"
