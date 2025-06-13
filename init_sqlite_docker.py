@@ -39,6 +39,21 @@ def init_sqlite_docker():
             db.create_all()
             print("✅ Created all database tables")
 
+            # Run email notification settings migration
+            print("🔄 Running email notification settings migration...")
+            try:
+                import subprocess
+                result = subprocess.run([sys.executable, 'docker_migration_email_notifications.py'],
+                                      capture_output=True, text=True, cwd='/app')
+                if result.returncode == 0:
+                    print("✅ Email notification settings migration completed")
+                else:
+                    print(f"⚠️ Migration warning: {result.stderr}")
+                    # Continue anyway as the migration might not be needed
+            except Exception as e:
+                print(f"⚠️ Could not run migration: {e}")
+                # Continue anyway
+
             # Verify database file exists
             db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
             if os.path.exists(db_path):

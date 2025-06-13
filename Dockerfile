@@ -81,7 +81,8 @@ COPY . .
 # Create necessary directories and set permissions
 RUN mkdir -p /app/data /app/logs && \
     chmod +x init_db.py && \
-    chmod +x init_sqlite_docker.py
+    chmod +x init_sqlite_docker.py && \
+    chmod +x docker_migration_email_notifications.py
 
 # Create entrypoint script for SQLite
 RUN echo '#!/bin/bash\n\
