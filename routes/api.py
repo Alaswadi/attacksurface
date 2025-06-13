@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, render_template, make_response, Response
 from flask_login import login_required, current_user
-from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, User, OrganizationUser, UserInvitation, EmailConfiguration, UserRole
+from models import db, Organization, Asset, Vulnerability, Alert, AssetType, SeverityLevel, User, OrganizationUser, UserInvitation, EmailConfiguration, UserRole, EmailNotificationSettings
 from datetime import datetime, timedelta
 import json
 import uuid
@@ -1996,25 +1996,117 @@ def save_scanning_settings():
 
     return jsonify({'success': True, 'message': 'Scanning settings saved successfully'})
 
-@api_bp.route('/settings/notifications', methods=['POST'])
+@api_bp.route('/settings/notifications', methods=['GET', 'POST'])
 @login_required
-def save_notification_settings():
-    """Save notification settings"""
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'No data provided'}), 400
+def notification_settings():
+    """Get or save notification settings"""
+    from utils.permissions import get_user_organization
 
-    # Validate email if provided
-    if 'notification_email' in data:
-        email = data['notification_email']
-        if email and '@' not in email:
-            return jsonify({'error': 'Invalid email address'}), 400
+    org = get_user_organization()
+    if not org:
+        return jsonify({'error': 'Organization not found'}), 404
 
-    valid_frequencies = ['immediate', 'hourly', 'daily', 'weekly']
-    if 'digest_frequency' in data and data['digest_frequency'] not in valid_frequencies:
-        return jsonify({'error': 'Invalid digest frequency'}), 400
+    if request.method == 'GET':
+        # Get existing notification settings for the user
+        settings = EmailNotificationSettings.query.filter_by(
+            user_id=current_user.id,
+            organization_id=org.id
+        ).first()
 
-    return jsonify({'success': True, 'message': 'Notification settings saved successfully'})
+        if not settings:
+            # Return default settings
+            return jsonify({
+                'email_enabled': True,
+                'notification_email': current_user.email,
+                'additional_recipients': '',
+                'digest_frequency': 'daily',
+                'notify_new_vulnerabilities': True,
+                'notify_scan_completion': True,
+                'notify_new_assets': False,
+                'notify_user_activity': False,
+                'notify_reports': True,
+                'alert_thresholds': {
+                    'critical': True,
+                    'high': True,
+                    'medium': True,
+                    'low': False,
+                    'info': False
+                }
+            })
+
+        return jsonify({
+            'email_enabled': settings.notify_scan_completion or settings.notify_new_vulnerabilities,
+            'notification_email': settings.notification_email or current_user.email,
+            'additional_recipients': settings.additional_recipients or '',
+            'digest_frequency': settings.digest_frequency,
+            'notify_new_vulnerabilities': settings.notify_new_vulnerabilities,
+            'notify_scan_completion': settings.notify_scan_completion,
+            'notify_new_assets': settings.notify_new_assets,
+            'notify_user_activity': settings.notify_user_activity,
+            'notify_reports': settings.notify_reports,
+            'alert_thresholds': {
+                'critical': settings.alert_critical,
+                'high': settings.alert_high,
+                'medium': settings.alert_medium,
+                'low': settings.alert_low,
+                'info': settings.alert_info
+            }
+        })
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # Validate email if provided
+        if 'notification_email' in data:
+            email = data['notification_email']
+            if email and '@' not in email:
+                return jsonify({'error': 'Invalid email address'}), 400
+
+        valid_frequencies = ['immediate', 'hourly', 'daily', 'weekly']
+        if 'digest_frequency' in data and data['digest_frequency'] not in valid_frequencies:
+            return jsonify({'error': 'Invalid digest frequency'}), 400
+
+        try:
+            # Get or create notification settings
+            settings = EmailNotificationSettings.query.filter_by(
+                user_id=current_user.id,
+                organization_id=org.id
+            ).first()
+
+            if not settings:
+                settings = EmailNotificationSettings(
+                    user_id=current_user.id,
+                    organization_id=org.id
+                )
+                db.session.add(settings)
+
+            # Update settings
+            settings.notification_email = data.get('notification_email', current_user.email)
+            settings.additional_recipients = data.get('additional_recipients', '')
+            settings.digest_frequency = data.get('digest_frequency', 'daily')
+            settings.notify_new_vulnerabilities = data.get('notify_new_vulnerabilities', True)
+            settings.notify_scan_completion = data.get('notify_scan_completion', True)
+            settings.notify_new_assets = data.get('notify_new_assets', False)
+            settings.notify_user_activity = data.get('notify_user_activity', False)
+            settings.notify_reports = data.get('notify_reports', True)
+
+            # Update alert thresholds
+            alert_thresholds = data.get('alert_thresholds', {})
+            settings.alert_critical = alert_thresholds.get('critical', True)
+            settings.alert_high = alert_thresholds.get('high', True)
+            settings.alert_medium = alert_thresholds.get('medium', True)
+            settings.alert_low = alert_thresholds.get('low', False)
+            settings.alert_info = alert_thresholds.get('info', False)
+
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Notification settings saved successfully'})
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': f'Failed to save notification settings: {str(e)}'}), 500
 
 @api_bp.route('/settings/data-retention', methods=['POST'])
 @login_required

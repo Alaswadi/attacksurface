@@ -250,12 +250,23 @@ class EmailNotificationSettings(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     organization_id = db.Column(db.Integer, db.ForeignKey('organization.id'), nullable=False)
 
+    # Email settings
+    notification_email = db.Column(db.String(255))  # Override email for notifications
+    additional_recipients = db.Column(db.Text)  # Comma-separated additional emails
+
     # Notification preferences
     notify_new_vulnerabilities = db.Column(db.Boolean, default=True)
     notify_scan_completion = db.Column(db.Boolean, default=True)
     notify_new_assets = db.Column(db.Boolean, default=False)
     notify_user_activity = db.Column(db.Boolean, default=False)
     notify_reports = db.Column(db.Boolean, default=True)
+
+    # Alert severity thresholds
+    alert_critical = db.Column(db.Boolean, default=True)
+    alert_high = db.Column(db.Boolean, default=True)
+    alert_medium = db.Column(db.Boolean, default=True)
+    alert_low = db.Column(db.Boolean, default=False)
+    alert_info = db.Column(db.Boolean, default=False)
 
     # Digest settings
     digest_frequency = db.Column(db.String(20), default='daily')  # immediate, hourly, daily, weekly
