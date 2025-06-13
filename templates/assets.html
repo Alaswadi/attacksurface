@@ -1140,7 +1140,7 @@ function renderAssets(assets = assetsData) {
                             </div>
                         </div>
                         <div class="ml-4">
-                            <div class="text-sm font-medium text-white">${asset.name}</div>
+                            <div class="text-sm font-medium text-white">${getAssetNameDisplay(asset)}</div>
                             <div class="text-sm text-slate-400">${asset.description || 'No description'}</div>
                             ${getTechnologiesBadges(asset)}
                         </div>
@@ -1194,6 +1194,36 @@ function getAssetTypeIcon(type) {
         'service': 'ri-apps-line'
     };
     return icons[type] || 'ri-computer-line';
+}
+
+function getAssetNameDisplay(asset) {
+    // Only make domains and subdomains clickable
+    if (asset.type !== 'domain' && asset.type !== 'subdomain') {
+        return asset.name;
+    }
+
+    let url = '';
+
+    // Try to get URL from HTTP probe data
+    if (asset.asset_metadata && asset.asset_metadata.http_probe) {
+        const httpProbe = asset.asset_metadata.http_probe;
+
+        // Use the full URL if available
+        if (httpProbe.url) {
+            url = httpProbe.url;
+        } else if (httpProbe.scheme) {
+            // Construct URL from scheme and asset name
+            url = `${httpProbe.scheme}://${asset.name}`;
+        }
+    }
+
+    // Fallback: construct HTTPS URL if no probe data available
+    if (!url) {
+        url = `https://${asset.name}`;
+    }
+
+    // Return clickable link with proper styling and security attributes
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary hover:text-primary/80 hover:underline transition-colors duration-200" title="Open ${asset.name} in new tab">${asset.name}</a>`;
 }
 
 function getStatusBadge(asset) {

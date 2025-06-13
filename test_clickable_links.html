@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Clickable Links</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0f172a;
+            color: white;
+            padding: 20px;
+        }
+        .test-case {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #1e293b;
+            border-radius: 8px;
+        }
+        .text-primary {
+            color: #10b981;
+        }
+        .text-primary:hover {
+            color: #059669;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Clickable Links Implementation</h1>
+    
+    <div class="test-case">
+        <h3>Test Case 1: Subdomain with full HTTP probe data</h3>
+        <div id="test1"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 2: Domain with scheme only</h3>
+        <div id="test2"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 3: Asset without HTTP probe data (fallback)</h3>
+        <div id="test3"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 4: Non-domain asset (should not be clickable)</h3>
+        <div id="test4"></div>
+    </div>
+
+    <script>
+        // Copy the getAssetNameDisplay function from assets.html
+        function getAssetNameDisplay(asset) {
+            // Only make domains and subdomains clickable
+            if (asset.type !== 'domain' && asset.type !== 'subdomain') {
+                return asset.name;
+            }
+
+            let url = '';
+            
+            // Try to get URL from HTTP probe data
+            if (asset.asset_metadata && asset.asset_metadata.http_probe) {
+                const httpProbe = asset.asset_metadata.http_probe;
+                
+                // Use the full URL if available
+                if (httpProbe.url) {
+                    url = httpProbe.url;
+                } else if (httpProbe.scheme) {
+                    // Construct URL from scheme and asset name
+                    url = `${httpProbe.scheme}://${asset.name}`;
+                }
+            }
+            
+            // Fallback: construct HTTPS URL if no probe data available
+            if (!url) {
+                url = `https://${asset.name}`;
+            }
+            
+            // Return clickable link with proper styling and security attributes
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" 
+                       class="text-primary hover:text-primary/80 hover:underline transition-colors duration-200" 
+                       title="Open ${asset.name} in new tab">${asset.name}</a>`;
+        }
+
+        // Test cases
+        const testCases = [
+            {
+                id: 'test1',
+                asset: {
+                    name: 'api.example.com',
+                    type: 'subdomain',
+                    asset_metadata: {
+                        http_probe: {
+                            url: 'https://api.example.com',
+                            scheme: 'https',
+                            status_code: 200
+                        }
+                    }
+                }
+            },
+            {
+                id: 'test2',
+                asset: {
+                    name: 'example.com',
+                    type: 'domain',
+                    asset_metadata: {
+                        http_probe: {
+                            scheme: 'http',
+                            status_code: 200
+                        }
+                    }
+                }
+            },
+            {
+                id: 'test3',
+                asset: {
+                    name: 'test.example.com',
+                    type: 'subdomain',
+                    asset_metadata: {}
+                }
+            },
+            {
+                id: 'test4',
+                asset: {
+                    name: '192.168.1.1',
+                    type: 'ip_address',
+                    asset_metadata: {}
+                }
+            }
+        ];
+
+        // Run tests
+        testCases.forEach(testCase => {
+            const element = document.getElementById(testCase.id);
+            const result = getAssetNameDisplay(testCase.asset);
+            element.innerHTML = `<strong>Result:</strong> ${result}`;
+        });
+    </script>
+</body>
+</html>

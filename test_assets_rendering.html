@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Assets Rendering</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0f172a;
+            color: white;
+            padding: 20px;
+        }
+        .test-case {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #1e293b;
+            border-radius: 8px;
+        }
+        .text-primary {
+            color: #10b981;
+        }
+        .text-primary:hover {
+            color: #059669;
+            text-decoration: underline;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #374151;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Assets Table Rendering</h1>
+    
+    <div class="test-case">
+        <h3>Simulated Assets Table</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="test-table-body">
+                <!-- Will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Copy the exact functions from assets.html
+        function getAssetNameDisplay(asset) {
+            // Only make domains and subdomains clickable
+            if (asset.type !== 'domain' && asset.type !== 'subdomain') {
+                return asset.name;
+            }
+
+            let url = '';
+            
+            // Try to get URL from HTTP probe data
+            if (asset.asset_metadata && asset.asset_metadata.http_probe) {
+                const httpProbe = asset.asset_metadata.http_probe;
+                
+                // Use the full URL if available
+                if (httpProbe.url) {
+                    url = httpProbe.url;
+                } else if (httpProbe.scheme) {
+                    // Construct URL from scheme and asset name
+                    url = `${httpProbe.scheme}://${asset.name}`;
+                }
+            }
+            
+            // Fallback: construct HTTPS URL if no probe data available
+            if (!url) {
+                url = `https://${asset.name}`;
+            }
+            
+            // Return clickable link with proper styling and security attributes
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary hover:text-primary/80 hover:underline transition-colors duration-200" title="Open ${asset.name} in new tab">${asset.name}</a>`;
+        }
+
+        function getAssetTypeIcon(type) {
+            const icons = {
+                'domain': 'ri-global-line',
+                'subdomain': 'ri-links-line',
+                'ip_address': 'ri-server-line',
+                'cloud_resource': 'ri-cloud-line',
+                'service': 'ri-apps-line'
+            };
+            return icons[type] || 'ri-computer-line';
+        }
+
+        // Test data similar to what the real API returns
+        const testAssets = [
+            {
+                id: 1,
+                name: 'example.com',
+                type: 'domain',
+                description: 'Main domain',
+                asset_metadata: {
+                    http_probe: {
+                        url: 'https://example.com',
+                        scheme: 'https',
+                        status_code: 200
+                    }
+                }
+            },
+            {
+                id: 2,
+                name: 'api.example.com',
+                type: 'subdomain',
+                description: 'API subdomain',
+                asset_metadata: {
+                    http_probe: {
+                        url: 'https://api.example.com',
+                        scheme: 'https',
+                        status_code: 200
+                    }
+                }
+            },
+            {
+                id: 3,
+                name: 'test.example.com',
+                type: 'subdomain',
+                description: 'Test subdomain without URL',
+                asset_metadata: {
+                    http_probe: {
+                        scheme: 'http',
+                        status_code: 200
+                    }
+                }
+            },
+            {
+                id: 4,
+                name: 'old.example.com',
+                type: 'subdomain',
+                description: 'Subdomain without probe data',
+                asset_metadata: {}
+            },
+            {
+                id: 5,
+                name: '192.168.1.1',
+                type: 'ip_address',
+                description: 'IP address (should not be clickable)',
+                asset_metadata: {}
+            }
+        ];
+
+        // Render the test table using the same logic as the real assets page
+        function renderTestAssets() {
+            const tbody = document.getElementById('test-table-body');
+            
+            tbody.innerHTML = testAssets.map(asset => {
+                const typeIcon = getAssetTypeIcon(asset.type);
+                
+                return `
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center;">
+                                <div style="margin-right: 10px;">
+                                    <i class="${typeIcon}"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: bold;">${getAssetNameDisplay(asset)}</div>
+                                    <div style="color: #9ca3af; font-size: 0.875rem;">${asset.description || 'No description'}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${asset.type.replace('_', ' ').toUpperCase()}</td>
+                        <td>Active</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Run the test
+        renderTestAssets();
+        
+        console.log('Test completed. Check the table above for clickable links.');
+        console.log('Domain and subdomain names should be clickable links.');
+        console.log('IP addresses should remain as plain text.');
+    </script>
+</body>
+</html>
